@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -150,7 +151,7 @@ const FAQSection = () => {
                 Get personalized answers and create your wellness plan
               </p>
               <Button asChild className="bg-earth text-gold hover:bg-earth/90">
-                <a href="#booking">Book Now</a>
+                <Link to="/booking">Book Now</Link>
               </Button>
             </CardContent>
           </Card>

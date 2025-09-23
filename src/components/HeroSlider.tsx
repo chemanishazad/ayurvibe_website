@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -73,7 +74,7 @@ const HeroSlider = () => {
   };
 
   return (
-    <div className="relative h-screen overflow-hidden">
+  <div className="relative h-[90vh] min-h-[600px] sm:h-screen overflow-hidden">
       {/* Background Images */}
       {slides.map((slide, index) => (
         <div
@@ -102,11 +103,11 @@ const HeroSlider = () => {
             </div>
           </div>
           <div className="hidden md:flex space-x-6 lg:space-x-8">
-            <a href="#about" className="text-white hover:text-gold transition-colors">About</a>
-            <a href="#treatments" className="text-white hover:text-gold transition-colors">Treatments</a>
-            <a href="#dosha" className="text-white hover:text-gold transition-colors">Find Your Dosha</a>
-            <a href="#booking" className="text-white hover:text-gold transition-colors">Book Appointment</a>
-            <a href="#contact" className="text-white hover:text-gold transition-colors">Contact</a>
+            <Link to="/about" className="text-white hover:text-gold transition-colors">About</Link>
+            <Link to="/treatments" className="text-white hover:text-gold transition-colors">Treatments</Link>
+            <Link to="/dosha" className="text-white hover:text-gold transition-colors">Find Your Dosha</Link>
+            <Link to="/booking" className="text-white hover:text-gold transition-colors">Book Appointment</Link>
+            <Link to="/contact" className="text-white hover:text-gold transition-colors">Contact</Link>
           </div>
         </div>
       </nav>
@@ -125,14 +126,14 @@ const HeroSlider = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <Button asChild size="lg" className="bg-gold hover:bg-gold/90 text-earth px-8 py-4 text-lg">
-              <a href="#booking">
+              <Link to="/booking">
                 <Calendar className="mr-2 h-5 w-5" />
                 Book Consultation
-              </a>
+              </Link>
             </Button>
-            <Button variant="outline" size="lg" className="border-gold text-gold hover:bg-gold hover:text-earth px-8 py-4 text-lg bg-white/10 backdrop-blur-sm">
-              Learn More
-            </Button>
+            {/* <Button asChild variant="outline" size="lg" className="border-gold text-gold hover:bg-gold hover:text-earth px-8 py-4 text-lg bg-white/10 backdrop-blur-sm">
+              <Link to="/about">Learn More</Link>
+            </Button> */}
           </div>
         </div>
       </div>

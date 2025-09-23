@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+// (imports restored above after cleanup)
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,7 @@ import BackToTop from '@/components/BackToTop';
 import ProgressiveWebApp from '@/components/ProgressiveWebApp';
 import HeroSlider from '@/components/HeroSlider';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
 declare global {
@@ -42,7 +44,7 @@ import shirodharaImg from '@/assets/shirodhara-therapy.jpg';
 import herbsImg from '@/assets/ayurvedic-herbs.jpg';
 import doctorImg from '@/assets/ayurvedic-doctor.jpg';
 import hospitalImg from '@/assets/hospital-exterior.jpg';
-import logoNew from '@/assets/logo.png';
+import logo from '@/assets/logo.png';
 import drVaitheeshwari from '@/assets/dr-vaitheeshwari.jpg';
 
 const Index = () => {
@@ -268,7 +270,7 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-healing">
+  <div className="min-h-dvh bg-gradient-healing pb-10">
       <SmoothScroll />
       <BackToTop />
       <ProgressiveWebApp />
@@ -277,12 +279,12 @@ const Index = () => {
       <HeroSlider />
 
       {/* About Section */}
-      <section id="about" className="min-h-screen bg-cream flex items-center">
-        <div className="container mx-auto px-4 w-full">
+  <section id="about" className="bg-cream section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center">
             <div className="flex items-center justify-center mb-8">
               <Heart className="h-12 w-12 text-primary mr-4" />
-              <h2 className="text-4xl md:text-5xl font-bold text-foreground">Our Sacred Mission</h2>
+              <h2 className="font-bold text-foreground fluid-h2">Our Sacred Mission</h2>
             </div>
             
             <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
@@ -352,17 +354,17 @@ const Index = () => {
       </section>
 
       {/* Treatments Section */}
-      <section id="treatments" className="py-16 md:py-20 bg-background">
-        <div className="container mx-auto px-4">
+  <section id="treatments" className="bg-background section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Sacred Treatments</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Sacred Treatments</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Each treatment is a journey of transformation, carefully crafted to restore your natural harmony 
               and awaken your body's innate healing wisdom.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 md:gap-8">
             {treatments.map((treatment, index) => (
               <Card key={index} className="border-none shadow-soft bg-card hover:shadow-warm transition-all duration-300 hover:scale-105 overflow-hidden">
                 <div className="relative h-48 overflow-hidden">
@@ -410,7 +412,7 @@ const Index = () => {
                   
                   <div className="flex gap-2 pt-2">
                     <Button asChild className="flex-1 bg-primary hover:bg-primary/90" size="sm">
-                      <a href="#booking">Book Now</a>
+                      <Link to="/booking">Book Now</Link>
                     </Button>
                     <Button 
                       variant="outline" 
@@ -463,7 +465,7 @@ const Index = () => {
                     </div>
                     <div className="flex gap-2 pt-2">
                       <Button asChild className="flex-1 bg-primary hover:bg-primary/90">
-                        <a href="#booking" onClick={() => setDetailsOpen(false)}>Book Now</a>
+                        <Link to="/booking" onClick={() => setDetailsOpen(false)}>Book Now</Link>
                       </Button>
                       <Button 
                         variant="outline" 
@@ -482,10 +484,10 @@ const Index = () => {
       </section>
 
       {/* Interactive Body Map Section */}
-      <section className="py-20 bg-cream">
-        <div className="container mx-auto px-4">
+  <section id="body-map" className="bg-cream section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Targeted Healing Solutions</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Targeted Healing Solutions</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Explore our interactive treatment map to discover personalized Ayurvedic solutions 
               for different areas of your body and specific health concerns.
@@ -496,10 +498,10 @@ const Index = () => {
       </section>
 
       {/* Treatment Comparison Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
+  <section id="comparison" className="bg-background section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Compare Our Treatments</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Compare Our Treatments</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Not sure which treatment is right for you? Use our comparison tool to explore 
               different therapies and find the perfect match for your wellness goals.
@@ -510,10 +512,10 @@ const Index = () => {
       </section>
 
       {/* Our Expert Practitioner Section */}
-      <section id="doctors" className="py-20 bg-cream">
-        <div className="container mx-auto px-4">
+  <section id="doctors" className="bg-cream section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Our Expert Practitioner</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Our Expert Practitioner</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Meet our experienced Ayurvedic doctor who combines ancient wisdom with modern medical expertise 
               to guide you on your healing journey.
@@ -539,7 +541,7 @@ const Index = () => {
                   <span className="text-sm text-muted-foreground">3 Years Experience</span>
                 </div>
                 <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                  <a href="#booking">Book Consultation</a>
+                  <Link to="/booking">Book Consultation</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -548,10 +550,10 @@ const Index = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-16 md:py-20 bg-gradient-earth text-white">
-        <div className="container mx-auto px-4">
+  <section id="testimonials" className="bg-gradient-earth text-white section-spacing full-bleed">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Healing Stories</h2>
+            <h2 className="font-bold mb-6 fluid-h2">Healing Stories</h2>
             <p className="text-xl text-white/90 max-w-3xl mx-auto">
               Real stories from our patients who found healing and transformation through Ayurveda.
             </p>
@@ -614,10 +616,10 @@ const Index = () => {
       </section>
 
       {/* Why Choose Us Section */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4">
+  <section id="why" className="bg-background section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Why Choose Ayurveda Hospital</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Why Choose Ayurveda Hospital</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Experience the perfect blend of ancient wisdom and modern facilities in your healing journey.
             </p>
@@ -625,10 +627,10 @@ const Index = () => {
 
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div className="relative">
-              <img 
-                src={hospitalImg} 
+              <img
+                src={hospitalImg}
                 alt="Ayurveda Hospital"
-                className="w-full h-96 object-cover rounded-2xl shadow-warm"
+                className="w-full h-64 md:h-80 lg:h-96 object-cover rounded-2xl shadow-warm"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent rounded-2xl"></div>
             </div>
@@ -679,10 +681,10 @@ const Index = () => {
       </section>
 
       {/* Find Your Dosha Section */}
-      <section id="dosha" className="py-20 bg-gradient-healing">
-        <div className="container mx-auto px-4">
+  <section id="dosha" className="bg-gradient-healing section-spacing full-bleed">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Discover Your Dosha</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Discover Your Dosha</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Understanding your constitutional type is the first step toward personalized healing. 
               Explore the three doshas and find your path to balance.
@@ -743,25 +745,25 @@ const Index = () => {
       </section>
 
       {/* Wellness Blog Section */}
-      <section id="blog" className="py-20 bg-background" aria-labelledby="blog-heading">
-        <div className="container mx-auto px-4">
+  <section id="blog" className="bg-background section-spacing" aria-labelledby="blog-heading">
+  <div className="wide-wrapper">
           <h2 id="blog-heading" className="sr-only">Wellness Blog</h2>
           <WellnessBlog />
         </div>
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 bg-cream">
-        <div className="container mx-auto px-4">
+  <section id="faq" className="bg-cream section-spacing">
+  <div className="wide-wrapper">
           <FAQSection />
         </div>
       </section>
 
       {/* Booking Section with Map */}
-      <section id="booking" className="py-20 bg-background">
-        <div className="container mx-auto px-4">
+  <section id="booking" className="bg-background section-spacing">
+  <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Book Your Healing Journey</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Book Your Healing Journey</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Begin your transformation today. Schedule a consultation with our expert practitioners 
               and discover the perfect treatment plan for your unique constitution.
@@ -881,13 +883,13 @@ const Index = () => {
       <LiveChat />
 
       {/* Footer */}
-      <footer id="contact" className="bg-earth text-primary-foreground py-16">
-        <div className="container mx-auto px-4">
+  <footer id="contact" className="bg-earth text-primary-foreground section-spacing">
+  <div className="wide-wrapper">
           <div className="grid md:grid-cols-3 gap-12 mb-12">
             <div>
-              <div className="flex items-center space-x-2 mb-6">
-                <img src={logoNew} alt="Sri Vinayaga Ayurvibe Logo" className="h-8 w-8" />
-                <span className="text-2xl font-bold">Sri Vinayaga Ayurvibe</span>
+              <div className="flex items-center space-x-3 mb-6">
+                  <img src={logo} alt="Sri Vinayaga Ayurvibe Logo" className="h-10 w-10 object-contain" loading="lazy" />
+                  <span className="text-2xl font-bold tracking-wide">Sri Vinayaga Ayurvibe</span>
               </div>
               <p className="text-primary-foreground/80 leading-relaxed mb-2">
                 Dr. Vaitheeshwari BAMS

@@ -121,9 +121,25 @@ All colors MUST be HSL.
     @apply bg-background text-foreground overflow-x-hidden;
   }
 
+  #root {
+    overflow-x: hidden;
+  }
+
+  /* Wider container for large desktop screens */
+  .container {
+    max-width: 100%; /* default fluid */
+  }
+  @media (min-width: 640px) { .container { max-width: 640px; } }
+  @media (min-width: 768px) { .container { max-width: 768px; } }
+  @media (min-width: 1024px) { .container { max-width: 1024px; } }
+  @media (min-width: 1280px) { .container { max-width: 1280px; } }
+  @media (min-width: 1536px) { .container { max-width: 1440px; } }
+  @media (min-width: 1800px) { .container { max-width: 1600px; } }
+
   img, video, svg, canvas, iframe {
     max-width: 100%;
     height: auto;
+    display: block;
   }
 }
 
@@ -132,6 +148,53 @@ All colors MUST be HSL.
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+
+/* Fluid responsive typography scale */
+:root {
+  --step--2: clamp(0.69rem, 0.72rem + -0.05vw, 0.7rem);
+  --step--1: clamp(0.83rem, 0.8rem + 0.1vw, 0.88rem);
+  --step-0: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.6vw, 1.5rem);
+  --step-2: clamp(1.56rem, 1.4rem + 0.9vw, 1.9rem);
+  --step-3: clamp(1.95rem, 1.75rem + 1.2vw, 2.4rem);
+  --step-4: clamp(2.44rem, 2.1rem + 1.7vw, 3rem);
+  --step-5: clamp(3.05rem, 2.6rem + 2.2vw, 3.75rem);
+}
+
+.fluid-h1 { font-size: var(--step-4); line-height: 1.1; }
+.fluid-h2 { font-size: var(--step-3); line-height: 1.15; }
+.fluid-h3 { font-size: var(--step-2); line-height: 1.2; }
+.fluid-lead { font-size: var(--step-1); }
+
+/* Safe area helpers */
+.safe-px { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+.safe-pt { padding-top: max(1rem, env(safe-area-inset-top)); }
+.safe-pb { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+@media (max-width: 420px) {
+  .marquee-track .min-w-\[280px\] { min-width: 240px !important; }
+}
+
+/* Full bleed section utility (background spans viewport edges while content stays in container) */
+.full-bleed {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+}
+
+/* Consistent vertical rhythm helpers */
+.section-spacing { padding-top: 4rem; padding-bottom: 4rem; }
+@media (min-width: 640px) { .section-spacing { padding-top: 5rem; padding-bottom: 5rem; } }
+@media (min-width: 1024px) { .section-spacing { padding-top: 6rem; padding-bottom: 6rem; } }
+
+/* Wide wrapper: full fluid width with responsive horizontal padding */
+.wide-wrapper { width:100%; margin-left:auto; margin-right:auto; padding-left:1rem; padding-right:1rem; }
+@media (min-width: 1280px) { .wide-wrapper { padding-left:3rem; padding-right:3rem; } }
+@media (min-width: 1536px) { .wide-wrapper { padding-left:4rem; padding-right:4rem; } }
+@media (min-width: 1800px) { .wide-wrapper { padding-left:5rem; padding-right:5rem; } }
 
 .marquee-track {
   display: flex;

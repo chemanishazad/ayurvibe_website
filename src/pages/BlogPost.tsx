@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
+import SEO from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -213,8 +214,24 @@ const BlogPost = () => {
     }
   };
 
+  const canonicalSlug = currentPost.title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+
   return (
     <div className="min-h-screen bg-gradient-healing">
+      <SEO 
+        title={`${currentPost.title} | Sri Vinayaga Ayurvibe Blog`} 
+        description={currentPost.excerpt} 
+        canonical={`https://svayurvibe.com/blog/${currentPost.id}/${canonicalSlug}`} 
+        image={currentPost.image}
+        type="article"
+        authorName={currentPost.author}
+        publishedTime={new Date(currentPost.date).toISOString()}
+        modifiedTime={new Date(currentPost.date).toISOString()}
+      />
       {/* Header with Logo and Navigation */}
       <header className="bg-white/95 backdrop-blur-sm border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">

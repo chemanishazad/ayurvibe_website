@@ -12,3 +12,9 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# Crawl-delay can be added if server strain appears (Firebase CDN handles scale).
+# Disallow sensitive (none currently):
+# Disallow: /admin
+
+Sitemap: https://svayurvibe.com/sitemap.xml

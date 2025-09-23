@@ -35,12 +35,12 @@ const LiveChat = () => {
   ];
 
   const botResponses = {
-    'book an appointment': 'I\'d be happy to help you book an appointment! Please call us at +91 98765 43210 or fill out our online booking form. What type of treatment are you interested in?',
+    'book an appointment': 'I\'d be happy to help you book an appointment! Please call us at 8122939197 or fill out our online booking form. What type of treatment are you interested in?',
     'treatment information': 'We offer various Ayurvedic treatments including Panchakarma, Abhyanga, Shirodhara, and more. Would you like details about a specific treatment?',
     'doctor consultation': 'Our experienced Ayurvedic doctors are available for consultations. Dr. Priya Sharma specializes in Panchakarma, Dr. Rajesh Kumar in chronic diseases, and Dr. Anita Gupta in digestive disorders. Which would you prefer?',
     'location & hours': 'We\'re located at Old Mahabalipuram Road, Sholinganallur, Chennai 600119. Our hours are Monday-Sunday 8:00 AM - 7:00 PM. Emergency consultations are available 24/7.',
-    'insurance questions': 'We accept most major insurance plans. Please bring your insurance card to your appointment. For specific coverage questions, please call our billing department at +91 98765 43210.',
-    'default': 'Thank you for your message. For immediate assistance, please call us at +91 98765 43210 or email info@ayurvedahospital.com. One of our team members will get back to you shortly!'
+    'insurance questions': 'We accept most major insurance plans. Please bring your insurance card to your appointment. For specific coverage questions, please call our billing department at 8122939197.',
+    'default': 'Thank you for your message. For immediate assistance, please call us at 8122939197 or email info@ayurvedahospital.com. One of our team members will get back to you shortly!'
   };
 
   useEffect(() => {
@@ -98,7 +98,7 @@ const LiveChat = () => {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 xs:bottom-5 xs:right-5 sm:bottom-6 sm:right-6 z-50 max-w-[calc(100vw-2rem)]">
         <Button
           onClick={() => setIsOpen(true)}
           className="rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-300 bg-primary hover:bg-primary/90"
@@ -113,8 +113,8 @@ const LiveChat = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <Card className="w-80 h-96 shadow-2xl border-none bg-card">
+    <div className="fixed bottom-2 right-2 xs:bottom-3 xs:right-3 sm:bottom-4 sm:right-4 z-50 w-full pointer-events-none flex justify-end pr-2">
+      <Card className="pointer-events-auto w-[90vw] max-w-[20rem] sm:max-w-[22rem] h-[26rem] sm:h-96 shadow-2xl border-none bg-card flex flex-col">
         <CardHeader className="bg-primary text-primary-foreground p-4 rounded-t-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -122,7 +122,7 @@ const LiveChat = () => {
                 <Bot className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-sm">Ayurveda Support</CardTitle>
+                <CardTitle className="text-sm">Ayurvibe Support</CardTitle>
                 <p className="text-xs opacity-90">Usually replies instantly</p>
               </div>
             </div>
@@ -137,9 +137,9 @@ const LiveChat = () => {
           </div>
         </CardHeader>
 
-        <CardContent className="p-0 flex flex-col h-80">
+  <CardContent className="p-0 flex flex-col flex-1 min-h-0">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -212,7 +212,7 @@ const LiveChat = () => {
             <div className="flex items-center justify-center space-x-4 mt-2 text-xs text-muted-foreground">
               <div className="flex items-center">
                 <Phone className="h-3 w-3 mr-1" />
-                +91 98765 43210
+                8122939197
               </div>
               <div className="flex items-center">
                 <Mail className="h-3 w-3 mr-1" />
