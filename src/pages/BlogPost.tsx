@@ -13,7 +13,7 @@ import morningRitualsImg from '@/assets/morning-rituals-blog.jpg';
 import meditationImg from '@/assets/meditation-blog.jpg';
 import nutritionImg from '@/assets/nutrition-blog.jpg';
 import abhyangaBlogImg from '@/assets/abhyanga-blog.jpg';
-import logo from '@/assets/logo.png';
+import { Logo, logoPath } from '@/components/Logo';
 
 const BlogPost = () => {
   const { id } = useParams();
@@ -226,7 +226,7 @@ const BlogPost = () => {
         title={`${currentPost.title} | Sri Vinayaga Ayurvibe Blog`} 
         description={currentPost.excerpt} 
         canonical={`https://svayurvibe.com/blog/${currentPost.id}/${canonicalSlug}`} 
-        image={currentPost.image}
+        image={currentPost.image || logoPath}
         type="article"
         authorName={currentPost.author}
         publishedTime={new Date(currentPost.date).toISOString()}
@@ -237,11 +237,7 @@ const BlogPost = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center space-x-3">
-              <img src={logo} alt="Sri Vinayaga Ayurvibe Logo" className="h-12 w-12" />
-              <div>
-                <h1 className="text-xl font-bold text-primary">Sri Vinayaga Ayurvibe</h1>
-                <p className="text-sm text-muted-foreground">Dr. Vaitheeshwari BAMS</p>
-              </div>
+              <Logo className="h-12 w-auto" withText textClassName="" subtitleText="Dr. Vaitheeshwari BAMS" />
             </Link>
             <Button asChild variant="outline">
               <Link to="/">

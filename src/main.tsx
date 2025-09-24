@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import appLogo from '@/assets/logo.png';
+import { logoPath as appLogo } from '@/components/Logo';
 
 // Dynamically replace any existing favicon & apple touch icon with our app logo
 const ensureFavicon = () => {

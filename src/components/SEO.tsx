@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { logoPath } from '@/components/Logo';
 
 interface SEOProps {
   title?: string;
@@ -20,7 +21,7 @@ export const SEO = ({
   title,
   description,
   canonical,
-  image = '/logo.png',
+  image = logoPath,
   robots,
   type = 'website',
   publishedTime,
@@ -62,19 +63,24 @@ export const SEO = ({
       el.content = content;
     };
 
+    // Normalize image to absolute URL for social crawlers
+    const resolvedImage = image
+      ? (image.startsWith('http') ? image : `${window.location.origin}${image.startsWith('/') ? image : '/' + image}`)
+      : undefined;
+
     // Basic meta
     setMeta('description', description);
     setMeta('robots', noIndex ? 'noindex,nofollow' : robots || 'index,follow');
-    setMeta('twitter:card', image ? 'summary_large_image' : 'summary');
+  setMeta('twitter:card', resolvedImage ? 'summary_large_image' : 'summary');
     setMeta('twitter:title', title);
     setMeta('twitter:description', description);
-    if (image) setMeta('twitter:image', image);
+  if (resolvedImage) setMeta('twitter:image', resolvedImage);
 
     // Open Graph
     setProperty('og:type', type);
     setProperty('og:title', title);
     setProperty('og:description', description);
-    setProperty('og:image', image);
+  if (resolvedImage) setProperty('og:image', resolvedImage);
     setProperty('og:site_name', siteName);
     if (canonical) setProperty('og:url', canonical);
 
@@ -113,7 +119,7 @@ export const SEO = ({
         '@type': 'Article',
         'headline': title,
         'description': description,
-        'image': image ? [image] : undefined,
+  'image': resolvedImage ? [resolvedImage] : undefined,
         'author': authorName ? { '@type': 'Person', 'name': authorName } : undefined,
         'datePublished': publishedTime,
         'dateModified': modifiedTime || publishedTime,

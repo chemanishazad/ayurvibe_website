@@ -18,3 +18,4 @@ Allow: /
 # Disallow: /admin
 
 Sitemap: https://svayurvibe.com/sitemap.xml
+Sitemap: https://svayurvibe.com/sitemap_index.xml

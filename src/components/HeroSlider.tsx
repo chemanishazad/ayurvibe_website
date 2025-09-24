@@ -10,7 +10,7 @@ import abhyangaImg from '@/assets/abhyanga-massage.jpg';
 import shirodharaImg from '@/assets/shirodhara-therapy.jpg';
 import herbsImg from '@/assets/ayurvedic-herbs.jpg';
 import hospitalImg from '@/assets/hospital-exterior.jpg';
-import logoNew from '@/assets/logo.png';
+import { Logo } from '@/components/Logo';
 
 const slides = [
   {
@@ -96,12 +96,7 @@ const HeroSlider = () => {
       {/* Navigation */}
       <nav className="relative z-20 container mx-auto px-4 py-4 md:py-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <img src={logoNew} alt="Sri Vinayaga Ayurvibe Logo" className="h-16 md:h-20 w-auto drop-shadow-lg" />
-            <div className="hidden sm:block">
-              <span className="text-xl md:text-2xl font-bold text-white">Sri Vinayaga Ayurvibe</span>
-            </div>
-          </div>
+          <Logo className="h-16 md:h-20 w-auto drop-shadow-lg" withText textClassName="hidden sm:block text-white" subtitleText="Holistic Ayurveda" />
           <div className="hidden md:flex space-x-6 lg:space-x-8">
             <Link to="/about" className="text-white hover:text-gold transition-colors">About</Link>
             <Link to="/treatments" className="text-white hover:text-gold transition-colors">Treatments</Link>

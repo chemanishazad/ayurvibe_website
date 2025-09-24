@@ -1,8 +1,9 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import BlogPost from "./pages/BlogPost";
@@ -11,12 +12,37 @@ import SEO from "@/components/SEO";
 
 const queryClient = new QueryClient();
 
+// Listens to route changes for SPA page_view tracking
+const AnalyticsListener = () => {
+  const location = useLocation();
+  // fire page_view when location changes
+  React.useEffect(() => {
+    // Respect availability & user consent (Cookiebot defines window.Cookiebot when loaded)
+    const sendPageView = () => {
+      // @ts-ignore
+      if (window.gtag && (!window.Cookiebot || window.Cookiebot.consent.statistics)) {
+        // @ts-ignore
+        window.gtag('event', 'page_view', {
+          page_path: location.pathname + location.search,
+          page_location: window.location.href,
+          page_title: document.title
+        });
+      }
+    };
+    // Delay slightly to allow dynamic title/SEO component updates
+    const timeout = setTimeout(sendPageView, 100);
+    return () => clearTimeout(timeout);
+  }, [location]);
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AnalyticsListener />
         <Routes>
           {/* Root */}
           <Route 

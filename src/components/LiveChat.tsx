@@ -216,7 +216,7 @@ const LiveChat = () => {
               </div>
               <div className="flex items-center">
                 <Mail className="h-3 w-3 mr-1" />
-                Support
+                sv.ayurvibe@gmail.com
               </div>
             </div>
           </div>

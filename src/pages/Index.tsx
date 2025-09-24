@@ -44,7 +44,7 @@ import shirodharaImg from '@/assets/shirodhara-therapy.jpg';
 import herbsImg from '@/assets/ayurvedic-herbs.jpg';
 import doctorImg from '@/assets/ayurvedic-doctor.jpg';
 import hospitalImg from '@/assets/hospital-exterior.jpg';
-import logo from '@/assets/logo.png';
+import { Logo } from '@/components/Logo';
 import drVaitheeshwari from '@/assets/dr-vaitheeshwari.jpg';
 
 const Index = () => {
@@ -887,10 +887,9 @@ const Index = () => {
   <div className="wide-wrapper">
           <div className="grid md:grid-cols-3 gap-12 mb-12">
             <div>
-              <div className="flex items-center space-x-3 mb-6">
-                  <img src={logo} alt="Sri Vinayaga Ayurvibe Logo" className="h-10 w-10 object-contain" loading="lazy" />
-                  <span className="text-2xl font-bold tracking-wide">Sri Vinayaga Ayurvibe</span>
-              </div>
+        <div className="flex items-center space-x-3 mb-6">
+          <Logo className="h-10 w-auto object-contain" withText textClassName="" subtitleText="Ayurveda Wellness" />
+        </div>
               <p className="text-primary-foreground/80 leading-relaxed mb-2">
                 Dr. Vaitheeshwari BAMS
               </p>
@@ -944,7 +943,7 @@ const Index = () => {
               </div>
               <Separator className="my-6 bg-primary-foreground/20" />
               <p className="text-sm text-primary-foreground/70">
-                Emergency consultations available 24/7
+                Government Certified Ayurveda Hospital
               </p>
             </div>
 
@@ -954,7 +953,7 @@ const Index = () => {
           
           <div className="text-center">
             <p className="text-primary-foreground/70">
-              © 2024 Sri Vinayaga Ayurvibe. All rights reserved. • Healing with love, wisdom, and compassion.
+              © 2025 Sri Vinayaga Ayurvibe. All rights reserved. • Healing with love, wisdom, and compassion.
             </p>
           </div>
         </div>
