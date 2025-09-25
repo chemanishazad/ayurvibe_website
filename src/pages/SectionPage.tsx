@@ -25,7 +25,12 @@ const SectionPage = ({ sectionId, title, description, canonical }: SectionPagePr
 
   return (
     <>
-      <SEO title={title} description={description} canonical={canonical} />
+      <SEO 
+        title={title} 
+        description={description} 
+        canonical={canonical}
+        locationKeywords={['Perumbakkam', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai']}
+      />
       <Index />
     </>
   );

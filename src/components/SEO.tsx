@@ -14,6 +14,7 @@ interface SEOProps {
   siteName?: string;
   noIndex?: boolean;
   jsonLd?: Record<string, any> | Record<string, any>[]; // allow custom injection
+  locationKeywords?: string[]; // Add location-specific keywords
 }
 
 // Enhanced client-side SEO helper. For maximal SEO consider SSR or prerender.
@@ -29,7 +30,8 @@ export const SEO = ({
   authorName,
   siteName = 'Sri Vinayaga Ayurvibe',
   noIndex,
-  jsonLd
+  jsonLd,
+  locationKeywords = ['Perumbakkam', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai']
 }: SEOProps) => {
   useEffect(() => {
     const doc = document;
@@ -71,6 +73,33 @@ export const SEO = ({
     // Basic meta
     setMeta('description', description);
     setMeta('robots', noIndex ? 'noindex,nofollow' : robots || 'index,follow');
+    
+    // Add comprehensive location-specific keywords
+    if (locationKeywords && locationKeywords.length > 0) {
+      const baseKeywords = [
+        'Ayurveda hospital Chennai', 'best Ayurveda clinic Chennai', 'top Ayurveda center Chennai',
+        'Panchakarma treatment Chennai', 'Abhyanga massage Chennai', 'Shirodhara therapy Chennai',
+        'Dr Vaitheeshwari Ayurveda doctor', 'BAMS doctor Chennai', 'Ayurvedic doctor Chennai',
+        'detox treatment Chennai', 'holistic wellness Chennai', 'traditional medicine Chennai',
+        'Ayurvedic medicine Chennai', 'alternative medicine Chennai', 'wellness therapy Chennai',
+        'stress management Chennai', 'chronic disease management Chennai', 'women health Chennai',
+        'digestive disorders Chennai', 'skin health Chennai', 'mental health Chennai',
+        'government certified Ayurveda hospital', 'authentic Ayurveda treatment Chennai',
+        'Ayurvedic detox Chennai', 'rejuvenation therapy Chennai', 'herbal medicine Chennai'
+      ];
+      
+      const locationSpecificKeywords = locationKeywords.flatMap(loc => [
+        `Ayurveda hospital ${loc}`, `Ayurveda clinic ${loc}`, `best Ayurveda ${loc}`,
+        `Panchakarma ${loc}`, `Abhyanga ${loc}`, `Shirodhara ${loc}`,
+        `detox treatment ${loc}`, `Ayurvedic doctor ${loc}`, `wellness center ${loc}`,
+        `traditional medicine ${loc}`, `holistic health ${loc}`, `Ayurvedic treatment ${loc}`,
+        `near ${loc}`, `in ${loc}`, `${loc} Ayurveda`, `${loc} Panchakarma`,
+        `${loc} Abhyanga`, `${loc} Shirodhara`, `${loc} detox`, `${loc} wellness`
+      ]);
+      
+      const allKeywords = [...baseKeywords, ...locationSpecificKeywords].join(', ');
+      setMeta('keywords', allKeywords);
+    }
   setMeta('twitter:card', resolvedImage ? 'summary_large_image' : 'summary');
     setMeta('twitter:title', title);
     setMeta('twitter:description', description);

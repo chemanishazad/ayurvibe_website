@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 // (imports restored above after cleanup)
 import { Button } from '@/components/ui/button';
+import SEO from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -271,6 +272,64 @@ const Index = () => {
 
   return (
   <div className="min-h-dvh bg-gradient-healing pb-10">
+      <SEO 
+        title="Sri Vinayaga Ayurvibe — #1 Best Ayurveda Hospital in Chennai | Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram | Dr. Vaitheeshwari BAMS"
+        description="🏆 #1 Best Ayurveda Hospital in Chennai! Sri Vinayaga Ayurvibe offers authentic Panchakarma, Abhyanga, Shirodhara treatments. Serving Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram. Expert care by Dr. Vaitheeshwari BAMS. Government certified. Book now!"
+        canonical="https://svayurvibe.com/"
+        locationKeywords={['Perumbakkam', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai', 'Chennai Ayurveda', 'Best Ayurveda Chennai', 'Top Ayurveda Chennai']}
+        jsonLd={[
+          {
+            "@type": "MedicalBusiness",
+            "name": "Sri Vinayaga Ayurvibe",
+            "description": "Premier Ayurveda hospital in Chennai offering comprehensive Panchakarma, Abhyanga, Shirodhara treatments and holistic wellness care.",
+            "areaServed": [
+              {"@type": "City", "name": "Perumbakkam"},
+              {"@type": "City", "name": "OMR Chennai"},
+              {"@type": "City", "name": "Sholinganallur"},
+              {"@type": "City", "name": "Pallikaranai"},
+              {"@type": "City", "name": "Navalur"},
+              {"@type": "City", "name": "Kelambakkam"},
+              {"@type": "City", "name": "Tambaram"},
+              {"@type": "City", "name": "Chennai"}
+            ],
+            "medicalSpecialty": ["Ayurveda", "Panchakarma", "Abhyanga Massage", "Shirodhara Therapy", "Detox Treatment", "Holistic Wellness"]
+          },
+          {
+            "@type": "Review",
+            "itemReviewed": {
+              "@type": "MedicalBusiness",
+              "name": "Sri Vinayaga Ayurvibe"
+            },
+            "reviewRating": {
+              "@type": "Rating",
+              "ratingValue": "5",
+              "bestRating": "5"
+            },
+            "author": {
+              "@type": "Person",
+              "name": "Ananya Sharma"
+            },
+            "reviewBody": "After my 14-day Panchakarma program, I feel like a completely new person. The stress that had been weighing me down for years is gone, and I have energy I haven't felt in decades."
+          },
+          {
+            "@type": "Review",
+            "itemReviewed": {
+              "@type": "MedicalBusiness",
+              "name": "Sri Vinayaga Ayurvibe"
+            },
+            "reviewRating": {
+              "@type": "Rating",
+              "ratingValue": "5",
+              "bestRating": "5"
+            },
+            "author": {
+              "@type": "Person",
+              "name": "Priyanka Iyer"
+            },
+            "reviewBody": "The personalized treatment plan and herbal medicines completely transformed my digestive health. I'm finally able to enjoy food again without discomfort."
+          }
+        ]}
+      />
       <SmoothScroll />
       <BackToTop />
       <ProgressiveWebApp />
@@ -290,14 +349,15 @@ const Index = () => {
             <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
               <div className="space-y-6 text-left">
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  In the gentle embrace of nature's wisdom, our hospital stands as a beacon of hope and healing. 
-                  We honor the ancient science of Ayurveda, where every herb whispers secrets of wellness, 
-                  and every treatment is a dance between mind, body, and spirit.
+                  🏆 <strong>Sri Vinayaga Ayurvibe</strong> is Chennai's #1 best Ayurveda hospital, strategically located in Perumbakkam to serve the entire Chennai region. 
+                  We are the premier destination for authentic Panchakarma, Abhyanga massage, and Shirodhara therapy. 
+                  Our hospital proudly serves patients from OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram, and surrounding Chennai areas with world-class Ayurvedic treatments.
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Our practitioners, trained in the timeless traditions yet equipped with modern understanding, 
-                  guide each soul on their unique path to balance. Here, healing is not just medicine—it is an art, 
-                  a poetry written in the language of restoration.
+                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital combines ancient wisdom with modern facilities. 
+                  We offer comprehensive detox treatments, holistic wellness programs, and personalized care plans. 
+                  Whether you're seeking Panchakarma detox in Pallikaranai, Abhyanga massage near OMR, or Shirodhara therapy in Kelambakkam, 
+                  we provide the best Ayurvedic treatments in Chennai with authentic traditional methods.
                 </p>
               </div>
               <div className="bg-gradient-gold rounded-2xl p-8 shadow-warm">
@@ -357,10 +417,11 @@ const Index = () => {
   <section id="treatments" className="bg-background section-spacing">
   <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Sacred Treatments</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">🏆 Best Ayurvedic Treatments in Chennai</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Each treatment is a journey of transformation, carefully crafted to restore your natural harmony 
-              and awaken your body's innate healing wisdom.
+              Experience Chennai's most authentic Ayurvedic treatments at Sri Vinayaga Ayurvibe. 
+              Our comprehensive Panchakarma, Abhyanga massage, and Shirodhara therapy programs are designed for complete wellness. 
+              Serving Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, and Tambaram areas with expert care by Dr. Vaitheeshwari BAMS.
             </p>
           </div>
           
@@ -515,10 +576,11 @@ const Index = () => {
   <section id="doctors" className="bg-cream section-spacing">
   <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Our Expert Practitioner</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">👩‍⚕️ Dr. Vaitheeshwari BAMS - Best Ayurveda Doctor in Chennai</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Meet our experienced Ayurvedic doctor who combines ancient wisdom with modern medical expertise 
-              to guide you on your healing journey.
+              Meet <strong>Dr. Vaitheeshwari BAMS</strong>, Chennai's leading Ayurveda doctor specializing in Panchakarma and Women's Health. 
+              With 3+ years of experience, she provides authentic Ayurvedic treatments for patients from Perumbakkam, OMR, Sholinganallur, 
+              Pallikaranai, Navalur, Kelambakkam, and Tambaram areas.
             </p>
           </div>
 
@@ -897,8 +959,9 @@ const Index = () => {
                 Reg No: 2095
               </p>
               <p className="text-primary-foreground/80 leading-relaxed mb-6">
-                A sanctuary of healing where ancient wisdom meets modern care. 
-                Your journey to wellness begins here.
+                🏆 <strong>Chennai's #1 Best Ayurveda Hospital!</strong> Sri Vinayaga Ayurvibe is your premier destination for authentic Ayurvedic treatments. 
+                We serve patients from Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram, and all Chennai areas. 
+                Experience world-class Panchakarma, Abhyanga massage, and Shirodhara therapy with Dr. Vaitheeshwari BAMS.
               </p>
               
             </div>

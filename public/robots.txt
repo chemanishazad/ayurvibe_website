@@ -1,8 +1,10 @@
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -10,8 +12,35 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
 User-agent: *
 Allow: /
+
+# High priority pages for crawling
+Allow: /best-ayurveda-hospital-chennai
+Allow: /top-ayurveda-clinic-chennai
+Allow: /dr-vaitheeshwari-ayurveda-doctor-chennai
+Allow: /government-certified-ayurveda-hospital-chennai
+Allow: /authentic-panchakarma-treatment-chennai
+Allow: /best-abhyanga-massage-chennai
+Allow: /shirodhara-therapy-chennai
+Allow: /ayurvedic-detox-treatment-chennai
+Allow: /holistic-wellness-center-chennai
+Allow: /traditional-medicine-chennai
+
+# Location-specific pages
+Allow: /ayurveda-hospital-perumbakkam-chennai
+Allow: /ayurveda-clinic-omr-chennai
+Allow: /ayurveda-treatment-sholinganallur-chennai
+Allow: /panchakarma-pallikaranai-chennai
+Allow: /abhyanga-massage-navalur-chennai
+Allow: /shirodhara-therapy-kelambakkam-chennai
+Allow: /ayurveda-doctor-tambaram-chennai
 
 # Crawl-delay can be added if server strain appears (Firebase CDN handles scale).
 # Disallow sensitive (none currently):
