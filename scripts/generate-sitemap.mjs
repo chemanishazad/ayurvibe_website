@@ -31,6 +31,39 @@ const writeXmlFile = (dir, name, xml) => {
 // Canonical static pages
 const staticPages = [
   { loc: '/', priority: '1.0', changefreq: 'daily' },
+  
+  // High-priority SEO pages
+  { loc: '/best-ayurveda-hospital-chennai', priority: '0.95', changefreq: 'daily' },
+  { loc: '/top-ayurveda-clinic-chennai', priority: '0.95', changefreq: 'daily' },
+  { loc: '/dr-vaitheeshwari-ayurveda-doctor-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/government-certified-ayurveda-hospital-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/authentic-panchakarma-treatment-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/best-abhyanga-massage-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/shirodhara-therapy-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurvedic-detox-treatment-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/holistic-wellness-center-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/traditional-medicine-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurvedic-medicine-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/alternative-medicine-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/wellness-therapy-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/stress-management-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/chronic-disease-management-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/women-health-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/digestive-disorders-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/skin-health-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/mental-health-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/bams-doctor-chennai', priority: '0.9', changefreq: 'weekly' },
+  
+  // Location-specific pages
+  { loc: '/ayurveda-hospital-perumbakkam-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurveda-clinic-omr-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurveda-treatment-sholinganallur-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/panchakarma-pallikaranai-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/abhyanga-massage-navalur-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/shirodhara-therapy-kelambakkam-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurveda-doctor-tambaram-chennai', priority: '0.9', changefreq: 'weekly' },
+  
+  // Regular pages
   { loc: '/about' },
   { loc: '/treatments' },
   { loc: '/doctors' },

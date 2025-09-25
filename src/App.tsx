@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import BlogPost from "./pages/BlogPost";
 import SectionPage from "./pages/SectionPage";
+import LocationPage from "./pages/LocationPage";
 import SEO from "@/components/SEO";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,15 @@ const App = () => (
           {/* Blog by numeric ID; optional slug for cleaner URLs */}
           <Route path="/blog/:id" element={<BlogPost />} />
           <Route path="/blog/:id/:slug" element={<BlogPost />} />
+
+          {/* Location-specific pages for SEO */}
+          <Route path="/ayurveda-hospital-perumbakkam-chennai" element={<LocationPage />} />
+          <Route path="/ayurveda-clinic-omr-chennai" element={<LocationPage />} />
+          <Route path="/ayurveda-treatment-sholinganallur-chennai" element={<LocationPage />} />
+          <Route path="/panchakarma-pallikaranai-chennai" element={<LocationPage />} />
+          <Route path="/abhyanga-massage-navalur-chennai" element={<LocationPage />} />
+          <Route path="/shirodhara-therapy-kelambakkam-chennai" element={<LocationPage />} />
+          <Route path="/ayurveda-doctor-tambaram-chennai" element={<LocationPage />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
