@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import BlogPost from "./pages/BlogPost";
 import SectionPage from "./pages/SectionPage";
 import LocationPage from "./pages/LocationPage";
+import SEORedirect from "./components/SEORedirect";
 import SEO from "@/components/SEO";
 
 const queryClient = new QueryClient();
@@ -75,14 +76,36 @@ const App = () => (
           <Route path="/blog/:id" element={<BlogPost />} />
           <Route path="/blog/:id/:slug" element={<BlogPost />} />
 
+          {/* All SEO routes redirect to main page with specific SEO */}
+          <Route path="/best-ayurveda-hospital-chennai" element={<SEORedirect />} />
+          <Route path="/top-ayurveda-clinic-chennai" element={<SEORedirect />} />
+          <Route path="/dr-vaitheeshwari-ayurveda-doctor-chennai" element={<SEORedirect />} />
+          <Route path="/government-certified-ayurveda-hospital-chennai" element={<SEORedirect />} />
+          <Route path="/authentic-panchakarma-treatment-chennai" element={<SEORedirect />} />
+          <Route path="/best-abhyanga-massage-chennai" element={<SEORedirect />} />
+          <Route path="/shirodhara-therapy-chennai" element={<SEORedirect />} />
+          <Route path="/ayurvedic-detox-treatment-chennai" element={<SEORedirect />} />
+          <Route path="/holistic-wellness-center-chennai" element={<SEORedirect />} />
+          <Route path="/traditional-medicine-chennai" element={<SEORedirect />} />
+          <Route path="/ayurvedic-medicine-chennai" element={<SEORedirect />} />
+          <Route path="/alternative-medicine-chennai" element={<SEORedirect />} />
+          <Route path="/wellness-therapy-chennai" element={<SEORedirect />} />
+          <Route path="/stress-management-chennai" element={<SEORedirect />} />
+          <Route path="/chronic-disease-management-chennai" element={<SEORedirect />} />
+          <Route path="/women-health-chennai" element={<SEORedirect />} />
+          <Route path="/digestive-disorders-chennai" element={<SEORedirect />} />
+          <Route path="/skin-health-chennai" element={<SEORedirect />} />
+          <Route path="/mental-health-chennai" element={<SEORedirect />} />
+          <Route path="/bams-doctor-chennai" element={<SEORedirect />} />
+          
           {/* Location-specific pages for SEO */}
-          <Route path="/ayurveda-hospital-perumbakkam-chennai" element={<LocationPage />} />
-          <Route path="/ayurveda-clinic-omr-chennai" element={<LocationPage />} />
-          <Route path="/ayurveda-treatment-sholinganallur-chennai" element={<LocationPage />} />
-          <Route path="/panchakarma-pallikaranai-chennai" element={<LocationPage />} />
-          <Route path="/abhyanga-massage-navalur-chennai" element={<LocationPage />} />
-          <Route path="/shirodhara-therapy-kelambakkam-chennai" element={<LocationPage />} />
-          <Route path="/ayurveda-doctor-tambaram-chennai" element={<LocationPage />} />
+          <Route path="/ayurveda-hospital-perumbakkam-chennai" element={<SEORedirect />} />
+          <Route path="/ayurveda-clinic-omr-chennai" element={<SEORedirect />} />
+          <Route path="/ayurveda-treatment-sholinganallur-chennai" element={<SEORedirect />} />
+          <Route path="/panchakarma-pallikaranai-chennai" element={<SEORedirect />} />
+          <Route path="/abhyanga-massage-navalur-chennai" element={<SEORedirect />} />
+          <Route path="/shirodhara-therapy-kelambakkam-chennai" element={<SEORedirect />} />
+          <Route path="/ayurveda-doctor-tambaram-chennai" element={<SEORedirect />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
