@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CheckCircle, Clock, DollarSign, User } from 'lucide-react';
+import { CheckCircle, Clock, User } from 'lucide-react';
 
 const TreatmentComparison = () => {
   const [selectedTreatments, setSelectedTreatments] = useState<string[]>(['panchakarma', 'abhyanga']);
@@ -12,7 +12,6 @@ const TreatmentComparison = () => {
     panchakarma: {
       name: 'Panchakarma Program',
       duration: '7-21 days',
-      price: 'From $1,200',
       intensity: 'High',
       benefits: [
         'Complete detoxification',
@@ -20,21 +19,26 @@ const TreatmentComparison = () => {
         'Mental clarity',
         'Improved immunity',
         'Weight management',
-        'Stress relief'
+        'Stress relief',
+        'Balanced doshas',
+        'Increased energy',
+        'Better sleep quality',
+        'Reduced inflammation'
       ],
-      bestFor: ['Chronic conditions', 'Complete wellness reset', 'Preventive care'],
+      bestFor: ['Chronic conditions', 'Complete wellness reset', 'Preventive care', 'Long-term health'],
       includes: [
         'Daily consultations',
         'Customized treatments',
         'Ayurvedic meals',
         'Yoga sessions',
-        'Meditation guidance'
+        'Meditation guidance',
+        'Herbal medicines',
+        'Follow-up care'
       ]
     },
     abhyanga: {
       name: 'Abhyanga Massage',
       duration: '60-90 mins',
-      price: 'From $150',
       intensity: 'Low',
       benefits: [
         'Improved circulation',
@@ -42,20 +46,25 @@ const TreatmentComparison = () => {
         'Better sleep',
         'Skin nourishment',
         'Joint flexibility',
-        'Relaxation'
+        'Relaxation',
+        'Muscle relaxation',
+        'Lymphatic drainage',
+        'Hormonal balance',
+        'Pain relief'
       ],
-      bestFor: ['Stress management', 'Skin health', 'Regular maintenance'],
+      bestFor: ['Stress management', 'Skin health', 'Regular maintenance', 'Muscle tension'],
       includes: [
         'Full body massage',
         'Herbal oils',
         'Steam therapy',
-        'Relaxation time'
+        'Relaxation time',
+        'Marma point therapy',
+        'Personalized oil blend'
       ]
     },
     shirodhara: {
       name: 'Shirodhara Therapy',
       duration: '45-60 mins',
-      price: 'From $120',
       intensity: 'Medium',
       benefits: [
         'Deep relaxation',
@@ -63,20 +72,25 @@ const TreatmentComparison = () => {
         'Better sleep',
         'Mental clarity',
         'Nervous system balance',
-        'Headache relief'
+        'Headache relief',
+        'Improved concentration',
+        'Emotional stability',
+        'Reduced blood pressure',
+        'Enhanced memory'
       ],
-      bestFor: ['Mental stress', 'Sleep disorders', 'Anxiety'],
+      bestFor: ['Mental stress', 'Sleep disorders', 'Anxiety', 'Headaches', 'Focus issues'],
       includes: [
         'Oil pouring therapy',
         'Scalp massage',
         'Meditation session',
-        'Herbal tea'
+        'Herbal tea',
+        'Third eye chakra therapy',
+        'Nervous system balancing'
       ]
     },
     detox: {
       name: 'Detox Program',
       duration: '3-14 days',
-      price: 'From $800',
       intensity: 'Medium',
       benefits: [
         'Toxin elimination',
@@ -84,15 +98,73 @@ const TreatmentComparison = () => {
         'Energy boost',
         'Digestive health',
         'Cellular renewal',
-        'Mental clarity'
+        'Mental clarity',
+        'Improved metabolism',
+        'Clearer skin',
+        'Better mood',
+        'Enhanced vitality'
       ],
-      bestFor: ['Weight loss', 'Digestive issues', 'Energy improvement'],
+      bestFor: ['Weight loss', 'Digestive issues', 'Energy improvement', 'Skin problems', 'Mood disorders'],
       includes: [
         'Herbal medicines',
         'Detox meals',
         'Colon therapy',
         'Steam treatments',
-        'Lifestyle counseling'
+        'Lifestyle counseling',
+        'Dietary guidance',
+        'Progress monitoring'
+      ]
+    },
+    pizhichil: {
+      name: 'Pizhichil Therapy',
+      duration: '60-90 mins',
+      intensity: 'Low',
+      benefits: [
+        'Deep tissue nourishment',
+        'Improved circulation',
+        'Muscle relaxation',
+        'Joint mobility',
+        'Skin rejuvenation',
+        'Stress relief',
+        'Better sleep',
+        'Pain relief',
+        'Enhanced flexibility',
+        'Balanced doshas'
+      ],
+      bestFor: ['Joint problems', 'Skin issues', 'Muscle pain', 'Stress relief', 'Wellness maintenance'],
+      includes: [
+        'Warm oil bath',
+        'Gentle massage',
+        'Medicated oils',
+        'Relaxation time',
+        'Tissue nourishment',
+        'Nervous system balance'
+      ]
+    },
+    udvartana: {
+      name: 'Udvartana Therapy',
+      duration: '45-60 mins',
+      intensity: 'Medium',
+      benefits: [
+        'Skin exfoliation',
+        'Improved circulation',
+        'Weight management',
+        'Lymphatic drainage',
+        'Cellulite reduction',
+        'Better skin texture',
+        'Increased metabolism',
+        'Toxin elimination',
+        'Enhanced energy',
+        'Improved muscle tone'
+      ],
+      bestFor: ['Weight management', 'Skin problems', 'Cellulite', 'Lymphatic issues', 'Metabolism boost'],
+      includes: [
+        'Herbal powder massage',
+        'Skin exfoliation',
+        'Lymphatic stimulation',
+        'Metabolism boost',
+        'Toxin elimination',
+        'Muscle toning'
       ]
     }
   };
@@ -157,10 +229,6 @@ const TreatmentComparison = () => {
                     <div className="flex items-center text-sm text-muted-foreground">
                       <Clock className="h-4 w-4 mr-1" />
                       {treatment.duration}
-                    </div>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <DollarSign className="h-4 w-4 mr-1" />
-                      {treatment.price}
                     </div>
                   </div>
                   <Badge className={`mt-2 ${getIntensityColor(treatment.intensity)}`}>

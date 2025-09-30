@@ -123,55 +123,81 @@ const Index = () => {
   const treatments = [
     {
       name: "Panchakarma",
-      description: "Complete detoxification and rejuvenation therapy using five traditional cleansing procedures to eliminate toxins and restore natural balance.",
+      description: "Complete detoxification and rejuvenation therapy using five traditional cleansing procedures to eliminate toxins and restore natural balance. This comprehensive treatment includes Vamana (therapeutic vomiting), Virechana (purgation), Basti (medicated enema), Nasya (nasal administration), and Raktamokshana (bloodletting) to cleanse the body at cellular level.",
       duration: "7-21 days",
-      price: "From $1,200",
-      benefits: ["Complete detoxification", "Improved digestion", "Enhanced immunity", "Mental clarity", "Rejuvenated skin"],
+      benefits: ["Complete detoxification", "Improved digestion", "Enhanced immunity", "Mental clarity", "Rejuvenated skin", "Balanced doshas", "Increased energy", "Better sleep quality", "Reduced inflammation", "Anti-aging effects"],
       image: panchakarmaImg,
       category: "Detox"
     },
     {
       name: "Abhyanga", 
-      description: "Full-body synchronized massage with warm herbal oils to balance doshas, improve circulation, and deeply nourish tissues.",
+      description: "Full-body synchronized massage with warm herbal oils to balance doshas, improve circulation, and deeply nourish tissues. This ancient therapy uses specific oil blends tailored to individual constitution, applied with rhythmic strokes to stimulate marma points and promote healing.",
       duration: "60-90 mins",
-      price: "From $150",
-      benefits: ["Improved circulation", "Stress relief", "Better sleep", "Skin nourishment", "Joint flexibility"],
+      benefits: ["Improved circulation", "Stress relief", "Better sleep", "Skin nourishment", "Joint flexibility", "Muscle relaxation", "Lymphatic drainage", "Hormonal balance", "Pain relief", "Enhanced immunity"],
       image: abhyangaImg,
       category: "Massage"
     },
     {
       name: "Shirodhara",
-      description: "Continuous pouring of warm medicated oil on the forehead to calm the mind, relieve stress, and enhance mental clarity.",
+      description: "Continuous pouring of warm medicated oil on the forehead to calm the mind, relieve stress, and enhance mental clarity. This deeply relaxing therapy targets the third eye chakra and nervous system, promoting profound relaxation and mental rejuvenation.",
       duration: "45-60 mins", 
-      price: "From $120",
-      benefits: ["Deep relaxation", "Anxiety relief", "Better sleep", "Mental clarity", "Nervous system balance"],
+      benefits: ["Deep relaxation", "Anxiety relief", "Better sleep", "Mental clarity", "Nervous system balance", "Headache relief", "Improved concentration", "Emotional stability", "Reduced blood pressure", "Enhanced memory"],
       image: shirodharaImg,
       category: "Therapy"
     },
     {
       name: "Detox Therapy",
-      description: "Personalized cleansing programs combining herbal medicines, dietary guidance, and therapeutic treatments.",
+      description: "Personalized cleansing programs combining herbal medicines, dietary guidance, and therapeutic treatments. Our detox programs are customized based on individual constitution, lifestyle, and health goals to ensure safe and effective toxin elimination.",
       duration: "3-14 days",
-      price: "From $800",
-      benefits: ["Toxin elimination", "Weight management", "Energy boost", "Digestive health", "Cellular renewal"],
+      benefits: ["Toxin elimination", "Weight management", "Energy boost", "Digestive health", "Cellular renewal", "Improved metabolism", "Clearer skin", "Better mood", "Reduced cravings", "Enhanced vitality"],
       image: herbsImg,
       category: "Detox"
     },
     {
       name: "Rejuvenation Programs",
-      description: "Comprehensive wellness packages combining multiple therapies for complete physical and mental renewal.",
+      description: "Comprehensive wellness packages combining multiple therapies for complete physical and mental renewal. These programs integrate Panchakarma, specialized massages, yoga, meditation, and dietary modifications for holistic transformation.",
       duration: "5-30 days", 
-      price: "From $2,500",
-      benefits: ["Complete renewal", "Anti-aging effects", "Vitality boost", "Stress management", "Longevity enhancement"],
+      benefits: ["Complete renewal", "Anti-aging effects", "Vitality boost", "Stress management", "Longevity enhancement", "Improved immunity", "Better sleep", "Enhanced mental clarity", "Balanced hormones", "Increased energy"],
       image: panchakarmaImg,
       category: "Wellness"
     },
     {
       name: "Herbal Steam Therapy",
-      description: "Medicated steam therapy using carefully selected herbs to open pores, improve circulation and eliminate toxins.",
+      description: "Medicated steam therapy using carefully selected herbs to open pores, improve circulation and eliminate toxins. This therapy combines the healing properties of specific herbs with the therapeutic benefits of steam to promote deep cleansing and relaxation.",
       duration: "20-30 mins",
-      price: "From $80", 
-      benefits: ["Pore cleansing", "Improved circulation", "Respiratory health", "Skin detox", "Muscle relaxation"],
+      benefits: ["Pore cleansing", "Improved circulation", "Respiratory health", "Skin detox", "Muscle relaxation", "Reduced inflammation", "Better breathing", "Enhanced skin texture", "Stress relief", "Improved immunity"],
+      image: herbsImg,
+      category: "Therapy"
+    },
+    {
+      name: "Pizhichil",
+      description: "Warm oil bath therapy where medicated oils are continuously poured over the body while receiving gentle massage. This luxurious treatment deeply nourishes tissues, improves circulation, and provides profound relaxation while balancing the nervous system.",
+      duration: "60-90 mins",
+      benefits: ["Deep tissue nourishment", "Improved circulation", "Muscle relaxation", "Joint mobility", "Skin rejuvenation", "Stress relief", "Better sleep", "Pain relief", "Enhanced flexibility", "Balanced doshas"],
+      image: abhyangaImg,
+      category: "Therapy"
+    },
+    {
+      name: "Udvartana",
+      description: "Herbal powder massage therapy that exfoliates the skin, improves circulation, and helps in weight management. This invigorating treatment uses specific herbal powders to stimulate the lymphatic system and promote healthy skin.",
+      duration: "45-60 mins",
+      benefits: ["Skin exfoliation", "Improved circulation", "Weight management", "Lymphatic drainage", "Cellulite reduction", "Better skin texture", "Increased metabolism", "Toxin elimination", "Enhanced energy", "Improved muscle tone"],
+      image: herbsImg,
+      category: "Therapy"
+    },
+    {
+      name: "Nasya",
+      description: "Nasal administration of medicated oils and herbal preparations to cleanse and nourish the head and neck region. This therapy is particularly beneficial for respiratory health, sinus issues, and mental clarity.",
+      duration: "15-30 mins",
+      benefits: ["Sinus relief", "Improved breathing", "Mental clarity", "Headache relief", "Better sleep", "Enhanced memory", "Reduced allergies", "Clearer vision", "Balanced hormones", "Improved concentration"],
+      image: herbsImg,
+      category: "Therapy"
+    },
+    {
+      name: "Kati Basti",
+      description: "Localized treatment for lower back pain where warm medicated oil is retained in a dough ring placed on the lower back. This targeted therapy provides deep relief for chronic back pain and spinal issues.",
+      duration: "30-45 mins",
+      benefits: ["Back pain relief", "Improved spinal health", "Muscle relaxation", "Reduced inflammation", "Better posture", "Enhanced flexibility", "Stress relief", "Improved circulation", "Nerve regeneration", "Better sleep"],
       image: herbsImg,
       category: "Therapy"
     }
@@ -273,23 +299,59 @@ const Index = () => {
   return (
   <div className="min-h-dvh bg-gradient-healing pb-10">
       <SEO 
-        title="Sri Vinayaga Ayurvibe — #1 Best Ayurveda Hospital in Chennai | Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram | Dr. Vaitheeshwari BAMS"
-        description="🏆 #1 Best Ayurveda Hospital in Chennai! Sri Vinayaga Ayurvibe offers authentic Panchakarma, Abhyanga, Shirodhara treatments. Serving Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram. Expert care by Dr. Vaitheeshwari BAMS. Government certified. Book now!"
+        title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Near Sholinganallur, Chennai | OMR, Perumbakkam, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Thiruvanmiyur | Dr. Vaitheeshwari BAMS"
+        description="Best Ayurveda Hospital Near Sholinganallur, Chennai. Sri Vinayaga Ayurvibe offers authentic Panchakarma, Abhyanga, Shirodhara treatments. Serving OMR, Perumbakkam, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Thiruvanmiyur. Expert care by Dr. Vaitheeshwari BAMS. Government certified. Book now!"
         canonical="https://svayurvibe.com/"
-        locationKeywords={['Perumbakkam', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai', 'Chennai Ayurveda', 'Best Ayurveda Chennai', 'Top Ayurveda Chennai']}
+        locationKeywords={['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai', '15km radius', 'near Sholinganallur']}
         jsonLd={[
           {
             "@type": "MedicalBusiness",
             "name": "Sri Vinayaga Ayurvibe",
-            "description": "Premier Ayurveda hospital in Chennai offering comprehensive Panchakarma, Abhyanga, Shirodhara treatments and holistic wellness care.",
+            "description": "Premier Ayurveda hospital near Sholinganallur, Chennai offering comprehensive Panchakarma, Abhyanga, Shirodhara treatments and holistic wellness care. Serving 15km radius.",
             "areaServed": [
+              {"@type": "City", "name": "Sholinganallur"},
               {"@type": "City", "name": "Perumbakkam"},
               {"@type": "City", "name": "OMR Chennai"},
-              {"@type": "City", "name": "Sholinganallur"},
               {"@type": "City", "name": "Pallikaranai"},
               {"@type": "City", "name": "Navalur"},
               {"@type": "City", "name": "Kelambakkam"},
               {"@type": "City", "name": "Tambaram"},
+              {"@type": "City", "name": "Medavakkam"},
+              {"@type": "City", "name": "Velachery"},
+              {"@type": "City", "name": "Thiruvanmiyur"},
+              {"@type": "City", "name": "Kovilambakkam"},
+              {"@type": "City", "name": "Thoraipakkam"},
+              {"@type": "City", "name": "Besant Nagar"},
+              {"@type": "City", "name": "Adyar"},
+              {"@type": "City", "name": "Mylapore"},
+              {"@type": "City", "name": "T. Nagar"},
+              {"@type": "City", "name": "Anna Nagar"},
+              {"@type": "City", "name": "Kodambakkam"},
+              {"@type": "City", "name": "Ashok Nagar"},
+              {"@type": "City", "name": "Porur"},
+              {"@type": "City", "name": "Mount Road"},
+              {"@type": "City", "name": "Egmore"},
+              {"@type": "City", "name": "Royapettah"},
+              {"@type": "City", "name": "Triplicane"},
+              {"@type": "City", "name": "George Town"},
+              {"@type": "City", "name": "Ambattur"},
+              {"@type": "City", "name": "Avadi"},
+              {"@type": "City", "name": "Pallavaram"},
+              {"@type": "City", "name": "Chromepet"},
+              {"@type": "City", "name": "St. Thomas Mount"},
+              {"@type": "City", "name": "Guindy"},
+              {"@type": "City", "name": "Saidapet"},
+              {"@type": "City", "name": "Nungambakkam"},
+              {"@type": "City", "name": "Kilpauk"},
+              {"@type": "City", "name": "Anna Salai"},
+              {"@type": "City", "name": "Cathedral Road"},
+              {"@type": "City", "name": "Rajiv Gandhi Salai"},
+              {"@type": "City", "name": "Old Mahabalipuram Road"},
+              {"@type": "City", "name": "ECR"},
+              {"@type": "City", "name": "East Coast Road"},
+              {"@type": "City", "name": "IT Corridor"},
+              {"@type": "City", "name": "Rajiv Gandhi IT Corridor"},
+              {"@type": "City", "name": "OMR IT Corridor"},
               {"@type": "City", "name": "Chennai"}
             ],
             "medicalSpecialty": ["Ayurveda", "Panchakarma", "Abhyanga Massage", "Shirodhara Therapy", "Detox Treatment", "Holistic Wellness"]
@@ -349,15 +411,11 @@ const Index = () => {
             <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
               <div className="space-y-6 text-left">
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  🏆 <strong>Sri Vinayaga Ayurvibe</strong> is Chennai's #1 best Ayurveda hospital, strategically located in Perumbakkam to serve the entire Chennai region. 
-                  We are the premier destination for authentic Panchakarma, Abhyanga massage, and Shirodhara therapy. 
-                  Our hospital proudly serves patients from OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram, and surrounding Chennai areas with world-class Ayurvedic treatments.
+                  <strong>Sri Vinayaga Ayurvibe</strong> is the best Ayurveda hospital near Sholinganallur, Chennai. 
+                  Located in Perumbakkam, we serve patients from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, and Thiruvanmiyur areas.
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital combines ancient wisdom with modern facilities. 
-                  We offer comprehensive detox treatments, holistic wellness programs, and personalized care plans. 
-                  Whether you're seeking Panchakarma detox in Pallikaranai, Abhyanga massage near OMR, or Shirodhara therapy in Kelambakkam, 
-                  we provide the best Ayurvedic treatments in Chennai with authentic traditional methods.
+                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic Panchakarma, Abhyanga massage, and Shirodhara therapy treatments.
                 </p>
               </div>
               <div className="bg-gradient-gold rounded-2xl p-8 shadow-warm">
@@ -417,11 +475,11 @@ const Index = () => {
   <section id="treatments" className="bg-background section-spacing">
   <div className="wide-wrapper">
           <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">🏆 Best Ayurvedic Treatments in Chennai</h2>
+            <h2 className="font-bold text-foreground mb-6 fluid-h2">Best Ayurvedic Treatments in Chennai</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Experience Chennai's most authentic Ayurvedic treatments at Sri Vinayaga Ayurvibe. 
+              Experience Chennai's most authentic Ayurvedic treatments near Sholinganallur at Sri Vinayaga Ayurvibe. 
               Our comprehensive Panchakarma, Abhyanga massage, and Shirodhara therapy programs are designed for complete wellness. 
-              Serving Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, and Tambaram areas with expert care by Dr. Vaitheeshwari BAMS.
+              Expert care by Dr. Vaitheeshwari BAMS.
             </p>
           </div>
           
@@ -450,7 +508,9 @@ const Index = () => {
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between mb-2">
                     <CardTitle className="text-xl text-foreground">{treatment.name}</CardTitle>
-                    <span className="text-lg font-bold text-primary">{treatment.price}</span>
+                    <Badge className="bg-primary/10 text-primary border-none">
+                      {treatment.duration}
+                    </Badge>
                   </div>
                 </CardHeader>
                 
@@ -499,7 +559,7 @@ const Index = () => {
                       <Badge className="ml-3 bg-gold text-earth border-none">{treatments[activeTreatmentIndex].category}</Badge>
                     </DialogTitle>
                     <DialogDescription>
-                      {treatments[activeTreatmentIndex].duration} • {treatments[activeTreatmentIndex].price}
+                      {treatments[activeTreatmentIndex].duration} 
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">

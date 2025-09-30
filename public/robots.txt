@@ -1,10 +1,8 @@
 User-agent: Googlebot
 Allow: /
-Crawl-delay: 1
 
 User-agent: Bingbot
 Allow: /
-Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -33,7 +31,14 @@ Allow: /ayurvedic-detox-treatment-chennai
 Allow: /holistic-wellness-center-chennai
 Allow: /traditional-medicine-chennai
 
-# Location-specific pages
+# Location-specific pages - Priority for Sholinganallur and 15km radius
+Allow: /ayurveda-hospital-sholinganallur-chennai
+Allow: /ayurveda-clinic-sholinganallur-chennai
+Allow: /best-ayurveda-hospital-sholinganallur
+Allow: /panchakarma-treatment-sholinganallur
+Allow: /abhyanga-massage-sholinganallur
+Allow: /shirodhara-therapy-sholinganallur
+Allow: /ayurveda-doctor-sholinganallur
 Allow: /ayurveda-hospital-perumbakkam-chennai
 Allow: /ayurveda-clinic-omr-chennai
 Allow: /ayurveda-treatment-sholinganallur-chennai
@@ -41,6 +46,42 @@ Allow: /panchakarma-pallikaranai-chennai
 Allow: /abhyanga-massage-navalur-chennai
 Allow: /shirodhara-therapy-kelambakkam-chennai
 Allow: /ayurveda-doctor-tambaram-chennai
+Allow: /ayurveda-hospital-medavakkam-chennai
+Allow: /ayurveda-clinic-kovilambakkam-chennai
+Allow: /ayurveda-treatment-thoraipakkam-chennai
+Allow: /ayurveda-hospital-velachery-chennai
+Allow: /ayurveda-clinic-thiruvanmiyur-chennai
+Allow: /ayurveda-treatment-besant-nagar-chennai
+Allow: /ayurveda-hospital-adyar-chennai
+Allow: /ayurveda-clinic-mylapore-chennai
+Allow: /ayurveda-treatment-t-nagar-chennai
+Allow: /ayurveda-hospital-anna-nagar-chennai
+Allow: /ayurveda-clinic-kodambakkam-chennai
+Allow: /ayurveda-treatment-ashok-nagar-chennai
+Allow: /ayurveda-hospital-porur-chennai
+Allow: /ayurveda-clinic-mount-road-chennai
+Allow: /ayurveda-treatment-egmore-chennai
+Allow: /ayurveda-hospital-royapettah-chennai
+Allow: /ayurveda-clinic-triplicane-chennai
+Allow: /ayurveda-treatment-george-town-chennai
+Allow: /ayurveda-hospital-ambattur-chennai
+Allow: /ayurveda-clinic-avadi-chennai
+Allow: /ayurveda-treatment-pallavaram-chennai
+Allow: /ayurveda-hospital-chromepet-chennai
+Allow: /ayurveda-clinic-st-thomas-mount-chennai
+Allow: /ayurveda-treatment-guindy-chennai
+Allow: /ayurveda-hospital-saidapet-chennai
+Allow: /ayurveda-clinic-nungambakkam-chennai
+Allow: /ayurveda-treatment-kilpauk-chennai
+Allow: /ayurveda-hospital-anna-salai-chennai
+Allow: /ayurveda-clinic-cathedral-road-chennai
+Allow: /ayurveda-treatment-rajiv-gandhi-salai-chennai
+Allow: /ayurveda-hospital-old-mahabalipuram-road-chennai
+Allow: /ayurveda-clinic-ecr-chennai
+Allow: /ayurveda-treatment-east-coast-road-chennai
+Allow: /ayurveda-hospital-it-corridor-chennai
+Allow: /ayurveda-clinic-rajiv-gandhi-it-corridor-chennai
+Allow: /ayurveda-treatment-omr-it-corridor-chennai
 
 # Crawl-delay can be added if server strain appears (Firebase CDN handles scale).
 # Disallow sensitive (none currently):

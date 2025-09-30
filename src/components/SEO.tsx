@@ -31,7 +31,7 @@ export const SEO = ({
   siteName = 'Sri Vinayaga Ayurvibe',
   noIndex,
   jsonLd,
-  locationKeywords = ['Perumbakkam', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai']
+  locationKeywords = ['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai']
 }: SEOProps) => {
   useEffect(() => {
     const doc = document;
@@ -77,15 +77,23 @@ export const SEO = ({
     // Add comprehensive location-specific keywords
     if (locationKeywords && locationKeywords.length > 0) {
       const baseKeywords = [
+        'Ayurveda hospital near Sholinganallur', 'best Ayurveda clinic Sholinganallur', 'top Ayurveda center Sholinganallur',
+        'Panchakarma treatment near Sholinganallur', 'Abhyanga massage Sholinganallur', 'Shirodhara therapy Sholinganallur',
+        'Dr Vaitheeshwari Ayurveda doctor', 'BAMS doctor near Sholinganallur', 'Ayurvedic doctor Sholinganallur',
+        'detox treatment near Sholinganallur', 'holistic wellness Sholinganallur', 'traditional medicine Sholinganallur',
+        'Ayurvedic medicine near Sholinganallur', 'alternative medicine Sholinganallur', 'wellness therapy Sholinganallur',
+        'stress management near Sholinganallur', 'chronic disease management Sholinganallur', 'women health Sholinganallur',
+        'digestive disorders near Sholinganallur', 'skin health Sholinganallur', 'mental health Sholinganallur',
+        'government certified Ayurveda hospital', 'authentic Ayurveda treatment near Sholinganallur',
+        'Ayurvedic detox Sholinganallur', 'rejuvenation therapy near Sholinganallur', 'herbal medicine Sholinganallur',
+        '15km radius Ayurveda hospital', 'near Sholinganallur Ayurveda', 'best Ayurveda hospital Chennai',
         'Ayurveda hospital Chennai', 'best Ayurveda clinic Chennai', 'top Ayurveda center Chennai',
         'Panchakarma treatment Chennai', 'Abhyanga massage Chennai', 'Shirodhara therapy Chennai',
-        'Dr Vaitheeshwari Ayurveda doctor', 'BAMS doctor Chennai', 'Ayurvedic doctor Chennai',
-        'detox treatment Chennai', 'holistic wellness Chennai', 'traditional medicine Chennai',
-        'Ayurvedic medicine Chennai', 'alternative medicine Chennai', 'wellness therapy Chennai',
+        'BAMS doctor Chennai', 'Ayurvedic doctor Chennai', 'detox treatment Chennai', 'holistic wellness Chennai',
+        'traditional medicine Chennai', 'Ayurvedic medicine Chennai', 'alternative medicine Chennai', 'wellness therapy Chennai',
         'stress management Chennai', 'chronic disease management Chennai', 'women health Chennai',
         'digestive disorders Chennai', 'skin health Chennai', 'mental health Chennai',
-        'government certified Ayurveda hospital', 'authentic Ayurveda treatment Chennai',
-        'Ayurvedic detox Chennai', 'rejuvenation therapy Chennai', 'herbal medicine Chennai'
+        'authentic Ayurveda treatment Chennai', 'Ayurvedic detox Chennai', 'rejuvenation therapy Chennai', 'herbal medicine Chennai'
       ];
       
       const locationSpecificKeywords = locationKeywords.flatMap(loc => [
@@ -94,7 +102,15 @@ export const SEO = ({
         `detox treatment ${loc}`, `Ayurvedic doctor ${loc}`, `wellness center ${loc}`,
         `traditional medicine ${loc}`, `holistic health ${loc}`, `Ayurvedic treatment ${loc}`,
         `near ${loc}`, `in ${loc}`, `${loc} Ayurveda`, `${loc} Panchakarma`,
-        `${loc} Abhyanga`, `${loc} Shirodhara`, `${loc} detox`, `${loc} wellness`
+        `${loc} Abhyanga`, `${loc} Shirodhara`, `${loc} detox`, `${loc} wellness`,
+        `Ayurveda hospital near ${loc}`, `best Ayurveda clinic near ${loc}`, `top Ayurveda center near ${loc}`,
+        `Panchakarma treatment near ${loc}`, `Abhyanga massage near ${loc}`, `Shirodhara therapy near ${loc}`,
+        `Ayurvedic doctor near ${loc}`, `wellness center near ${loc}`, `detox treatment near ${loc}`,
+        `holistic wellness near ${loc}`, `traditional medicine near ${loc}`, `Ayurvedic medicine near ${loc}`,
+        `alternative medicine near ${loc}`, `wellness therapy near ${loc}`, `stress management near ${loc}`,
+        `chronic disease management near ${loc}`, `women health near ${loc}`, `digestive disorders near ${loc}`,
+        `skin health near ${loc}`, `mental health near ${loc}`, `Ayurvedic detox near ${loc}`,
+        `rejuvenation therapy near ${loc}`, `herbal medicine near ${loc}`
       ]);
       
       const allKeywords = [...baseKeywords, ...locationSpecificKeywords].join(', ');
