@@ -135,7 +135,7 @@ const LiveChat = () => {
       question: "Perfect! What time would work best for you?",
       field: 'preferredTime',
       type: 'select',
-      options: ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'],
+      options: ['10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM'],
       required: true
     },
     {
@@ -168,8 +168,8 @@ const LiveChat = () => {
   ];
 
   const timeSlots = [
-    '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
-    '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM'
+    '10:00 AM', '11:00 AM', '12:00 PM',
+    '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM'
   ];
 
   const botResponses = {
@@ -178,7 +178,7 @@ const LiveChat = () => {
     'abhyanga': 'Abhyanga is our therapeutic oil massage that promotes relaxation and healing. It\'s excellent for stress relief and improving circulation. Shall I help you schedule a session?',
     'shirodhara': 'Shirodhara involves warm oil being poured on your forehead in a continuous stream. It\'s highly effective for stress, insomnia, and mental wellness. Would you like to book this treatment?',
     'doctor': 'Dr. Vaitheeshwari is our Chief Ayurvedic Doctor with BAMS qualification and extensive experience in traditional medicine. She specializes in Panchakarma, women\'s health, and chronic disease management. Would you like to book a consultation with her?',
-    'location': 'We\'re located at No: 12/597, Main Road, Nethaji Nagar, Perumbakkam (Nookampalayam), Chennai 600131. Our hours are Monday-Friday: 10:00-19:00, Saturday: 10:00-18:00, Sunday: 10:00-16:00. We serve all Chennai areas including OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, and Tambaram.',
+    'location': 'We\'re located at 12/597, Main Road, Nethaji Nagar Main Rd, Nookampalayam, Perumbakkam, Chennai, Tamil Nadu 600131. Our hours are 10:00 AM - 8:00 PM every day. We serve areas within 20km including OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Chromepet, and more.',
     'pricing': 'Our treatment costs are: Consultation: ₹500, Abhyanga: ₹2,000, Shirodhara: ₹2,500, Panchakarma (14 days): ₹15,000. We offer package deals and accept insurance. Would you like to book any treatment?',
     'emergency': 'For emergency consultations, please call us immediately at +91 8122939197. We provide 24/7 emergency Ayurvedic care for urgent health issues.',
     'default': 'Thank you for your message! For immediate assistance, please call us at +91 8122939197 or email sv.ayurvibe@gmail.com. Our team will get back to you shortly!'

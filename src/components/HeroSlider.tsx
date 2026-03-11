@@ -16,7 +16,7 @@ const slides = [
   {
     id: 1,
     image: hospitalImg,
-    title: "Ayurveda Hospital",
+    title: "Best Ayurveda Hospital in Chennai",
     subtitle: "Where Ancient Wisdom Meets Modern Healing",
     description: "Experience the timeless art of Ayurvedic medicine in a sanctuary designed for your complete wellness journey"
   },

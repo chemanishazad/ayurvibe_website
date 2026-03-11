@@ -205,3 +205,18 @@ All colors MUST be HSL.
 .marquee-container:hover .marquee-track {
   animation-play-state: paused;
 }
+
+/* Print: show only prescription (#print-prescription) */
+@media print {
+  body * { visibility: hidden; }
+  #print-prescription, #print-prescription * { visibility: visible; }
+  #print-prescription {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    padding: 2rem;
+  }
+}

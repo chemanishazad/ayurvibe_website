@@ -9,6 +9,15 @@ import NotFound from "./pages/NotFound";
 import BlogPost from "./pages/BlogPost";
 import SectionPage from "./pages/SectionPage";
 import LocationPage from "./pages/LocationPage";
+import Login from "./pages/Login";
+import AdminRoute from "./components/AdminRoute";
+import AdminShell from "./pages/admin/AdminShell";
+import DashboardPage from "./pages/admin/DashboardPage";
+import PatientsPage from "./pages/admin/PatientsPage";
+import ConsultationsPage from "./pages/admin/ConsultationsPage";
+import MedicinesPage from "./pages/admin/MedicinesPage";
+import InventoryPage from "./pages/admin/InventoryPage";
+import ReportsPage from "./pages/admin/ReportsPage";
 import SEORedirect from "./components/SEORedirect";
 import SEO from "@/components/SEO";
 
@@ -52,8 +61,8 @@ const App = () => (
             element={
               <>
                 <SEO 
-                  title="Sri Vinayaga Ayurvibe — Ayurveda Hospital Chennai" 
-                  description="Ayurveda hospital in Perumbakkam, Chennai offering Panchakarma, Abhyanga, Shirodhara, detox & holistic wellness treatments." 
+                  title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR" 
+                  description="Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr.V.Vaitheeshwari B.A.M.S., Book now." 
                   canonical="https://svayurvibe.com/"
                 />
                 <Index />
@@ -71,6 +80,19 @@ const App = () => (
           <Route path="/blog" element={<SectionPage sectionId="blog" title="Blog | Sri Vinayaga Ayurvibe" description="Ayurveda blog: detox tips, nutrition, herbal therapies & natural healing guidance Chennai." canonical="https://svayurvibe.com/blog" />} />
           <Route path="/faq" element={<SectionPage sectionId="faq" title="FAQ | Sri Vinayaga Ayurvibe" description="FAQ: Ayurvedic treatment duration, Panchakarma process, pricing & consultation details Chennai." canonical="https://svayurvibe.com/faq" />} />
           <Route path="/booking" element={<SectionPage sectionId="booking" title="Book Appointment | Sri Vinayaga Ayurvibe" description="Book Ayurveda consultation or Panchakarma therapy in Perumbakkam, Chennai – call or schedule online." canonical="https://svayurvibe.com/booking" />} />
+
+          {/* Admin: login at /admin, dashboard at /admin/dashboard, etc. */}
+          <Route path="/admin">
+            <Route index element={<Login />} />
+            <Route element={<AdminRoute><AdminShell /></AdminRoute>}>
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="patients" element={<PatientsPage />} />
+              <Route path="consultations" element={<ConsultationsPage />} />
+              <Route path="medicines" element={<MedicinesPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+            </Route>
+          </Route>
 
           {/* Blog by numeric ID; optional slug for cleaner URLs */}
           <Route path="/blog/:id" element={<BlogPost />} />
@@ -106,6 +128,9 @@ const App = () => (
           <Route path="/abhyanga-massage-navalur-chennai" element={<SEORedirect />} />
           <Route path="/shirodhara-therapy-kelambakkam-chennai" element={<SEORedirect />} />
           <Route path="/ayurveda-doctor-tambaram-chennai" element={<SEORedirect />} />
+          <Route path="/ayurveda-hospital-medavakkam-chennai" element={<SEORedirect />} />
+          <Route path="/ayurveda-clinic-velachery-chennai" element={<SEORedirect />} />
+          <Route path="/ayurveda-treatment-chromepet-chennai" element={<SEORedirect />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

@@ -299,15 +299,15 @@ const Index = () => {
   return (
   <div className="min-h-dvh bg-gradient-healing pb-10">
       <SEO 
-        title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Near Sholinganallur, Chennai | OMR, Perumbakkam, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Thiruvanmiyur | Dr. Vaitheeshwari BAMS"
-        description="Best Ayurveda Hospital Near Sholinganallur, Chennai. Sri Vinayaga Ayurvibe offers authentic Panchakarma, Abhyanga, Shirodhara treatments. Serving OMR, Perumbakkam, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Thiruvanmiyur. Expert care by Dr. Vaitheeshwari BAMS. Government certified. Book now!"
+        title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR"
+        description="Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr. Vaitheeshwari BAMS. Book now."
         canonical="https://svayurvibe.com/"
-        locationKeywords={['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai', '15km radius', 'near Sholinganallur']}
+        locationKeywords={['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai', '20km radius', 'near Sholinganallur', 'Nookampalayam']}
         jsonLd={[
           {
             "@type": "MedicalBusiness",
             "name": "Sri Vinayaga Ayurvibe",
-            "description": "Premier Ayurveda hospital near Sholinganallur, Chennai offering comprehensive Panchakarma, Abhyanga, Shirodhara treatments and holistic wellness care. Serving 15km radius.",
+            "description": "Premier Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai offering Panchakarma, Abhyanga, Shirodhara treatments. Serving 20km radius – easily reachable from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Chromepet.",
             "areaServed": [
               {"@type": "City", "name": "Sholinganallur"},
               {"@type": "City", "name": "Perumbakkam"},
@@ -412,10 +412,10 @@ const Index = () => {
               <div className="space-y-6 text-left">
                 <p className="text-lg leading-relaxed text-muted-foreground">
                   <strong>Sri Vinayaga Ayurvibe</strong> is the best Ayurveda hospital near Sholinganallur, Chennai. 
-                  Located in Perumbakkam, we serve patients from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, and Thiruvanmiyur areas.
+                  Located at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), we serve patients within 20km – <Link to="/ayurveda-treatment-sholinganallur-chennai" className="text-primary hover:underline">Sholinganallur</Link>, <Link to="/ayurveda-clinic-omr-chennai" className="text-primary hover:underline">OMR</Link>, <Link to="/panchakarma-pallikaranai-chennai" className="text-primary hover:underline">Pallikaranai</Link>, <Link to="/ayurveda-hospital-perumbakkam-chennai" className="text-primary hover:underline">Perumbakkam</Link>, Navalur, Kelambakkam, Tambaram, <Link to="/ayurveda-hospital-medavakkam-chennai" className="text-primary hover:underline">Medavakkam</Link>, <Link to="/ayurveda-clinic-velachery-chennai" className="text-primary hover:underline">Velachery</Link>, Chromepet, and all nearby areas.
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic Panchakarma, Abhyanga massage, and Shirodhara therapy treatments.
+                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic <Link to="/treatments" className="text-primary hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> treatments. Explore our <Link to="/about" className="text-primary hover:underline">about</Link> page, <Link to="/doctors" className="text-primary hover:underline">doctors</Link>, and <Link to="/faq" className="text-primary hover:underline">FAQ</Link>.
                 </p>
               </div>
               <div className="bg-gradient-gold rounded-2xl p-8 shadow-warm">
@@ -478,8 +478,7 @@ const Index = () => {
             <h2 className="font-bold text-foreground mb-6 fluid-h2">Best Ayurvedic Treatments in Chennai</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Experience Chennai's most authentic Ayurvedic treatments near Sholinganallur at Sri Vinayaga Ayurvibe. 
-              Our comprehensive Panchakarma, Abhyanga massage, and Shirodhara therapy programs are designed for complete wellness. 
-              Expert care by Dr. Vaitheeshwari BAMS.
+              Our comprehensive <Link to="/authentic-panchakarma-treatment-chennai" className="text-primary hover:underline">Panchakarma</Link>, <Link to="/best-abhyanga-massage-chennai" className="text-primary hover:underline">Abhyanga</Link>, and <Link to="/shirodhara-therapy-chennai" className="text-primary hover:underline">Shirodhara</Link> programs. Read our <Link to="/blog" className="text-primary hover:underline">blog</Link> for wellness tips.
             </p>
           </div>
           
@@ -639,7 +638,7 @@ const Index = () => {
             <h2 className="font-bold text-foreground mb-6 fluid-h2">👩‍⚕️ Dr. Vaitheeshwari BAMS - Best Ayurveda Doctor in Chennai</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Meet <strong>Dr. Vaitheeshwari BAMS</strong>, Chennai's leading Ayurveda doctor specializing in Panchakarma and Women's Health. 
-              With 3+ years of experience, she provides authentic Ayurvedic treatments for patients from Perumbakkam, OMR, Sholinganallur, 
+              With 3+ years of experience, she provides authentic Ayurvedic treatments for patients from Perumbakkam, Nookampalayam, OMR, Sholinganallur, 
               Pallikaranai, Navalur, Kelambakkam, and Tambaram areas.
             </p>
           </div>
@@ -1019,9 +1018,9 @@ const Index = () => {
                 Reg No: 2095
               </p>
               <p className="text-primary-foreground/80 leading-relaxed mb-6">
-                🏆 <strong>Chennai's #1 Best Ayurveda Hospital!</strong> Sri Vinayaga Ayurvibe is your premier destination for authentic Ayurvedic treatments. 
-                We serve patients from Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram, and all Chennai areas. 
-                Experience world-class Panchakarma, Abhyanga massage, and Shirodhara therapy with Dr. Vaitheeshwari BAMS.
+                Sri Vinayaga Ayurvibe is your destination for authentic Ayurvedic treatments. 
+                Located at Nookampalayam, Perumbakkam, we serve patients across Chennai and nearby areas within 20km. 
+                Experience Panchakarma, Abhyanga massage, and Shirodhara therapy with Dr. Vaitheeshwari BAMS.
               </p>
               
             </div>
@@ -1032,9 +1031,9 @@ const Index = () => {
                 <div className="flex items-center space-x-3">
                   <MapPin className="h-5 w-5 text-gold" />
                   <div>
-                    <p className="text-primary-foreground/90">No: 12/597, Main Road, Nethaji Nagar</p>
-                    <p className="text-primary-foreground/90">Perumbakkam (Nookampalayam)</p>
-                    <p className="text-primary-foreground/90">Chennai - 600131</p>
+                    <p className="text-primary-foreground/90">12/597, Main Road, Nethaji Nagar Main Rd</p>
+                    <p className="text-primary-foreground/90">Nookampalayam, Perumbakkam, Chennai</p>
+                    <p className="text-primary-foreground/90">Tamil Nadu 600131</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -1052,22 +1051,14 @@ const Index = () => {
               <h3 className="text-xl font-bold mb-6 text-gold">Hours of Operation</h3>
               <div className="space-y-2 text-primary-foreground/90">
                 <div className="flex justify-between">
-                  <span>Monday - Friday</span>
-                  <span>10:00 AM - 7:00 PM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Saturday</span>
-                  <span>10:00 AM - 6:00 PM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Sunday</span>
-                  <span>10:00 AM - 4:00 PM</span>
+                  <span>Every day</span>
+                  <span>10:00 AM - 8:00 PM</span>
                 </div>
               </div>
               <Separator className="my-6 bg-primary-foreground/20" />
-              <p className="text-sm text-primary-foreground/70">
+              {/* <p className="text-sm text-primary-foreground/70">
                 Government Certified Ayurveda Hospital
-              </p>
+              </p> */}
             </div>
 
           </div>

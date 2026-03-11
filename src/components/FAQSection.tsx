@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -139,7 +138,6 @@ const FAQSection = () => {
                 <p className="font-medium mb-1">Response Times:</p>
                 <p>• Phone: Immediate during business hours</p>
                 <p>• Email: Within 24 hours</p>
-                <p>• Emergency: 24/7 hotline available</p>
               </div>
             </CardContent>
           </Card>

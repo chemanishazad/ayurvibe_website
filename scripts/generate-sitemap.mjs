@@ -62,6 +62,9 @@ const staticPages = [
   { loc: '/abhyanga-massage-navalur-chennai', priority: '0.9', changefreq: 'weekly' },
   { loc: '/shirodhara-therapy-kelambakkam-chennai', priority: '0.9', changefreq: 'weekly' },
   { loc: '/ayurveda-doctor-tambaram-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurveda-hospital-medavakkam-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurveda-clinic-velachery-chennai', priority: '0.9', changefreq: 'weekly' },
+  { loc: '/ayurveda-treatment-chromepet-chennai', priority: '0.9', changefreq: 'weekly' },
   
   // Regular pages
   { loc: '/about' },
