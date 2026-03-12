@@ -3,11 +3,19 @@
  * Simple sitemap generator for the SPA.
  * Builds a sitemap.xml inside public/ so Vite copies it OR directly into dist/ if it exists post-build.
  */
-import { writeFileSync, existsSync, mkdirSync, createWriteStream } from 'fs';
+import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { gzipSync } from 'zlib';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { blogPosts, slugify } from '../src/content/blogPosts.ts';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const blogPosts = require('../src/content/blogPosts.json');
+
+const slugify = (title) => title.toLowerCase()
+  .replace(/[^a-z0-9\s-]/g, '')
+  .trim()
+  .replace(/\s+/g, '-');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(__dirname); // project root
