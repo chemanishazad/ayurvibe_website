@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,33 +68,31 @@ const InventoryPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground">Clinic-wise medicine stock</p>
+    <div className="space-y-8">
+      <PageHeader title="Inventory" description="Clinic-wise medicine stock">
+        <div className="flex items-center gap-2">
+          {user?.role === 'admin' && clinics.length > 1 && (
+            <Select value={clinicId} onValueChange={setClinicId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select clinic" />
+              </SelectTrigger>
+              <SelectContent>
+                {clinics.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {targetClinicId && (
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add / Update Stock
+            </Button>
+          )}
         </div>
-        {user?.role === 'admin' && clinics.length > 1 && (
-          <Select value={clinicId} onValueChange={setClinicId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select clinic" />
-            </SelectTrigger>
-            <SelectContent>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        {targetClinicId && (
-          <Button onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add / Update Stock
-          </Button>
-        )}
-      </div>
+      </PageHeader>
 
       {lowStock.length > 0 && (
         <Card className="border-amber-200 bg-amber-50/50">

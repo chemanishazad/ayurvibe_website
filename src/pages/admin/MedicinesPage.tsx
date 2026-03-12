@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -108,19 +109,15 @@ const MedicinesPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Medicine Master</h1>
-          <p className="text-muted-foreground">Manage medicine catalog (Admin only for add/edit)</p>
-        </div>
+    <div className="space-y-8">
+      <PageHeader title="Medicine Master" description="Manage medicine catalog (Admin only for add/edit)">
         {isAdmin && (
           <Button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', uom: 'tablet', purchasePrice: '', sellingPrice: '', minStockLevel: '10', description: '' }); }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Medicine
           </Button>
         )}
-      </div>
+      </PageHeader>
       <Card>
         <CardHeader>
           <CardTitle>Medicines</CardTitle>

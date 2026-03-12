@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,34 +61,35 @@ const ReportsPage = () => {
   }, [targetClinicId, from, to]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
-        <h1 className="text-2xl font-bold">Reports</h1>
-        {user?.role === 'admin' && clinics.length > 1 && (
-          <Select value={clinicId} onValueChange={setClinicId}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="All clinics" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All clinics</SelectItem>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <div className="flex gap-2 items-center">
-          <Label>From</Label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+    <div className="space-y-8">
+      <PageHeader title="Reports" description="Analytics and reports">
+        <div className="flex flex-wrap items-center gap-4">
+          {user?.role === 'admin' && clinics.length > 1 && (
+            <Select value={clinicId} onValueChange={setClinicId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All clinics" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All clinics</SelectItem>
+                {clinics.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <div className="flex gap-2 items-center">
+            <Label>From</Label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+          </div>
+          <div className="flex gap-2 items-center">
+            <Label>To</Label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+          </div>
+          <Button variant="outline" onClick={loadReports}>Refresh</Button>
         </div>
-        <div className="flex gap-2 items-center">
-          <Label>To</Label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
-        </div>
-        <Button variant="outline" onClick={loadReports}>Refresh</Button>
-      </div>
+      </PageHeader>
 
       <Tabs defaultValue="daily">
         <TabsList>

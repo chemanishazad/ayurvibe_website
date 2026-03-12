@@ -18,8 +18,8 @@ All colors MUST be HSL.
     --popover: 35 35% 98%;
     --popover-foreground: 30 15% 15%;
 
-    --primary: 140 35% 25%;
-    --primary-foreground: 35 35% 98%;
+    --primary: 113 63% 43%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 35 20% 88%;
     --secondary-foreground: 30 15% 15%;
@@ -35,7 +35,7 @@ All colors MUST be HSL.
 
     --border: 35 15% 85%;
     --input: 35 15% 90%;
-    --ring: 140 35% 25%;
+    --ring: 113 63% 43%;
 
     /* Ayurveda Design Tokens */
     --gold: 45 85% 65%;
@@ -56,21 +56,15 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Admin sidebar - logo green theme (vibrant green on dark) */
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 113 63% 43%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 113 55% 28%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 113 30% 18%;
+    --sidebar-ring: 113 63% 43%;
   }
 
   .dark {
@@ -101,14 +95,14 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 113 63% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 113 55% 28%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 113 30% 18%;
+    --sidebar-ring: 113 63% 43%;
   }
 }
 
@@ -206,17 +200,34 @@ All colors MUST be HSL.
   animation-play-state: paused;
 }
 
-/* Print: show only prescription (#print-prescription) */
+/* Print: prescription page (#print-prescription) - full A4 edge-to-edge */
 @media print {
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
   body * { visibility: hidden; }
   #print-prescription, #print-prescription * { visibility: visible; }
   #print-prescription {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    box-sizing: border-box;
     background: white;
-    padding: 2rem;
+    padding: 8mm !important;
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    size: A4;
+    margin: 0;
   }
 }

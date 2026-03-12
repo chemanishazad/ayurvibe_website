@@ -15,6 +15,9 @@ import AdminShell from "./pages/admin/AdminShell";
 import DashboardPage from "./pages/admin/DashboardPage";
 import PatientsPage from "./pages/admin/PatientsPage";
 import ConsultationsPage from "./pages/admin/ConsultationsPage";
+import ConsultationPrintPage from "./pages/admin/ConsultationPrintPage";
+import TreatmentPlansPage from "./pages/admin/TreatmentPlansPage";
+import DirectSalesPage from "./pages/admin/DirectSalesPage";
 import MedicinesPage from "./pages/admin/MedicinesPage";
 import InventoryPage from "./pages/admin/InventoryPage";
 import ReportsPage from "./pages/admin/ReportsPage";
@@ -81,6 +84,9 @@ const App = () => (
           <Route path="/faq" element={<SectionPage sectionId="faq" title="FAQ | Sri Vinayaga Ayurvibe" description="FAQ: Ayurvedic treatment duration, Panchakarma process, pricing & consultation details Chennai." canonical="https://svayurvibe.com/faq" />} />
           <Route path="/booking" element={<SectionPage sectionId="booking" title="Book Appointment | Sri Vinayaga Ayurvibe" description="Book Ayurveda consultation or Panchakarma therapy in Perumbakkam, Chennai – call or schedule online." canonical="https://svayurvibe.com/booking" />} />
 
+          {/* Print: no login required, uses localStorage for data */}
+          <Route path="/print/consultation/:id" element={<ConsultationPrintPage />} />
+
           {/* Admin: login at /admin, dashboard at /admin/dashboard, etc. */}
           <Route path="/admin">
             <Route index element={<Login />} />
@@ -88,6 +94,8 @@ const App = () => (
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="patients" element={<PatientsPage />} />
               <Route path="consultations" element={<ConsultationsPage />} />
+              <Route path="treatment-plans" element={<TreatmentPlansPage />} />
+              <Route path="direct-sales" element={<DirectSalesPage />} />
               <Route path="medicines" element={<MedicinesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="reports" element={<ReportsPage />} />

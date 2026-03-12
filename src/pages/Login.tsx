@@ -87,22 +87,24 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
-      <Card className="w-full max-w-md shadow-lg border-primary/10">
-        <CardHeader className="text-center space-y-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-primary/5 p-4">
+      <Card className="w-full max-w-md border-0 shadow-xl shadow-primary/5">
+        <CardHeader className="text-center space-y-6 pb-2">
           <div className="flex justify-center">
             <Logo withText textClassName="text-center" />
           </div>
           <div className="flex justify-center">
-            <div className="rounded-full bg-primary/10 p-3">
-              <Lock className="h-8 w-8 text-primary" />
+            <div className="rounded-2xl bg-primary/10 p-4 ring-4 ring-primary/5">
+              <Lock className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Admin Login</CardTitle>
-          <CardDescription>Sign in with your username and password. Clinic is assigned based on your account.</CardDescription>
+          <div>
+            <CardTitle className="text-2xl font-bold tracking-tight">Admin Login</CardTitle>
+            <CardDescription className="mt-2">Sign in with your username and password. Clinic is assigned based on your account.</CardDescription>
+          </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="pt-2">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
@@ -129,7 +131,7 @@ const Login = () => {
                 disabled={isLoading}
               />
             </div>
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+            <Button type="submit" className="w-full font-medium" size="lg" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

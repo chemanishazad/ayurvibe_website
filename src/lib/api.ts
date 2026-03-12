@@ -33,6 +33,10 @@ export const api = {
   },
   patients: {
     search: (mobile: string) => fetchApi<{ exists: boolean; patient: Record<string, unknown> | null }>(`/api/patients?mobile=${encodeURIComponent(mobile)}`),
+    list: (params?: { name?: string; mobile?: string; search?: string; from?: string; to?: string }) => {
+      const q = new URLSearchParams({ list: '1', ...(params as Record<string, string>) });
+      return fetchApi<Array<Record<string, unknown> & { isReturning?: boolean; consultationCount?: number }>>(`/api/patients?${q}`);
+    },
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/patients', { method: 'POST', body: JSON.stringify(data) }),
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/patients/${id}`),
     history: (id: string) => fetchApi<Record<string, unknown>[]>(`/api/patients/${id}/history`),
@@ -52,24 +56,42 @@ export const api = {
     update: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/inventory', { method: 'POST', body: JSON.stringify(data) }),
   },
   consultations: {
-    list: (params?: { clinicId?: string; from?: string; to?: string }) => {
+    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
       const q = new URLSearchParams(params as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/consultations${q ? `?${q}` : ''}`);
     },
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/consultations/${id}`),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/consultations', { method: 'POST', body: JSON.stringify(data) }),
   },
+  directSales: {
+    list: (params?: { clinicId?: string; from?: string; to?: string }) => {
+      const q = new URLSearchParams(params as Record<string, string>).toString();
+      return fetchApi<Record<string, unknown>[]>(`/api/direct-sales${q ? `?${q}` : ''}`);
+    },
+    create: (data: { clinicId: string; saleDate: string; items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice: number }> }) =>
+      fetchApi<Record<string, unknown>>('/api/direct-sales', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  treatmentPlans: {
+    list: (consultationId?: string) => fetchApi<Record<string, unknown>[]>(`/api/treatment-plans${consultationId ? `?consultationId=${consultationId}` : ''}`),
+    get: (id: string) => fetchApi<Record<string, unknown>>(`/api/treatment-plans/${id}`),
+    create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/treatment-plans', { method: 'POST', body: JSON.stringify(data) }),
+  },
   dashboard: {
     admin: () => fetchApi<{
       totalClinics: number;
       totalPatients: number;
       dailyConsultations: number;
+      newPatientRegistrationsToday?: number;
       medicineSales: number;
       totalRevenue: number;
       totalProfit: number;
       dailyRevenue: number;
       clinicWiseRevenue: { clinicId: string; clinicName: string; revenue: number }[];
     }>('/api/dashboard/admin'),
+    analytics: (params?: { clinicId?: string; period?: string }) => {
+      const q = new URLSearchParams(params as Record<string, string>).toString();
+      return fetchApi<{ period: string; chartData: { date: string; visits: number; revenue: number }[] }>(`/api/dashboard/analytics${q ? `?${q}` : ''}`);
+    },
     clinic: (clinicId?: string) => fetchApi<{
       todayPatients: number;
       consultationsCount: number;
