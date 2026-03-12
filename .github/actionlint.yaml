@@ -1,0 +1,5 @@
+# USER is a valid secret name; linter flags it due to env.USER ambiguity
+paths:
+  .github/workflows/*.yml:
+    ignore:
+      - 'Context access might be invalid: USER'
