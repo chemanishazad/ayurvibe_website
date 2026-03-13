@@ -17,4 +17,4 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.KEY }}
           script: |
-            sh /mnt/data/scripts/deploy_backend.sh
+            sh /mnt/data/scripts/deploy_frontend.sh
