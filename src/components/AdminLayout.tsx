@@ -62,7 +62,6 @@ const navGroups = [
     label: 'Clinical',
     items: [
       { path: '/admin/patients', label: 'Patients', icon: Users },
-      { path: '/admin/consultations', label: 'Consultations', icon: Stethoscope },
       { path: '/admin/treatment-plans', label: 'Treatment Plans', icon: ClipboardList },
     ],
   },
@@ -250,8 +249,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
             </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
-          <div className="mx-auto max-w-7xl">{children}</div>
+        <main className="flex-1 flex flex-col min-h-0 overflow-auto p-3">
+          <div className="mx-auto w-full max-w-[1600px] flex-1 flex flex-col min-h-0">{children}</div>
         </main>
       </SidebarInset>
     </SidebarProvider>

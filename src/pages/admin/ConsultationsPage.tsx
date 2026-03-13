@@ -30,7 +30,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2, Stethoscope, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -314,6 +314,31 @@ const ConsultationsPage = () => {
 
   const invList = inventory as { id: string; medicineId: string; medicineName: string; sellingPrice: string; currentStock?: number }[];
 
+  /** Group consultations: each initial visit with its follow-ups nested. Orphan follow-ups (parent not in list) shown separately. */
+  const { consultationGroups, orphanFollowUps } = React.useMemo(() => {
+    const initials = consultations.filter((c) => !c.parentConsultationId).sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    const initialIds = new Set(initials.map((i) => i.id));
+    const byParent = new Map<string, ConsultationRow[]>();
+    const orphans: ConsultationRow[] = [];
+    for (const c of consultations) {
+      if (c.parentConsultationId) {
+        if (initialIds.has(c.parentConsultationId as string)) {
+          const list = byParent.get(c.parentConsultationId as string) || [];
+          list.push(c);
+          byParent.set(c.parentConsultationId as string, list);
+        } else {
+          orphans.push(c);
+        }
+      }
+    }
+    for (const list of byParent.values()) {
+      list.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    }
+    orphans.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    const groups = initials.map((init) => ({ initial: init, followUps: byParent.get(init.id) || [] }));
+    return { consultationGroups: groups, orphanFollowUps: orphans };
+  }, [consultations]);
+
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const searchPatients = (term: string) => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
@@ -339,9 +364,9 @@ const ConsultationsPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <PageHeader title="Consultations" description="View consultations and create new or follow-up" />
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center justify-between gap-4 mb-3 shrink-0">
+        <PageHeader title="Consultations" />
         {user?.role === 'admin' && clinics.length > 0 && (
           <Select value={clinicId || undefined} onValueChange={setClinicId}>
             <SelectTrigger className="w-[200px]">
@@ -356,17 +381,17 @@ const ConsultationsPage = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(400px,1.5fr)] gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(400px,1.5fr)] gap-4 flex-1 min-h-0 overflow-hidden">
         {/* Left: Recent Consultations (filtered by patient when selected) */}
-        <Card className="flex flex-col min-h-0">
-          <CardHeader className="pb-3">
+        <Card className="flex flex-col min-h-0 overflow-hidden">
+          <CardHeader className="pb-2 shrink-0">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">
                   {form.patientId ? form.patientName || 'Patient' : 'Recent Consultations'}
                 </CardTitle>
                 <CardDescription className="mt-0.5">
-                  {form.patientId ? 'This patient only. ' : ''}Click row to add review
+                  {form.patientId ? 'This patient only. ' : ''}Initial visits with follow-ups grouped below. Click to add follow-up.
                 </CardDescription>
               </div>
               {form.patientId && (
@@ -376,7 +401,7 @@ const ConsultationsPage = () => {
               )}
             </div>
           </CardHeader>
-          <CardContent className="flex-1 min-h-0 overflow-y-auto p-4">
+          <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
             {listLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
@@ -391,41 +416,116 @@ const ConsultationsPage = () => {
                 <p className="text-sm text-muted-foreground mt-1">Select a patient to filter or create a new consultation</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {consultations.map((c) => (
-                  <div
-                    key={c.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => viewConsultationDetails(c)}
-                    onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(c)}
-                    className={cn(
-                      'flex items-center justify-between gap-3 rounded-lg border p-3.5 cursor-pointer transition-all duration-200',
-                      activeConsId === c.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-sm">{form.patientId ? c.consultationDate : c.patientName}</p>
-                        {c.parentConsultationId ? (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 font-medium">Review</span>
-                        ) : (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-medium">Consult</span>
+              <div className="space-y-4">
+                {orphanFollowUps.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground px-1 mb-1">Other follow-ups</p>
+                    {orphanFollowUps.map((f) => (
+                      <div
+                        key={f.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => viewConsultationDetails(f)}
+                        onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                        className={cn(
+                          'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
+                          activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium text-sm">{form.patientId ? f.consultationDate : f.patientName}</p>
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
+                              <FileText className="h-3 w-3" /> Follow-up
+                            </span>
+                          </div>
+                          {f.diagnosis && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{String(f.diagnosis)}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                            <Printer className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {consultationGroups.map(({ initial, followUps }) => (
+                  <div key={initial.id} className="space-y-1">
+                    {/* Initial Visit (mother consult) */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => viewConsultationDetails(initial)}
+                      onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(initial)}
+                      className={cn(
+                        'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
+                        activeConsId === initial.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm">{form.patientId ? initial.consultationDate : initial.patientName}</p>
+                          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
+                            <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
+                          </span>
+                        </div>
+                        {initial.diagnosis && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{String(initial.diagnosis)}</p>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {!form.patientId && `${c.consultationDate} · `}<span className="font-medium text-foreground">₹{c.totalAmount}</span>
-                      </p>
-                      {c.diagnosis && <p className="text-xs text-muted-foreground mt-0.5 truncate">{String(c.diagnosis)}</p>}
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(initial)} title="Add follow-up">
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(initial.id)} title="Print">
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(c)} title="Add review">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(c.id)} title="Print">
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {/* Follow-ups nested under this initial */}
+                    {followUps.length > 0 && (
+                      <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
+                        {followUps.map((f) => (
+                          <div
+                            key={f.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => viewConsultationDetails(f)}
+                            onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                            className={cn(
+                              'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
+                              activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm">{form.patientId ? f.consultationDate : f.patientName}</p>
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold border border-amber-200/60">
+                                  <FileText className="h-3 w-3" /> Follow-up
+                                </span>
+                              </div>
+                              {f.diagnosis && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{String(f.diagnosis)}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -434,20 +534,20 @@ const ConsultationsPage = () => {
         </Card>
 
         {/* Right: New/Review form */}
-        <Card className="flex flex-col min-h-0 border-l-0 lg:border-l">
-          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
+        <Card className="flex flex-col min-h-0 overflow-hidden border-l-0 lg:border-l">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3 shrink-0">
             <div>
               <CardTitle className="text-lg">
-                {form.parentConsultationId ? 'Add Review' : 'New Consult'}
+                {form.parentConsultationId ? 'Add Follow-up' : 'New Initial Visit'}
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {form.parentConsultationId
-                  ? 'Data copied from previous. Edit and save as new review.'
+                  ? 'Data copied from previous visit. Edit and save as follow-up.'
                   : 'Select patient, doctor, date and medicines.'}
               </CardDescription>
             </div>
             <Button onClick={openNewConsultation} disabled={!targetClinicId} size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" /> New Consult
+              <Plus className="h-4 w-4 mr-1.5" /> New Initial Visit
             </Button>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
