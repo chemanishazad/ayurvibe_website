@@ -34,7 +34,8 @@ export const api = {
   patients: {
     search: (mobile: string) => fetchApi<{ exists: boolean; patient: Record<string, unknown> | null }>(`/api/patients?mobile=${encodeURIComponent(mobile)}`),
     list: (params?: { name?: string; mobile?: string; search?: string; from?: string; to?: string }) => {
-      const q = new URLSearchParams({ list: '1', ...(params as Record<string, string>) });
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams({ list: '1', ...p } as Record<string, string>).toString();
       return fetchApi<Array<Record<string, unknown> & { isReturning?: boolean; consultationCount?: number }>>(`/api/patients?${q}`);
     },
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/patients', { method: 'POST', body: JSON.stringify(data) }),
@@ -57,7 +58,8 @@ export const api = {
   },
   consultations: {
     list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
-      const q = new URLSearchParams(params as Record<string, string>).toString();
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/consultations${q ? `?${q}` : ''}`);
     },
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/consultations/${id}`),
@@ -65,7 +67,8 @@ export const api = {
   },
   directSales: {
     list: (params?: { clinicId?: string; from?: string; to?: string }) => {
-      const q = new URLSearchParams(params as Record<string, string>).toString();
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/direct-sales${q ? `?${q}` : ''}`);
     },
     create: (data: { clinicId: string; saleDate: string; items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice: number }> }) =>
@@ -77,7 +80,10 @@ export const api = {
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/treatment-plans', { method: 'POST', body: JSON.stringify(data) }),
   },
   dashboard: {
-    admin: () => fetchApi<{
+    admin: (params?: { from?: string; to?: string }) => {
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
+      return fetchApi<{
       totalClinics: number;
       totalPatients: number;
       dailyConsultations: number;
@@ -86,31 +92,52 @@ export const api = {
       totalRevenue: number;
       totalProfit: number;
       dailyRevenue: number;
+      consultationAmount: number;
+      prescriptionMedicineSales: number;
+      directMedicineSales: number;
+      dailyConsultationAmount: number;
+      dailyPrescriptionMedicine: number;
+      dailyDirectMedicine: number;
       clinicWiseRevenue: { clinicId: string; clinicName: string; revenue: number }[];
-    }>('/api/dashboard/admin'),
-    analytics: (params?: { clinicId?: string; period?: string }) => {
-      const q = new URLSearchParams(params as Record<string, string>).toString();
+    }>(`/api/dashboard/admin${q ? `?${q}` : ''}`);
+    },
+    analytics: (params?: { clinicId?: string; period?: string; from?: string; to?: string }) => {
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<{ period: string; chartData: { date: string; visits: number; revenue: number }[] }>(`/api/dashboard/analytics${q ? `?${q}` : ''}`);
     },
-    clinic: (clinicId?: string) => fetchApi<{
+    clinic: (clinicId?: string, params?: { from?: string; to?: string }) => {
+      const p: Record<string, string> = {};
+      if (clinicId) p.clinicId = clinicId;
+      if (params?.from) p.from = params.from;
+      if (params?.to) p.to = params.to;
+      const q = new URLSearchParams(p).toString();
+      return fetchApi<{
       todayPatients: number;
       consultationsCount: number;
       medicineSales: number;
       dailyRevenue: number;
+      consultationAmount: number;
+      prescriptionMedicineSales: number;
+      directMedicineSales: number;
       lowStockAlerts: { medicineName: string; currentStock: number; minStockLevel: number; message: string }[];
-    }>(`/api/dashboard/clinic${clinicId ? `?clinicId=${clinicId}` : ''}`),
+    }>(`/api/dashboard/clinic${q ? `?${q}` : ''}`);
+    },
   },
   reports: {
     dailyConsultations: (params?: { clinicId?: string; from?: string; to?: string }) => {
-      const q = new URLSearchParams(params as Record<string, string>).toString();
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<{ date: string; count: number; revenue: number }[]>(`/api/reports/daily-consultations${q ? `?${q}` : ''}`);
     },
     medicineSales: (params?: { clinicId?: string; from?: string; to?: string }) => {
-      const q = new URLSearchParams(params as Record<string, string>).toString();
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<{ medicineName: string; quantity: number; total: number }[]>(`/api/reports/medicine-sales${q ? `?${q}` : ''}`);
     },
     clinicRevenue: (params?: { from?: string; to?: string }) => {
-      const q = new URLSearchParams(params as Record<string, string>).toString();
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<{ clinicId: string; clinicName: string; revenue: number; consultations: number }[]>(`/api/reports/clinic-revenue${q ? `?${q}` : ''}`);
     },
     inventory: (clinicId?: string) => fetchApi<Record<string, unknown>[]>(`/api/reports/inventory${clinicId ? `?clinicId=${clinicId}` : ''}`),
