@@ -34,7 +34,6 @@ import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-const DEFAULT_FEE = 250;
 
 type ConsultationRow = Record<string, unknown> & {
   id: string;
@@ -54,10 +53,11 @@ const ConsultationsPage = () => {
 
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
-  const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
+  const [medicinesMaster, setMedicinesMaster] = useState<{ id: string; name: string }[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState('');
   const [form, setForm] = useState({
     patientId: patientIdFromState || '',
@@ -68,14 +68,18 @@ const ConsultationsPage = () => {
     symptoms: '',
     diagnosis: '',
     notes: '',
-    consultationFee: DEFAULT_FEE,
     followUpRequired: false,
     parentConsultationId: '',
-    medicines: [] as { inventoryId: string; medicineId: string; medicineName: string; quantity: number; unitPrice: number }[],
+    weight: '' as string | number,
+    bpSystolic: '' as string | number,
+    bpDiastolic: '' as string | number,
+    temperature: '' as string | number,
+    pulse: '' as string | number,
+    dietLifestyleAdvice: '',
+    prescription: [] as { medicineId: string; medicineName: string; dosage: string; durationDays: string | number }[],
   });
-  const [medicineOpen, setMedicineOpen] = useState<number | null>(null);
+  const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
   const [followUpDateOpen, setFollowUpDateOpen] = useState(false);
-  const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [patientSearchOpen, setPatientSearchOpen] = useState(false);
   const [patientSearchResults, setPatientSearchResults] = useState<{ id: string; name: string; mobile: string }[]>([]);
   const [patientSearching, setPatientSearching] = useState(false);
@@ -97,7 +101,7 @@ const ConsultationsPage = () => {
   useEffect(() => {
     if (!parentConsultationIdFromState || !isReview) return;
     api.consultations.get(parentConsultationIdFromState).then((cons) => {
-      const meds = (cons.medicines as { inventoryId?: string; medicineId?: string; medicineName: string; quantity: number; unitPrice: string }[]) || [];
+      const presc = (cons.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
       if (user?.role === 'admin' && cons.clinicId) setClinicId(cons.clinicId as string);
       setForm((f) => ({
         ...f,
@@ -107,15 +111,19 @@ const ConsultationsPage = () => {
         symptoms: (cons.symptoms as string) || '',
         diagnosis: (cons.diagnosis as string) || '',
         notes: (cons.notes as string) || '',
-        consultationFee: Number(cons.consultationFee) || DEFAULT_FEE,
         followUpRequired: true,
         followUpDate: (cons.followUpDate as string) || '',
-        medicines: meds.filter((m) => m.inventoryId && m.medicineId).map((m) => ({
-          inventoryId: m.inventoryId!,
-          medicineId: m.medicineId!,
-          medicineName: m.medicineName || 'Medicine',
-          quantity: m.quantity,
-          unitPrice: parseFloat(m.unitPrice) || 0,
+        weight: cons.weight != null ? String(cons.weight) : '',
+        bpSystolic: cons.bpSystolic != null ? String(cons.bpSystolic) : '',
+        bpDiastolic: cons.bpDiastolic != null ? String(cons.bpDiastolic) : '',
+        temperature: cons.temperature != null ? String(cons.temperature) : '',
+        pulse: cons.pulse != null ? String(cons.pulse) : '',
+        dietLifestyleAdvice: (cons.dietLifestyleAdvice as string) || '',
+        prescription: presc.filter((p) => p.medicineId).map((p) => ({
+          medicineId: p.medicineId!,
+          medicineName: p.medicineName || 'Medicine',
+          dosage: p.dosage || '',
+          durationDays: p.durationDays ?? '',
         })),
       }));
     }).catch((err) => {
@@ -136,18 +144,13 @@ const ConsultationsPage = () => {
       if (user?.role === 'admin' && data.length > 0) setClinicId((c) => c || data[0].id);
     }).catch(() => setClinics([]));
     api.doctors.list().then(setDoctors).catch(() => setDoctors([]));
+    api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
   }, [user?.role]);
 
-  useEffect(() => {
-    if (targetClinicId) {
-      api.inventory.list(targetClinicId).then(setInventory).catch(() => setInventory([]));
-    } else setInventory([]);
-  }, [targetClinicId]);
-
   const loadConsultations = () => {
-    if (user?.role === 'admin' && !targetClinicId) return;
     setListLoading(true);
-    const params: Record<string, string> = user?.role === 'admin' ? { clinicId: targetClinicId } : {};
+    const params: Record<string, string> = {};
+    if (user?.role === 'admin' && targetClinicId) params.clinicId = targetClinicId;
     if (form.patientId?.trim()) params.patientId = form.patientId.trim();
     api.consultations.list(params)
       .then((data) => setConsultations(data as ConsultationRow[]))
@@ -159,39 +162,38 @@ const ConsultationsPage = () => {
     loadConsultations();
   }, [targetClinicId, user?.role, form.patientId]);
 
-  const addMedicine = () => {
-    const inv = inventory[0] as { id: string; medicineId: string; medicineName: string; sellingPrice: string };
-    if (!inv) return;
+  const addPrescription = () => {
+    const first = medicinesMaster[0];
+    if (!first) return;
     setForm((f) => ({
       ...f,
-      medicines: [...f.medicines, { inventoryId: inv.id, medicineId: inv.medicineId, medicineName: inv.medicineName || 'Medicine', quantity: 1, unitPrice: parseFloat(inv.sellingPrice as string) || 0 }],
+      prescription: [...f.prescription, { medicineId: first.id, medicineName: first.name, dosage: '', durationDays: '' }],
     }));
-    setMedicineOpen(form.medicines.length);
+    setPrescriptionOpen(form.prescription.length);
   };
 
-  const selectMedicine = (idx: number, inv: { id: string; medicineId: string; medicineName: string; sellingPrice: string; currentStock?: number }) => {
+  const selectPrescription = (idx: number, med: { id: string; name: string }) => {
     setForm((f) => ({
       ...f,
-      medicines: f.medicines.map((m, i) =>
-        i === idx ? { ...m, inventoryId: inv.id, medicineId: inv.medicineId, medicineName: inv.medicineName || 'Medicine', unitPrice: parseFloat(inv.sellingPrice as string) || 0 } : m
+      prescription: f.prescription.map((p, i) =>
+        i === idx ? { ...p, medicineId: med.id, medicineName: med.name } : p
       ),
     }));
-    setMedicineOpen(null);
+    setPrescriptionOpen(null);
   };
 
-  const removeMedicine = (idx: number) => {
-    setForm((f) => ({ ...f, medicines: f.medicines.filter((_, i) => i !== idx) }));
+  const removePrescription = (idx: number) => {
+    setForm((f) => ({ ...f, prescription: f.prescription.filter((_, i) => i !== idx) }));
   };
 
-  const updateMedicine = (idx: number, field: string, value: number | string) => {
+  const updatePrescription = (idx: number, field: string, value: string | number) => {
     setForm((f) => ({
       ...f,
-      medicines: f.medicines.map((m, i) => (i === idx ? { ...m, [field]: value } : m)),
+      prescription: f.prescription.map((p, i) => (i === idx ? { ...p, [field]: value } : p)),
     }));
   };
 
-  const medicineTotal = form.medicines.reduce((s, m) => s + m.quantity * m.unitPrice, 0);
-  const totalAmount = form.consultationFee + medicineTotal;
+  const toNum = (v: string | number) => (v === '' || v == null ? undefined : Number(v));
 
   const handleSubmit = async () => {
     if (!form.patientId || !form.doctorId || !targetClinicId) {
@@ -208,18 +210,23 @@ const ConsultationsPage = () => {
         symptoms: form.symptoms || undefined,
         diagnosis: form.diagnosis || undefined,
         notes: form.notes || undefined,
-        consultationFee: form.consultationFee,
+        consultationFee: 0,
         followUpRequired: form.followUpRequired,
         followUpDate: form.followUpDate || undefined,
         parentConsultationId: form.parentConsultationId || undefined,
-        medicines: form.medicines.map((m) => ({
-          inventoryId: m.inventoryId,
-          medicineId: m.medicineId,
-          quantity: m.quantity,
-          unitPrice: m.unitPrice,
+        weight: toNum(form.weight),
+        bpSystolic: toNum(form.bpSystolic),
+        bpDiastolic: toNum(form.bpDiastolic),
+        temperature: toNum(form.temperature),
+        pulse: toNum(form.pulse),
+        dietLifestyleAdvice: form.dietLifestyleAdvice || undefined,
+        prescription: form.prescription.filter((p) => p.medicineId).map((p) => ({
+          medicineId: p.medicineId,
+          dosage: p.dosage || undefined,
+          durationDays: toNum(p.durationDays),
         })),
       }) as { id?: string };
-      toast({ title: 'Consultation saved', description: `Total: ₹${totalAmount}` });
+      toast({ title: 'Consultation saved', description: 'Prescription recorded. Add fee & medicines at Pharmacy.' });
       const savedPatientId = form.patientId;
       const savedPatientName = form.patientName;
       setForm({
@@ -231,10 +238,15 @@ const ConsultationsPage = () => {
         symptoms: '',
         diagnosis: '',
         notes: '',
-        consultationFee: DEFAULT_FEE,
         followUpRequired: false,
         parentConsultationId: '',
-        medicines: [],
+        weight: '',
+        bpSystolic: '',
+        bpDiastolic: '',
+        temperature: '',
+        pulse: '',
+        dietLifestyleAdvice: '',
+        prescription: [],
       });
       loadConsultations();
       if (created?.id) {
@@ -270,51 +282,59 @@ const ConsultationsPage = () => {
       symptoms: '',
       diagnosis: '',
       notes: '',
-      consultationFee: DEFAULT_FEE,
       followUpRequired: false,
       parentConsultationId: '',
-      medicines: [],
+      weight: '',
+      bpSystolic: '',
+      bpDiastolic: '',
+      temperature: '',
+      pulse: '',
+      dietLifestyleAdvice: '',
+      prescription: [],
     });
   };
 
-  const openReviewFromConsultation = (cons: ConsultationRow) => {
-    api.consultations.get(cons.id).then((data) => {
-      const meds = (data.medicines as { inventoryId?: string; medicineId?: string; medicineName: string; quantity: number; unitPrice: string }[]) || [];
-      setActiveConsId(cons.id);
-      setForm({
+  const loadConsultationForFollowUp = (consultationId: string) => {
+    api.consultations.get(consultationId).then((data) => {
+      const presc = (data.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
+      const d = data as Record<string, unknown>;
+      setForm((f) => ({
+        ...f,
         patientId: data.patientId as string,
         patientName: data.patientName as string,
         doctorId: data.doctorId as string,
+        parentConsultationId: consultationId,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
-        followUpDate: '',
+        followUpRequired: true,
         symptoms: (data.symptoms as string) || '',
         diagnosis: (data.diagnosis as string) || '',
         notes: (data.notes as string) || '',
-        consultationFee: Number(data.consultationFee) || DEFAULT_FEE,
-        followUpRequired: true,
-        parentConsultationId: cons.id,
-        medicines: meds.filter((m) => m.inventoryId && m.medicineId).map((m) => ({
-          inventoryId: m.inventoryId!,
-          medicineId: m.medicineId!,
-          medicineName: m.medicineName || 'Medicine',
-          quantity: m.quantity,
-          unitPrice: parseFloat(m.unitPrice) || 0,
+        weight: d.weight != null ? String(d.weight) : '',
+        bpSystolic: d.bpSystolic != null ? String(d.bpSystolic) : '',
+        bpDiastolic: d.bpDiastolic != null ? String(d.bpDiastolic) : '',
+        temperature: d.temperature != null ? String(d.temperature) : '',
+        pulse: d.pulse != null ? String(d.pulse) : '',
+        dietLifestyleAdvice: (d.dietLifestyleAdvice as string) || '',
+        prescription: presc.filter((p) => p.medicineId).map((p) => ({
+          medicineId: p.medicineId!,
+          medicineName: p.medicineName || 'Medicine',
+          dosage: p.dosage || '',
+          durationDays: p.durationDays ?? '',
         })),
-      });
+      }));
     }).catch(() => toast({ title: 'Failed to load details', variant: 'destructive' }));
   };
 
-  const openFollowUp = (cons: ConsultationRow) => {
-    openReviewFromConsultation(cons);
-  };
-
   const viewConsultationDetails = (cons: ConsultationRow) => {
-    openReviewFromConsultation(cons);
+    setActiveConsId(cons.id);
+    loadConsultationForFollowUp(cons.id);
   };
 
-  const invList = inventory as { id: string; medicineId: string; medicineName: string; sellingPrice: string; currentStock?: number }[];
+  const openFollowUp = (cons: ConsultationRow) => {
+    viewConsultationDetails(cons);
+  };
 
-  /** Group consultations: each initial visit with its follow-ups nested. Orphan follow-ups (parent not in list) shown separately. */
+  /** Group consultations: initial visits with follow-ups nested. Orphan follow-ups shown separately. */
   const { consultationGroups, orphanFollowUps } = React.useMemo(() => {
     const initials = consultations.filter((c) => !c.parentConsultationId).sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
     const initialIds = new Set(initials.map((i) => i.id));
@@ -382,16 +402,16 @@ const ConsultationsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(400px,1.5fr)] gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Left: Recent Consultations (filtered by patient when selected) */}
+        {/* Left: Old records — select for follow-up or new consult */}
         <Card className="flex flex-col min-h-0 overflow-hidden">
           <CardHeader className="pb-2 shrink-0">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">
-                  {form.patientId ? form.patientName || 'Patient' : 'Recent Consultations'}
+                  {form.patientId ? form.patientName || 'Patient' : 'Consultation Records'}
                 </CardTitle>
                 <CardDescription className="mt-0.5">
-                  {form.patientId ? 'This patient only. ' : ''}Initial visits with follow-ups grouped below. Click to add follow-up.
+                  {form.patientId ? 'This patient only. ' : ''}Click a record to view, add follow-up, or start new consult.
                 </CardDescription>
               </div>
               {form.patientId && (
@@ -405,7 +425,7 @@ const ConsultationsPage = () => {
             {listLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
-                <p className="text-sm text-muted-foreground">Loading consultations...</p>
+                <p className="text-sm text-muted-foreground">Loading records...</p>
               </div>
             ) : consultations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -457,7 +477,6 @@ const ConsultationsPage = () => {
                 )}
                 {consultationGroups.map(({ initial, followUps }) => (
                   <div key={initial.id} className="space-y-1">
-                    {/* Initial Visit (mother consult) */}
                     <div
                       role="button"
                       tabIndex={0}
@@ -488,7 +507,6 @@ const ConsultationsPage = () => {
                         </Button>
                       </div>
                     </div>
-                    {/* Follow-ups nested under this initial */}
                     {followUps.length > 0 && (
                       <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
                         {followUps.map((f) => (
@@ -533,7 +551,7 @@ const ConsultationsPage = () => {
           </CardContent>
         </Card>
 
-        {/* Right: New/Review form */}
+        {/* Right: New/Edit form */}
         <Card className="flex flex-col min-h-0 overflow-hidden border-l-0 lg:border-l">
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3 shrink-0">
             <div>
@@ -543,7 +561,7 @@ const ConsultationsPage = () => {
               <CardDescription className="mt-0.5">
                 {form.parentConsultationId
                   ? 'Data copied from previous visit. Edit and save as follow-up.'
-                  : 'Select patient, doctor, date and medicines.'}
+                  : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
               </CardDescription>
             </div>
             <Button onClick={openNewConsultation} disabled={!targetClinicId} size="sm" className="shrink-0">
@@ -631,6 +649,28 @@ const ConsultationsPage = () => {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div>
+                <Label className="text-xs">Weight (kg)</Label>
+                <Input type="number" step="0.1" className="h-9" placeholder="—" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">BP (mmHg)</Label>
+                <div className="flex gap-1 items-center">
+                  <Input type="number" className="h-9 w-14" placeholder="—" value={form.bpSystolic} onChange={(e) => setForm((f) => ({ ...f, bpSystolic: e.target.value }))} />
+                  <span className="text-muted-foreground">/</span>
+                  <Input type="number" className="h-9 w-14" placeholder="—" value={form.bpDiastolic} onChange={(e) => setForm((f) => ({ ...f, bpDiastolic: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Temperature (°C)</Label>
+                <Input type="number" step="0.1" className="h-9" placeholder="—" value={form.temperature} onChange={(e) => setForm((f) => ({ ...f, temperature: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Pulse (bpm)</Label>
+                <Input type="number" className="h-9" placeholder="—" value={form.pulse} onChange={(e) => setForm((f) => ({ ...f, pulse: e.target.value }))} />
+              </div>
+            </div>
             <div className="pt-4 border-t space-y-4">
             <div>
               <Label>Symptoms</Label>
@@ -643,6 +683,10 @@ const ConsultationsPage = () => {
             <div>
               <Label>Notes</Label>
               <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Notes" />
+            </div>
+            <div>
+              <Label>Diet / Lifestyle Advice</Label>
+              <Textarea value={form.dietLifestyleAdvice} onChange={(e) => setForm((f) => ({ ...f, dietLifestyleAdvice: e.target.value }))} placeholder="Diet advice, lifestyle recommendations..." rows={2} className="resize-none" />
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -681,7 +725,11 @@ const ConsultationsPage = () => {
             {consultations.length > 0 && !form.parentConsultationId && (
               <div>
                 <Label>Link to previous (follow-up)</Label>
-                <Select value={form.parentConsultationId || '__none__'} onValueChange={(v) => setForm((f) => ({ ...f, parentConsultationId: v === '__none__' ? '' : v }))}>
+                <Select value={form.parentConsultationId || '__none__'} onValueChange={(v) => {
+                  const id = v === '__none__' ? '' : v;
+                  setForm((f) => ({ ...f, parentConsultationId: id }));
+                  if (id) loadConsultationForFollowUp(id);
+                }}>
                   <SelectTrigger><SelectValue placeholder="None (new consultation)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None – new consultation</SelectItem>
@@ -693,26 +741,22 @@ const ConsultationsPage = () => {
               </div>
             )}
             </div>
-            <div>
-              <Label>Consultation Fee (₹)</Label>
-              <Input type="number" value={form.consultationFee} onChange={(e) => setForm((f) => ({ ...f, consultationFee: Number(e.target.value) || DEFAULT_FEE }))} />
-            </div>
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between mb-2">
-                <Label className="text-muted-foreground">Medicines</Label>
-                <Button size="sm" variant="outline" onClick={addMedicine} disabled={!targetClinicId || inventory.length === 0}>
-                  <Plus className="h-4 w-4 mr-1" /> Add medicine
+                <Label className="text-muted-foreground">Section 1 — Prescription (what doctor prescribes)</Label>
+                <Button size="sm" variant="outline" onClick={addPrescription} disabled={medicinesMaster.length === 0}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
-              {form.medicines.length > 0 && (
+              <p className="text-xs text-muted-foreground mb-1">Medicine | Dosage | Duration — Patient may not buy all</p>
+              {form.prescription.length > 0 && (
                 <div className="mt-2 space-y-2">
-                  {form.medicines.map((m, i) => (
-                    <div key={i} className="flex gap-2 items-center rounded border p-2">
-                      <Popover open={medicineOpen === i} onOpenChange={(o) => setMedicineOpen(o ? i : null)}>
+                  {form.prescription.map((p, i) => (
+                    <div key={i} className="flex gap-2 items-center rounded border p-2 flex-wrap">
+                      <Popover open={prescriptionOpen === i} onOpenChange={(o) => setPrescriptionOpen(o ? i : null)}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="flex-1 justify-between font-normal">
-                            {m.medicineName || 'Select medicine'}
-                            <span className="text-muted-foreground ml-1">({invList.find((x) => x.id === m.inventoryId)?.currentStock ?? 0} left)</span>
+                          <Button variant="outline" role="combobox" className="min-w-[140px] justify-between font-normal">
+                            {p.medicineName || 'Select medicine'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[300px] p-0" align="start">
@@ -721,34 +765,23 @@ const ConsultationsPage = () => {
                             <CommandList>
                               <CommandEmpty>No medicine found</CommandEmpty>
                               <CommandGroup>
-                                {invList
-                                  .filter((inv) => inv.currentStock !== undefined && inv.currentStock > 0)
-                                  .map((inv) => (
-                                    <CommandItem key={inv.id} value={inv.medicineName} onSelect={() => selectMedicine(i, inv)}>
-                                      {inv.medicineName} (Stock: {inv.currentStock}) – ₹{inv.sellingPrice}
-                                    </CommandItem>
-                                  ))}
-                                {invList.filter((inv) => (inv.currentStock ?? 0) > 0).length === 0 && (
-                                  <CommandItem disabled>No stock available</CommandItem>
-                                )}
+                                {medicinesMaster.map((med) => (
+                                  <CommandItem key={med.id} value={med.name} onSelect={() => selectPrescription(i, med)}>
+                                    {med.name}
+                                  </CommandItem>
+                                ))}
                               </CommandGroup>
                             </CommandList>
                           </Command>
                         </PopoverContent>
                       </Popover>
-                      <Input type="number" className="w-16" value={m.quantity} onChange={(e) => updateMedicine(i, 'quantity', Number(e.target.value) || 1)} min={1} />
-                      <Input type="number" className="w-20" value={m.unitPrice} onChange={(e) => updateMedicine(i, 'unitPrice', Number(e.target.value) || 0)} />
-                      <span className="text-sm">₹{m.quantity * m.unitPrice}</span>
-                      <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)}><Trash2 className="h-4 w-4" /></Button>
+                      <Input className="w-28" placeholder="e.g. 1 tab BD" value={p.dosage} onChange={(e) => updatePrescription(i, 'dosage', e.target.value)} />
+                      <Input type="number" className="w-16" placeholder="days" value={p.durationDays} onChange={(e) => updatePrescription(i, 'durationDays', e.target.value)} min={0} />
+                      <Button size="icon" variant="ghost" onClick={() => removePrescription(i)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-            <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Consultation Fee</span><span>₹{form.consultationFee}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Medicines</span><span>₹{medicineTotal}</span></div>
-              <div className="flex justify-between font-semibold text-base pt-2 border-t"><span>Total</span><span className="text-primary">₹{totalAmount}</span></div>
             </div>
             <Button onClick={handleSubmit} disabled={loading || !targetClinicId} className="w-full h-11 font-medium" size="lg">
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save & Print'}

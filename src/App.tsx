@@ -11,13 +11,15 @@ import SectionPage from "./pages/SectionPage";
 import LocationPage from "./pages/LocationPage";
 import Login from "./pages/Login";
 import AdminRoute from "./components/AdminRoute";
+import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
 import AdminShell from "./pages/admin/AdminShell";
 import DashboardPage from "./pages/admin/DashboardPage";
 import PatientsPage from "./pages/admin/PatientsPage";
 import ConsultationsPage from "./pages/admin/ConsultationsPage";
+import PharmacyPage from "./pages/admin/PharmacyPage";
 import ConsultationPrintPage from "./pages/admin/ConsultationPrintPage";
+import PharmacyPrintPage from "./pages/admin/PharmacyPrintPage";
 import TreatmentPlansPage from "./pages/admin/TreatmentPlansPage";
-import DirectSalesPage from "./pages/admin/DirectSalesPage";
 import MedicinesPage from "./pages/admin/MedicinesPage";
 import InventoryPage from "./pages/admin/InventoryPage";
 import ReportsPage from "./pages/admin/ReportsPage";
@@ -86,16 +88,17 @@ const App = () => (
 
           {/* Print: no login required, uses localStorage for data */}
           <Route path="/print/consultation/:id" element={<ConsultationPrintPage />} />
+          <Route path="/print/pharmacy/:id" element={<PharmacyPrintPage />} />
 
           {/* Admin: login at /admin, dashboard at /admin/dashboard, etc. */}
           <Route path="/admin">
             <Route index element={<Login />} />
-            <Route element={<AdminRoute><AdminShell /></AdminRoute>}>
+            <Route element={<AdminRoute><AdminErrorBoundary><AdminShell /></AdminErrorBoundary></AdminRoute>}>
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="patients" element={<PatientsPage />} />
               <Route path="consultations" element={<ConsultationsPage />} />
+              <Route path="pharmacy" element={<PharmacyPage />} />
               <Route path="treatment-plans" element={<TreatmentPlansPage />} />
-              <Route path="direct-sales" element={<DirectSalesPage />} />
               <Route path="medicines" element={<MedicinesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="reports" element={<ReportsPage />} />

@@ -37,7 +37,6 @@ import {
   Package,
   FileText,
   Building2,
-  ShoppingCart,
   ClipboardList,
   Menu,
   ChevronDown,
@@ -62,13 +61,14 @@ const navGroups = [
     label: 'Clinical',
     items: [
       { path: '/admin/patients', label: 'Patients', icon: Users },
+      { path: '/admin/consultations', label: 'Consultations', icon: Stethoscope },
+      { path: '/admin/pharmacy', label: 'Pharmacy', icon: Pill },
       { path: '/admin/treatment-plans', label: 'Treatment Plans', icon: ClipboardList },
     ],
   },
   {
     label: 'Commerce',
     items: [
-      { path: '/admin/direct-sales', label: 'Direct Sales', icon: ShoppingCart },
       { path: '/admin/medicines', label: 'Medicines', icon: Pill },
       { path: '/admin/inventory', label: 'Inventory', icon: Package },
     ],
@@ -98,7 +98,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
   React.useEffect(() => {
     const token = getAuthToken();
     if (!token) return;
-    fetch(`${API_URL}/api/clinics`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_URL}/api/clinics`, { cache: 'no-store', headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then((data: Clinic[]) => setClinics(Array.isArray(data) ? data : []))
       .catch(() => setClinics([]));

@@ -244,7 +244,7 @@ const DashboardPage = () => {
     );
   }
 
-  if (isAdmin && adminData) {
+  if (isAdmin && adminData && typeof adminData.totalClinics === 'number') {
     const clinicChartData = adminData.clinicWiseRevenue.map((r) => ({
       name: r.clinicName,
       revenue: r.revenue,
@@ -426,7 +426,7 @@ const DashboardPage = () => {
     );
   }
 
-  if (clinicData) {
+  if (clinicData && typeof clinicData.consultationsCount === 'number') {
     const revenueBreakdown = [
       { name: 'Consultation Fees', value: clinicData.consultationAmount, color: CHART_COLORS[0] },
       { name: 'Prescription Medicine', value: clinicData.prescriptionMedicineSales, color: CHART_COLORS[1] },

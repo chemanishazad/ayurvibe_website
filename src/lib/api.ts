@@ -8,6 +8,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -64,6 +65,12 @@ export const api = {
     },
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/consultations/${id}`),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/consultations', { method: 'POST', body: JSON.stringify(data) }),
+    addPharmacy: (id: string, payload: {
+      items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice?: number }>;
+      consultationFee?: number;
+      treatments?: Array<{ name: string; price: number }>;
+    }) =>
+      fetchApi<Record<string, unknown>>(`/api/consultations/${id}/pharmacy`, { method: 'POST', body: JSON.stringify(payload) }),
   },
   directSales: {
     list: (params?: { clinicId?: string; from?: string; to?: string }) => {
