@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -149,9 +149,28 @@ const MedicinesPage = () => {
                       <td className="py-2 text-right">{m.minStockLevel}</td>
                       {isAdmin && (
                         <td className="py-2 text-right">
+                          <div className="flex gap-1 justify-end">
                           <Button size="sm" variant="ghost" onClick={() => openEdit(m)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={async () => {
+                              if (!confirm(`Delete "${m.name}"? This fails if medicine is in use.`)) return;
+                              try {
+                                await api.medicines.delete(m.id);
+                                toast({ title: 'Medicine deleted' });
+                                api.medicines.list().then((data) => setMedicines(data as Medicine[]));
+                              } catch (e) {
+                                toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          </div>
                         </td>
                       )}
                     </tr>

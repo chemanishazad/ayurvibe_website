@@ -52,6 +52,17 @@ export const api = {
     list: () => fetchApi<{ id: string; name: string; uom: string; purchasePrice: string; sellingPrice: string; minStockLevel: number }[]>('/api/medicines'),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/medicines', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/medicines/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/medicines/${id}`, { method: 'DELETE' }),
+  },
+  suppliers: {
+    list: () => fetchApi<{ id: string; name: string; contact?: string; address?: string }[]>('/api/suppliers'),
+    create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/suppliers', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/suppliers/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/suppliers/${id}`, { method: 'DELETE' }),
+  },
+  purchases: {
+    create: (data: { clinicId: string; medicineId: string; supplierId: string; quantity: number; unitPurchasePrice: number | string; sellingPrice?: number | string; purchaseDate?: string; expiryDate?: string }) =>
+      fetchApi<Record<string, unknown>>('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),
   },
   inventory: {
     list: (clinicId?: string) => fetchApi<Record<string, unknown>[]>(`/api/inventory${clinicId ? `?clinicId=${clinicId}` : ''}`),

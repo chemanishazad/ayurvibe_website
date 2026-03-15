@@ -40,6 +40,7 @@ import {
   ClipboardList,
   Menu,
   ChevronDown,
+  Truck,
 } from 'lucide-react';
 import { getAuthToken, getAuthUser, setAdminAuthenticated, setAuthUser } from '@/pages/Login';
 import { api } from '@/lib/api';
@@ -70,6 +71,7 @@ const navGroups = [
     label: 'Commerce',
     items: [
       { path: '/admin/medicines', label: 'Medicines', icon: Pill },
+      { path: '/admin/suppliers', label: 'Suppliers', icon: Truck },
       { path: '/admin/inventory', label: 'Inventory', icon: Package },
     ],
   },
