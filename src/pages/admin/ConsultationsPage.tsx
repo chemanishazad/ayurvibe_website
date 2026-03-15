@@ -33,14 +33,38 @@ import { getAuthUser } from '@/pages/Login';
 import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2, Stethoscope, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { BmiDisplay } from '@/components/BmiDisplay';
 
 
 type ConsultationRow = Record<string, unknown> & {
   id: string;
   patientName: string;
   consultationDate: string;
+  consultationTime?: string | null;
   totalAmount: string;
   parentConsultationId?: string | null;
+};
+
+const fmtDateWithTime = (date: string, time?: string | null) =>
+  time ? `${format(new Date(date + 'T00:00:00'), 'dd-MM-yyyy')} ${time}` : format(new Date(date + 'T00:00:00'), 'dd-MM-yyyy');
+
+/** Restrict numeric input: max N digits whole part, optional decimal places. */
+const restrictVital = (v: string, maxWhole = 3, maxDecimal = 2): string => {
+  if (!v) return '';
+  const parts = v.replace(/[^\d.]/g, '').split('.');
+  const whole = parts[0]?.slice(0, maxWhole) ?? '';
+  if (parts.length === 1) return whole;
+  const dec = parts[1]?.slice(0, maxDecimal) ?? '';
+  return maxDecimal ? `${whole}.${dec}` : whole;
+};
+
+const diagnosisDisplay = (d: unknown): string => {
+  if (d == null || d === '') return '';
+  try {
+    const parsed = typeof d === 'string' ? JSON.parse(d) : d;
+    if (Array.isArray(parsed)) return parsed.map((x: { name?: string }) => x?.name).filter(Boolean).join(', ');
+  } catch {}
+  return String(d);
 };
 
 const ConsultationsPage = () => {
@@ -59,23 +83,69 @@ const ConsultationsPage = () => {
   const [loading, setLoading] = useState(false);
   const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState('');
+  const defaultPersonalHistory = () => ({
+    diet: [] as string[],
+    exercise: [] as string[],
+    habits: [] as string[],
+    bowelMovement: [] as string[],
+    appetite: [] as string[],
+    micturition: [] as string[],
+    sleepPattern: [] as string[],
+  });
+  const defaultMenstrualHistory = () => ({
+    menstrualCycle: '' as '' | 'Regular' | 'Irregular',
+    lmp: '',
+    padsPerDay: '' as string | number,
+    cycleLengthDays: '' as string | number,
+    cycleCountOnVisit: '' as string | number,
+    clots: '' as '' | 'Yes' | 'No',
+    menstrualFlow: '' as '' | 'Normal' | 'Heavy' | 'Scanty',
+    dysmenorrhea: false,
+    leucorrhea: false,
+    menopause: false,
+    menopauseAge: '' as string | number,
+    gravida: '' as string | number,
+    para: '' as string | number,
+    abortions: '' as string | number,
+  });
+  const defaultAyurvedaExamination = () => ({
+    naadi: '' as '' | 'V' | 'P' | 'K' | 'VP' | 'VK' | 'PK',
+    malam: '' as '' | 'Regular' | 'Constipated',
+    mootram: '' as '' | 'Regular' | 'Irregular',
+    mootramColour: '' as '' | 'Clear' | 'White' | 'Yellow'| 'Red' ,
+    jihwa: '' as '' | 'Lipta' | 'Alipta',
+    shabda: '' as '' | 'Normal' | 'Abnormal',
+    sparsha: [] as string[],
+    drik: '' as '' | 'Normal' | 'Abnormal',
+    drikColour: '' as '' | 'White' | 'Pink' | 'Red' | 'Yellow',
+    aakriti: '' as '' | 'Heena' | 'Madhyama' | 'Sthula',
+  });
   const [form, setForm] = useState({
     patientId: patientIdFromState || '',
     patientName: '',
+    patientMedicalHistory: '',
+    patientGender: '',
     doctorId: '',
     consultationDate: format(new Date(), 'yyyy-MM-dd'),
+    consultationTime: format(new Date(), 'HH:mm'),
     followUpDate: '',
     symptoms: '',
+    personalHistory: defaultPersonalHistory(),
     diagnosis: '',
     notes: '',
     followUpRequired: false,
     parentConsultationId: '',
     weight: '' as string | number,
+    height: '' as string | number,
     bpSystolic: '' as string | number,
     bpDiastolic: '' as string | number,
     temperature: '' as string | number,
     pulse: '' as string | number,
+    spo2: '' as string | number,
+    cbg: '' as string | number,
     dietLifestyleAdvice: '',
+    menstrualHistory: defaultMenstrualHistory(),
+    ayurvedaExamination: defaultAyurvedaExamination(),
     prescription: [] as { medicineId: string; medicineName: string; dosage: string; durationDays: string | number }[],
   });
   const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
@@ -83,7 +153,17 @@ const ConsultationsPage = () => {
   const [patientSearchOpen, setPatientSearchOpen] = useState(false);
   const [patientSearchResults, setPatientSearchResults] = useState<{ id: string; name: string; mobile: string }[]>([]);
   const [patientSearching, setPatientSearching] = useState(false);
+  const [consultationErrors, setConsultationErrors] = useState<string[]>([]);
   const { toast } = useToast();
+
+  const consultationFormErrors = (): string[] => {
+    const errs: string[] = [];
+    if (!form.patientId?.trim()) errs.push('Beneficiary is required');
+    if (!form.doctorId?.trim()) errs.push('Doctor is required');
+    if (!targetClinicId) errs.push('Clinic is required');
+    if (!form.consultationDate?.trim()) errs.push('Consultation date is required');
+    return errs;
+  };
 
   const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
 
@@ -92,8 +172,13 @@ const ConsultationsPage = () => {
   }, [patientIdFromState]);
 
   useEffect(() => {
-    if (form.patientId && !form.patientName) {
-      api.patients.get(form.patientId).then((p) => setForm((f) => ({ ...f, patientName: (p.name as string) || '' }))).catch(() => {});
+    if (form.patientId) {
+      api.patients.get(form.patientId).then((p) => setForm((f) => ({
+        ...f,
+        patientName: (p.name as string) || '',
+        patientMedicalHistory: (p.medicalHistory as string) || '',
+        patientGender: (p.gender as string) || '',
+      }))).catch(() => {});
     }
   }, [form.patientId]);
 
@@ -103,21 +188,58 @@ const ConsultationsPage = () => {
     api.consultations.get(parentConsultationIdFromState).then((cons) => {
       const presc = (cons.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
       if (user?.role === 'admin' && cons.clinicId) setClinicId(cons.clinicId as string);
+      let ph = defaultPersonalHistory();
+      try {
+        const raw = cons.personalHistory as string;
+        if (raw) ph = { ...defaultPersonalHistory(), ...JSON.parse(raw) };
+      } catch {}
+      let mh = defaultMenstrualHistory();
+      try {
+        const rawMh = cons.menstrualHistory as string;
+        if (rawMh) mh = { ...defaultMenstrualHistory(), ...JSON.parse(rawMh) };
+      } catch {}
+      let ae = defaultAyurvedaExamination();
+      try {
+        const rawAe = cons.ayurvedaExamination as string;
+        if (rawAe) {
+          const parsed = JSON.parse(rawAe) as Record<string, unknown>;
+          ae = { ...defaultAyurvedaExamination(), ...parsed };
+          if (parsed.sparsha != null && !Array.isArray(parsed.sparsha)) ae.sparsha = [String(parsed.sparsha)];
+        }
+      } catch {}
+      let diagnosisText = '';
+      try {
+        const d = cons.diagnosis as string;
+        if (d?.startsWith('[')) {
+          const arr = JSON.parse(d) as { name?: string }[];
+          diagnosisText = arr.map((x) => x?.name).filter(Boolean).join('\n');
+        } else if (d) diagnosisText = d;
+      } catch { diagnosisText = (cons.diagnosis as string) || ''; }
       setForm((f) => ({
         ...f,
         parentConsultationId: parentConsultationIdFromState,
         patientId: cons.patientId as string,
+        patientGender: (cons.patientGender as string) || '',
+        patientMedicalHistory: (cons.patientMedicalHistory as string) || (f.patientMedicalHistory || ''),
         doctorId: cons.doctorId as string,
+        consultationDate: format(new Date(), 'yyyy-MM-dd'),
+        consultationTime: format(new Date(), 'HH:mm'),
         symptoms: (cons.symptoms as string) || '',
-        diagnosis: (cons.diagnosis as string) || '',
+        personalHistory: ph,
+        menstrualHistory: mh,
+        ayurvedaExamination: ae,
+        diagnosis: diagnosisText,
         notes: (cons.notes as string) || '',
         followUpRequired: true,
         followUpDate: (cons.followUpDate as string) || '',
         weight: cons.weight != null ? String(cons.weight) : '',
+        height: cons.height != null ? String(cons.height) : '',
         bpSystolic: cons.bpSystolic != null ? String(cons.bpSystolic) : '',
         bpDiastolic: cons.bpDiastolic != null ? String(cons.bpDiastolic) : '',
         temperature: cons.temperature != null ? String(cons.temperature) : '',
         pulse: cons.pulse != null ? String(cons.pulse) : '',
+        spo2: cons.spo2 != null ? String(cons.spo2) : '',
+        cbg: cons.cbg != null ? String(cons.cbg) : '',
         dietLifestyleAdvice: (cons.dietLifestyleAdvice as string) || '',
         prescription: presc.filter((p) => p.medicineId).map((p) => ({
           medicineId: p.medicineId!,
@@ -196,8 +318,10 @@ const ConsultationsPage = () => {
   const toNum = (v: string | number) => (v === '' || v == null ? undefined : Number(v));
 
   const handleSubmit = async () => {
-    if (!form.patientId || !form.doctorId || !targetClinicId) {
-      toast({ title: 'Missing fields', description: 'Patient, doctor and clinic required', variant: 'destructive' });
+    const errs = consultationFormErrors();
+    setConsultationErrors(errs);
+    if (errs.length > 0) {
+      toast({ title: 'Validation error', description: errs[0], variant: 'destructive' });
       return;
     }
     setLoading(true);
@@ -207,44 +331,62 @@ const ConsultationsPage = () => {
         doctorId: form.doctorId,
         clinicId: targetClinicId,
         consultationDate: form.consultationDate,
+        consultationTime: form.consultationTime || undefined,
+        patientMedicalHistory: form.patientMedicalHistory,
         symptoms: form.symptoms || undefined,
-        diagnosis: form.diagnosis || undefined,
+        personalHistory: form.personalHistory,
+        diagnosis: form.diagnosis?.trim() || undefined,
         notes: form.notes || undefined,
         consultationFee: 0,
         followUpRequired: form.followUpRequired,
         followUpDate: form.followUpDate || undefined,
         parentConsultationId: form.parentConsultationId || undefined,
         weight: toNum(form.weight),
+        height: toNum(form.height),
         bpSystolic: toNum(form.bpSystolic),
         bpDiastolic: toNum(form.bpDiastolic),
         temperature: toNum(form.temperature),
         pulse: toNum(form.pulse),
+        spo2: toNum(form.spo2),
+        cbg: toNum(form.cbg),
         dietLifestyleAdvice: form.dietLifestyleAdvice || undefined,
+        menstrualHistory: form.patientGender?.toLowerCase() === 'female' ? form.menstrualHistory : undefined,
+        ayurvedaExamination: form.ayurvedaExamination,
         prescription: form.prescription.filter((p) => p.medicineId).map((p) => ({
           medicineId: p.medicineId,
           dosage: p.dosage || undefined,
           durationDays: toNum(p.durationDays),
         })),
       }) as { id?: string };
+      setConsultationErrors([]);
       toast({ title: 'Consultation saved', description: 'Prescription recorded. Add fee & medicines at Pharmacy.' });
       const savedPatientId = form.patientId;
       const savedPatientName = form.patientName;
       setForm({
         patientId: savedPatientId,
         patientName: savedPatientName,
+        patientMedicalHistory: form.patientMedicalHistory,
+        patientGender: form.patientGender,
         doctorId: '',
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
+        consultationTime: format(new Date(), 'HH:mm'),
         followUpDate: '',
         symptoms: '',
+        personalHistory: defaultPersonalHistory(),
+        menstrualHistory: defaultMenstrualHistory(),
+        ayurvedaExamination: defaultAyurvedaExamination(),
         diagnosis: '',
         notes: '',
         followUpRequired: false,
         parentConsultationId: '',
         weight: '',
+        height: '',
         bpSystolic: '',
         bpDiastolic: '',
         temperature: '',
         pulse: '',
+        spo2: '',
+        cbg: '',
         dietLifestyleAdvice: '',
         prescription: [],
       });
@@ -273,22 +415,32 @@ const ConsultationsPage = () => {
 
   const openNewConsultation = () => {
     setActiveConsId(null);
+    setConsultationErrors([]);
     setForm({
       patientId: '',
       patientName: '',
+      patientMedicalHistory: '',
+      patientGender: '',
       doctorId: '',
       consultationDate: format(new Date(), 'yyyy-MM-dd'),
+      consultationTime: format(new Date(), 'HH:mm'),
       followUpDate: '',
       symptoms: '',
+      personalHistory: defaultPersonalHistory(),
+      menstrualHistory: defaultMenstrualHistory(),
+      ayurvedaExamination: defaultAyurvedaExamination(),
       diagnosis: '',
       notes: '',
       followUpRequired: false,
       parentConsultationId: '',
       weight: '',
+      height: '',
       bpSystolic: '',
       bpDiastolic: '',
       temperature: '',
       pulse: '',
+      spo2: '',
+      cbg: '',
       dietLifestyleAdvice: '',
       prescription: [],
     });
@@ -298,22 +450,58 @@ const ConsultationsPage = () => {
     api.consultations.get(consultationId).then((data) => {
       const presc = (data.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
       const d = data as Record<string, unknown>;
+      let ph = defaultPersonalHistory();
+      try {
+        const raw = d.personalHistory as string;
+        if (raw) ph = { ...defaultPersonalHistory(), ...JSON.parse(raw) };
+      } catch {}
+      let mh = defaultMenstrualHistory();
+      try {
+        const rawMh = d.menstrualHistory as string;
+        if (rawMh) mh = { ...defaultMenstrualHistory(), ...JSON.parse(rawMh) };
+      } catch {}
+      let ae = defaultAyurvedaExamination();
+      try {
+        const rawAe = d.ayurvedaExamination as string;
+        if (rawAe) {
+          const parsed = JSON.parse(rawAe) as Record<string, unknown>;
+          ae = { ...defaultAyurvedaExamination(), ...parsed };
+          if (parsed.sparsha != null && !Array.isArray(parsed.sparsha)) ae.sparsha = [String(parsed.sparsha)];
+        }
+      } catch {}
+      let diagnosisText = '';
+      try {
+        const diag = d.diagnosis as string;
+        if (diag?.startsWith('[')) {
+          const arr = JSON.parse(diag) as { name?: string }[];
+          diagnosisText = arr.map((x) => x?.name).filter(Boolean).join('\n');
+        } else if (diag) diagnosisText = diag;
+      } catch { diagnosisText = (d.diagnosis as string) || ''; }
       setForm((f) => ({
         ...f,
         patientId: data.patientId as string,
         patientName: data.patientName as string,
+        patientMedicalHistory: (d.patientMedicalHistory as string) || f.patientMedicalHistory || '',
+        patientGender: (d.patientGender as string) || '',
+        menstrualHistory: mh,
+        ayurvedaExamination: ae,
         doctorId: data.doctorId as string,
         parentConsultationId: consultationId,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
+        consultationTime: format(new Date(), 'HH:mm'),
         followUpRequired: true,
         symptoms: (data.symptoms as string) || '',
-        diagnosis: (data.diagnosis as string) || '',
+        personalHistory: ph,
+        diagnosis: diagnosisText,
         notes: (data.notes as string) || '',
         weight: d.weight != null ? String(d.weight) : '',
+        height: d.height != null ? String(d.height) : '',
         bpSystolic: d.bpSystolic != null ? String(d.bpSystolic) : '',
         bpDiastolic: d.bpDiastolic != null ? String(d.bpDiastolic) : '',
         temperature: d.temperature != null ? String(d.temperature) : '',
         pulse: d.pulse != null ? String(d.pulse) : '',
+        spo2: d.spo2 != null ? String(d.spo2) : '',
+        cbg: d.cbg != null ? String(d.cbg) : '',
         dietLifestyleAdvice: (d.dietLifestyleAdvice as string) || '',
         prescription: presc.filter((p) => p.medicineId).map((p) => ({
           medicineId: p.medicineId!,
@@ -388,7 +576,7 @@ const ConsultationsPage = () => {
       <div className="flex items-center justify-between gap-4 mb-3 shrink-0">
         <PageHeader title="Consultations" />
         {user?.role === 'admin' && clinics.length > 0 && (
-          <Select value={clinicId || undefined} onValueChange={setClinicId}>
+          <Select value={clinicId || undefined} onValueChange={(v) => { setClinicId(v); setConsultationErrors((e) => e.filter((x) => !x.includes('Clinic'))); }}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select clinic" />
             </SelectTrigger>
@@ -408,7 +596,7 @@ const ConsultationsPage = () => {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">
-                  {form.patientId ? form.patientName || 'Patient' : 'Consultation Records'}
+                  {form.patientId ? form.patientName || 'Beneficiary' : 'Consultation Records'}
                 </CardTitle>
                 <CardDescription className="mt-0.5">
                   {form.patientId ? 'This patient only. ' : ''}Click a record to view, add follow-up, or start new consult.
@@ -433,7 +621,7 @@ const ConsultationsPage = () => {
                   <User className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <p className="font-medium text-muted-foreground">No consultations yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Select a patient to filter or create a new consultation</p>
+                <p className="text-sm text-muted-foreground mt-1">Select a beneficiary to filter or create a new consultation</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -454,13 +642,13 @@ const ConsultationsPage = () => {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-sm">{form.patientId ? f.consultationDate : f.patientName}</p>
+                            <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
                               <FileText className="h-3 w-3" /> Follow-up
                             </span>
                           </div>
                           {f.diagnosis && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{String(f.diagnosis)}</p>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(f.diagnosis)}</p>
                           )}
                         </div>
                         <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -489,13 +677,13 @@ const ConsultationsPage = () => {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-sm">{form.patientId ? initial.consultationDate : initial.patientName}</p>
+                          <p className="font-semibold text-sm">{form.patientId ? fmtDateWithTime(initial.consultationDate as string, initial.consultationTime) : initial.patientName}</p>
                           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
                             <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
                           </span>
                         </div>
                         {initial.diagnosis && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{String(initial.diagnosis)}</p>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(initial.diagnosis)}</p>
                         )}
                       </div>
                       <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -523,13 +711,13 @@ const ConsultationsPage = () => {
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-medium text-sm">{form.patientId ? f.consultationDate : f.patientName}</p>
+                                <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
                                 <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold border border-amber-200/60">
                                   <FileText className="h-3 w-3" /> Follow-up
                                 </span>
                               </div>
                               {f.diagnosis && (
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{String(f.diagnosis)}</p>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(f.diagnosis)}</p>
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -570,15 +758,24 @@ const ConsultationsPage = () => {
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
           <div className="space-y-4">
+            {consultationErrors.length > 0 && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                <ul className="list-disc list-inside space-y-0.5">
+                  {consultationErrors.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div>
               <Label className="flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5" /> Patient <span className="text-destructive">*</span>
+                <User className="h-3.5 w-3.5" /> Beneficiary <span className="text-destructive">*</span>
               </Label>
               <div className="flex gap-2 mt-1.5">
                 <Popover open={patientSearchOpen} onOpenChange={(open) => { setPatientSearchOpen(open); if (open) loadRecentPatients(); }}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className={cn('flex-1 justify-between font-normal h-10', !form.patientName && 'text-muted-foreground')}>
-                      <span className="truncate">{form.patientName || 'Search patient by name...'}</span>
+                    <Button variant="outline" role="combobox" className={cn('flex-1 justify-between font-normal h-10', !form.patientName && 'text-muted-foreground', consultationErrors.some((e) => e.includes('Beneficiary')) && 'border-destructive')}>
+                      <span className="truncate">{form.patientName || 'Search beneficiary by name...'}</span>
                       <Search className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -596,7 +793,7 @@ const ConsultationsPage = () => {
                       )}
                       {!patientSearching && (
                         <>
-                          <CommandEmpty>No patient found. Try different search.</CommandEmpty>
+                          <CommandEmpty>No beneficiary found. Try different search.</CommandEmpty>
                           <CommandGroup>
                             {patientSearchResults.map((p) => (
                               <CommandItem
@@ -605,6 +802,7 @@ const ConsultationsPage = () => {
                                 onSelect={() => {
                                   setForm((f) => ({ ...f, patientId: p.id, patientName: p.name }));
                                   setPatientSearchOpen(false);
+                                  setConsultationErrors((e) => e.filter((x) => !x.includes('Beneficiary')));
                                 }}
                               >
                                 <div className="flex flex-col">
@@ -621,17 +819,17 @@ const ConsultationsPage = () => {
                 </PopoverContent>
               </Popover>
               {form.patientName && (
-                <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10" onClick={() => setForm((f) => ({ ...f, patientId: '', patientName: '' }))} title="Clear patient">
+                <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10" onClick={() => { setForm((f) => ({ ...f, patientId: '', patientName: '', patientMedicalHistory: '', patientGender: '', menstrualHistory: defaultMenstrualHistory(), ayurvedaExamination: defaultAyurvedaExamination() })); setConsultationErrors((e) => e.filter((x) => !x.includes('Beneficiary'))); }} title="Clear beneficiary">
                   <X className="h-4 w-4" />
                 </Button>
               )}
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label>Doctor <span className="text-destructive">*</span></Label>
-                <Select value={form.doctorId} onValueChange={(v) => setForm((f) => ({ ...f, doctorId: v }))}>
-                  <SelectTrigger className="h-10"><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                <Select value={form.doctorId} onValueChange={(v) => { setForm((f) => ({ ...f, doctorId: v })); setConsultationErrors((e) => e.filter((x) => !x.includes('Doctor'))); }}>
+                  <SelectTrigger className={cn('h-10', consultationErrors.some((e) => e.includes('Doctor')) && 'border-destructive')}><SelectValue placeholder="Select doctor" /></SelectTrigger>
                   <SelectContent>
                     {doctors.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -640,45 +838,477 @@ const ConsultationsPage = () => {
                 </Select>
               </div>
               <div>
-                <Label>Date</Label>
+                <Label>Date <span className="text-destructive">*</span></Label>
                 <Input
                   type="date"
-                  className="h-10"
+                  className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
                   value={form.consultationDate}
-                  onChange={(e) => setForm((f) => ({ ...f, consultationDate: e.target.value }))}
+                  onChange={(e) => { setForm((f) => ({ ...f, consultationDate: e.target.value })); setConsultationErrors((e) => e.filter((x) => !x.includes('date'))); }}
+                />
+              </div>
+              <div>
+                <Label>Time</Label>
+                <Input
+                  type="time"
+                  className="h-10"
+                  value={form.consultationTime}
+                  onChange={(e) => setForm((f) => ({ ...f, consultationTime: e.target.value }))}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
               <div>
-                <Label className="text-xs">Weight (kg)</Label>
-                <Input type="number" step="0.1" className="h-9" placeholder="—" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} />
+                <Label className="text-xs">Weight (kgs)</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: restrictVital(e.target.value, 3, 2) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Height (cm)</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: restrictVital(e.target.value, 3, 2) }))} />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-2 min-w-0">
+                <BmiDisplay weight={toNum(form.weight)} height={toNum(form.height)} compact />
               </div>
               <div>
                 <Label className="text-xs">BP (mmHg)</Label>
                 <div className="flex gap-1 items-center">
-                  <Input type="number" className="h-9 w-14" placeholder="—" value={form.bpSystolic} onChange={(e) => setForm((f) => ({ ...f, bpSystolic: e.target.value }))} />
+                  <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpSystolic} onChange={(e) => setForm((f) => ({ ...f, bpSystolic: restrictVital(e.target.value, 3, 0) }))} />
                   <span className="text-muted-foreground">/</span>
-                  <Input type="number" className="h-9 w-14" placeholder="—" value={form.bpDiastolic} onChange={(e) => setForm((f) => ({ ...f, bpDiastolic: e.target.value }))} />
+                  <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpDiastolic} onChange={(e) => setForm((f) => ({ ...f, bpDiastolic: restrictVital(e.target.value, 3, 0) }))} />
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Temperature (°C)</Label>
-                <Input type="number" step="0.1" className="h-9" placeholder="—" value={form.temperature} onChange={(e) => setForm((f) => ({ ...f, temperature: e.target.value }))} />
+                <Label className="text-xs">Temperature</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.temperature} onChange={(e) => setForm((f) => ({ ...f, temperature: restrictVital(e.target.value, 3, 2) }))} />
               </div>
               <div>
                 <Label className="text-xs">Pulse (bpm)</Label>
-                <Input type="number" className="h-9" placeholder="—" value={form.pulse} onChange={(e) => setForm((f) => ({ ...f, pulse: e.target.value }))} />
+                <Input type="text" inputMode="numeric" className="h-9" placeholder="—" value={form.pulse} onChange={(e) => setForm((f) => ({ ...f, pulse: restrictVital(e.target.value, 3, 0) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">SpO2 (%)</Label>
+                <Input type="text" inputMode="numeric" className="h-9" placeholder="—" value={form.spo2} onChange={(e) => setForm((f) => ({ ...f, spo2: restrictVital(e.target.value, 3, 0) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">CBG (mg/dL)</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.cbg} onChange={(e) => setForm((f) => ({ ...f, cbg: restrictVital(e.target.value, 3, 2) }))} />
               </div>
             </div>
             <div className="pt-4 border-t space-y-4">
             <div>
-              <Label>Symptoms</Label>
-              <Textarea value={form.symptoms} onChange={(e) => setForm((f) => ({ ...f, symptoms: e.target.value }))} placeholder="Patient symptoms" rows={2} className="resize-none" />
+              <Label>Present Complaint with duration</Label>
+              <Textarea value={form.symptoms} onChange={(e) => setForm((f) => ({ ...f, symptoms: e.target.value }))} placeholder="Describe complaint and duration (e.g. Headache for 3 days)" rows={2} className="resize-none" />
+            </div>
+            <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+              <Label className="text-sm font-semibold">Personal History</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Diet</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Vegetarian', 'Non-Vegetarian', 'Eggetarian'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.diet.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              diet: e.target.checked ? [...f.personalHistory.diet, opt] : f.personalHistory.diet.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Exercise / Physical Activity</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Regular', 'Moderate', 'Minimal', 'None'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.exercise.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              exercise: e.target.checked ? [...f.personalHistory.exercise, opt] : f.personalHistory.exercise.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Habits / Addictions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Alcohol', 'Smoking', 'Tobacco', 'None'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.habits.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              habits: e.target.checked ? [...f.personalHistory.habits, opt] : f.personalHistory.habits.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Bowel Movement</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Regular', 'Irregular', 'Constipation'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.bowelMovement.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              bowelMovement: e.target.checked ? [...f.personalHistory.bowelMovement, opt] : f.personalHistory.bowelMovement.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Appetite</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Good', 'Moderate', 'Poor'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.appetite.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              appetite: e.target.checked ? [...f.personalHistory.appetite, opt] : f.personalHistory.appetite.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Micturition (Urination)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Regular', 'Irregular', 'Burning', 'Frequent'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.micturition.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              micturition: e.target.checked ? [...f.personalHistory.micturition, opt] : f.personalHistory.micturition.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Sleep Pattern</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Sound', 'Disturbed', 'Insomnia'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.sleepPattern.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              sleepPattern: e.target.checked ? [...f.personalHistory.sleepPattern, opt] : f.personalHistory.sleepPattern.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {form.patientGender?.toLowerCase() === 'female' && (
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/30 border-rose-200">
+                <Label className="text-sm font-semibold">Menstrual History</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Menstrual Cycle</p>
+                    <div className="flex gap-4">
+                      {(['Regular', 'Irregular'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="menstrualCycle" checked={form.menstrualHistory.menstrualCycle === opt} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menstrualCycle: opt } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Last Menstrual Period (LMP)</Label>
+                    <Input type="date" className="h-9 mt-0.5" value={form.menstrualHistory.lmp} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, lmp: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Per day pads count (During Period)</Label>
+                    <Input type="number" className="h-9 mt-0.5" min={0} placeholder="—" value={form.menstrualHistory.padsPerDay} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, padsPerDay: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Cycle Length (days)</Label>
+                    <Input type="number" className="h-9 mt-0.5 w-20" min={1} max={99} placeholder="—" value={form.menstrualHistory.cycleLengthDays} onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') return setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleLengthDays: '' } }));
+                      const n = parseInt(v, 10);
+                      if (isNaN(n) || n < 1) return;
+                      setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleLengthDays: n > 99 ? 99 : v } }));
+                    }} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Day's of Cycle</Label>
+                    <Input type="number" className="h-9 mt-0.5 w-20" min={1} max={99} placeholder="—" value={form.menstrualHistory.cycleCountOnVisit} onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') return setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleCountOnVisit: '' } }));
+                      const n = parseInt(v, 10);
+                      if (isNaN(n) || n < 1) return;
+                      setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleCountOnVisit: n > 99 ? 99 : v } }));
+                    }} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Clots</p>
+                    <div className="flex gap-4">
+                      {(['Yes', 'No'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="clots" checked={form.menstrualHistory.clots === opt} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, clots: opt } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Menstrual Flow</p>
+                    <div className="flex gap-3 flex-wrap">
+                      {(['Normal', 'Heavy', 'Scanty'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="menstrualFlow" checked={form.menstrualHistory.menstrualFlow === opt} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menstrualFlow: opt } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={form.menstrualHistory.dysmenorrhea} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, dysmenorrhea: e.target.checked } }))} className="rounded border-input" />
+                      <span>Dysmenorrhea (Pain During Periods)</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={form.menstrualHistory.leucorrhea} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, leucorrhea: e.target.checked } }))} className="rounded border-input" />
+                      <span>Leucorrhea (White Discharge)</span>
+                    </label>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Menopause</p>
+                    <div className="flex gap-4">
+                      {(['No', 'Yes'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="menopause" checked={(opt === 'Yes') === form.menstrualHistory.menopause} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menopause: opt === 'Yes' } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {form.menstrualHistory.menopause && (
+                    <div>
+                      <Label className="text-xs">Age at Menopause</Label>
+                      <Input type="number" className="h-9 mt-0.5" min={0} placeholder="—" value={form.menstrualHistory.menopauseAge} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menopauseAge: e.target.value } }))} />
+                    </div>
+                  )}
+                  <div className="sm:col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Pregnancy History (if applicable)</p>
+                    <div className="flex gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Gravida:</Label>
+                        <Input type="number" className="h-9 w-16" min={0} value={form.menstrualHistory.gravida} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, gravida: e.target.value } }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Para:</Label>
+                        <Input type="number" className="h-9 w-16" min={0} value={form.menstrualHistory.para} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, para: e.target.value } }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Abortions:</Label>
+                        <Input type="number" className="h-9 w-16" min={0} value={form.menstrualHistory.abortions} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, abortions: e.target.value } }))} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+              <Label className="text-sm font-semibold">Ayurvedic Examinations</Label>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-2 font-medium">Parameter</th>
+                      <th className="text-left py-2 px-2 font-medium">Observation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Naadi (Pulse)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-2">
+                          {(['V', 'P', 'K', 'VP', 'VK', 'PK'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="naadi" checked={form.ayurvedaExamination.naadi === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, naadi: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Malam (Stool)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Regular', 'Constipated'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="malam" checked={form.ayurvedaExamination.malam === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, malam: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Mootram (Urine)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Flow:</span>
+                            {(['Regular', 'Irregular'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="mootram" checked={form.ayurvedaExamination.mootram === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, mootram: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Colour:</span>
+                            {(['Clear', 'White', 'Yellow', 'Red'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="mootramColour" checked={form.ayurvedaExamination.mootramColour === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, mootramColour: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Jihwa (Tongue)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Lipta', 'Alipta'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="jihwa" checked={form.ayurvedaExamination.jihwa === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, jihwa: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Shabda (Voice)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Normal', 'Abnormal'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="shabda" checked={form.ayurvedaExamination.shabda === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, shabda: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Sparsha (Touch)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-2">
+                          {(['Ushna', 'Sheeta', 'Ruksha', 'Mrudu'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="checkbox" checked={(Array.isArray(form.ayurvedaExamination.sparsha) ? form.ayurvedaExamination.sparsha : []).includes(opt)} onChange={(e) => {
+                                const arr = Array.isArray(form.ayurvedaExamination.sparsha) ? form.ayurvedaExamination.sparsha : [];
+                                setForm((f) => ({
+                                  ...f,
+                                  ayurvedaExamination: {
+                                    ...f.ayurvedaExamination,
+                                    sparsha: e.target.checked ? [...arr, opt] : arr.filter((x) => x !== opt),
+                                  },
+                                }));
+                              }} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Drik (Eyes)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Status:</span>
+                            {(['Normal', 'Abnormal'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="drik" checked={form.ayurvedaExamination.drik === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, drik: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Colour:</span>
+                            {(['White', 'Pink', 'Red', 'Yellow'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="drikColour" checked={form.ayurvedaExamination.drikColour === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, drikColour: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Aakriti (Physique)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Heena', 'Madhyama', 'Sthula'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="aakriti" checked={form.ayurvedaExamination.aakriti === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, aakriti: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <Label>Medical History</Label>
+              <Textarea value={form.patientMedicalHistory} onChange={(e) => setForm((f) => ({ ...f, patientMedicalHistory: e.target.value }))} placeholder="From beneficiary record" rows={2} className="resize-none" />
             </div>
             <div>
               <Label>Diagnosis</Label>
-              <Textarea value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis" rows={2} />
+              <Textarea value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis (one or more lines)" rows={3} className="resize-none" />
             </div>
             <div>
               <Label>Notes</Label>
@@ -734,7 +1364,7 @@ const ConsultationsPage = () => {
                   <SelectContent>
                     <SelectItem value="__none__">None – new consultation</SelectItem>
                     {consultations.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.patientName} – {c.consultationDate}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.patientName} – {fmtDateWithTime(c.consultationDate as string, c.consultationTime)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -748,38 +1378,57 @@ const ConsultationsPage = () => {
                   <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Medicine | Dosage | Duration — Patient may not buy all</p>
               {form.prescription.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {form.prescription.map((p, i) => (
-                    <div key={i} className="flex gap-2 items-center rounded border p-2 flex-wrap">
-                      <Popover open={prescriptionOpen === i} onOpenChange={(o) => setPrescriptionOpen(o ? i : null)}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="min-w-[140px] justify-between font-normal">
-                            {p.medicineName || 'Select medicine'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search medicine..." />
-                            <CommandList>
-                              <CommandEmpty>No medicine found</CommandEmpty>
-                              <CommandGroup>
-                                {medicinesMaster.map((med) => (
-                                  <CommandItem key={med.id} value={med.name} onSelect={() => selectPrescription(i, med)}>
-                                    {med.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <Input className="w-28" placeholder="e.g. 1 tab BD" value={p.dosage} onChange={(e) => updatePrescription(i, 'dosage', e.target.value)} />
-                      <Input type="number" className="w-16" placeholder="days" value={p.durationDays} onChange={(e) => updatePrescription(i, 'durationDays', e.target.value)} min={0} />
-                      <Button size="icon" variant="ghost" onClick={() => removePrescription(i)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                  ))}
+                <div className="mt-2 rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b">
+                        <th className="text-left py-2 px-3 font-medium">Medicine</th>
+                        <th className="text-left py-2 px-3 font-medium">Dosage</th>
+                        <th className="text-left py-2 px-3 font-medium w-20">Duration</th>
+                        <th className="w-10" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.prescription.map((p, i) => (
+                        <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="py-2 px-3">
+                            <Popover open={prescriptionOpen === i} onOpenChange={(o) => setPrescriptionOpen(o ? i : null)}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" size="sm" className="w-full justify-between font-normal">
+                                  {p.medicineName || 'Select medicine'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Search medicine..." />
+                                  <CommandList>
+                                    <CommandEmpty>No medicine found</CommandEmpty>
+                                    <CommandGroup>
+                                      {medicinesMaster.map((med) => (
+                                        <CommandItem key={med.id} value={med.name} onSelect={() => selectPrescription(i, med)}>
+                                          {med.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input className="h-8 w-28" placeholder="e.g. 1 tab BD" value={p.dosage} onChange={(e) => updatePrescription(i, 'dosage', e.target.value)} />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input type="number" className="h-8 w-16" placeholder="days" value={p.durationDays} onChange={(e) => updatePrescription(i, 'durationDays', e.target.value)} min={0} />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removePrescription(i)}><Trash2 className="h-4 w-4" /></Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

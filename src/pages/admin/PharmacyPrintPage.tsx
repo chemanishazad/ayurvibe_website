@@ -56,14 +56,17 @@ const PharmacyPrintPage = () => {
     total: m.total ?? String(Number(m.quantity) * parseFloat(m.unitPrice || '0')),
   }));
   const treatments = (cons.treatments as { name: string; price: string }[]) || [];
+  const consultationFee = parseFloat(treatments.find((t) => t.name === 'Consultation')?.price || '0');
+  const treatmentsExcludingFee = treatments.filter((t) => t.name !== 'Consultation');
   const patientName = (cons.patientName as string) || '';
   const consultationDate = (cons.consultationDate as string) || '';
+  const consultationTime = (cons.consultationTime as string) || '';
+  const dateTimeStr = consultationTime ? `${consultationDate} ${consultationTime}` : consultationDate;
   const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
   const doctorName = (cons.doctorName as string) || 'Dr. V.VAITHEESHWARI BAMS';
-  const consultationFee = parseFloat((cons.consultationFee as string) || '0');
   const medicineTotal = parseFloat((cons.medicineTotal as string) || '0') || medicines.reduce((s, m) => s + parseFloat(m.total || '0'), 0);
   const treatmentTotal = parseFloat((cons.treatmentTotal as string) || '0') || treatments.reduce((s, t) => s + parseFloat(t.price || '0'), 0);
-  const grandTotal = consultationFee + medicineTotal + treatmentTotal;
+  const grandTotal = medicineTotal + treatmentTotal;
 
   return (
     <div className="min-h-screen bg-white p-4 print:p-0">
@@ -97,10 +100,10 @@ const PharmacyPrintPage = () => {
           <img src={logo} alt="Logo" className="h-9 w-auto shrink-0" />
         </div>
 
-        {/* Patient */}
+        {/* Beneficiary */}
         <div className="mb-2 text-[10px]">
-          <p><strong>Patient:</strong> {patientName || '—'}</p>
-          <p><strong>Date:</strong> {consultationDate || '—'}</p>
+          <p><strong>Beneficiary:</strong> {patientName || '—'}</p>
+          <p><strong>Date:</strong> {dateTimeStr || '—'}</p>
         </div>
 
         {/* Bill: Consultation + Treatments + Medicines */}
@@ -124,7 +127,7 @@ const PharmacyPrintPage = () => {
                   <td className="py-1.5 px-2 text-right font-medium">{consultationFee.toFixed(2)}</td>
                 </tr>
               )}
-              {treatments.map((t, i) => (
+              {treatmentsExcludingFee.map((t, i) => (
                 <tr key={i} className="border-b border-gray-200">
                   <td className="py-1.5 px-2 border-r border-gray-200">{t.name}</td>
                   <td className="py-1.5 px-2 text-right border-r border-gray-200">1</td>
@@ -146,7 +149,7 @@ const PharmacyPrintPage = () => {
           <div className="mt-3 print:mt-2 flex justify-end">
             <div className="text-right space-y-0.5">
               {consultationFee > 0 && <p className="text-xs">Consultation: ₹{consultationFee.toFixed(2)}</p>}
-              {treatmentTotal > 0 && <p className="text-xs">Treatments: ₹{treatmentTotal.toFixed(2)}</p>}
+              {treatmentsExcludingFee.length > 0 && <p className="text-xs">Treatments: ₹{treatmentsExcludingFee.reduce((s, t) => s + parseFloat(t.price || '0'), 0).toFixed(2)}</p>}
               {medicineTotal > 0 && <p className="text-xs">Medicines: ₹{medicineTotal.toFixed(2)}</p>}
               <p className="text-sm font-bold pt-1">Grand Total: ₹{grandTotal.toFixed(2)}</p>
             </div>

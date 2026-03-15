@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { Search, UserPlus, UserCheck, Eye } from 'lucide-react';
+import { Search, UserPlus, UserCheck, Eye, Pencil } from 'lucide-react';
+import { format } from 'date-fns';
 import {
   Select,
   SelectContent,
@@ -15,13 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -39,7 +30,6 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Calendar } from 'lucide-react';
-
 type PatientRow = Record<string, unknown> & { isReturning?: boolean; consultationCount?: number; lastConsultationId?: string };
 
 const PAGE_SIZES = [10, 20, 50];
@@ -48,12 +38,9 @@ const PatientsPage = () => {
   const navigate = useNavigate();
   const [rawPatients, setRawPatients] = useState<PatientRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [filters, setFilters] = useState({ search: '', from: '', to: '' });
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const { toast } = useToast();
 
   const totalPatients = rawPatients.length;
   const totalPages = Math.max(1, Math.ceil(totalPatients / perPage));
@@ -78,22 +65,12 @@ const PatientsPage = () => {
     if (page > totalPages && totalPages > 0) setPage(totalPages);
   }, [perPage, totalPages]);
 
-  const handleCreateOrUpdate = async () => {
-    setLoading(true);
-    try {
-      await api.patients.create(formData);
-      setShowForm(false);
-      toast({ title: 'Patient saved', description: 'Patient registered successfully.' });
-      loadPatients();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Save failed', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleView = (patientId: string) => {
     navigate('/admin/consultations', { state: { patientId } });
+  };
+
+  const handleEdit = (patientId: string) => {
+    navigate(`/admin/patients/${patientId}/edit`);
   };
 
   return (
@@ -136,7 +113,7 @@ const PatientsPage = () => {
               <Button variant="outline" size="sm" onClick={loadPatients} className="h-9">
                 Filter
               </Button>
-              <Button size="sm" onClick={() => { setFormData({ mobile: '', name: '', age: '', gender: '', address: '', medicalHistory: '' }); setShowForm(true); }} className="h-9">
+              <Button size="sm" onClick={() => navigate('/admin/patients/new')} className="h-9">
                 <UserPlus className="h-4 w-4 mr-1.5" />
                 Add Patient
               </Button>
@@ -147,24 +124,25 @@ const PatientsPage = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead>Name</TableHead>
+                  <TableHead>Patient Name</TableHead>
                   <TableHead>Mobile</TableHead>
                   <TableHead>Age</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Visits</TableHead>
+                  <TableHead>Registered</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : rawPatients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       No patients found. Add a new patient to get started.
                     </TableCell>
                   </TableRow>
@@ -189,11 +167,20 @@ const PatientsPage = () => {
                           )}
                         </TableCell>
                         <TableCell>{visits}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                          {p.createdAt ? format(new Date(p.createdAt as string), 'dd-MM-yyyy HH:mm') : '-'}
+                        </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => handleView(p.id as string)}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(p.id as string)}>
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button size="sm" onClick={() => handleView(p.id as string)}>
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -263,78 +250,6 @@ const PatientsPage = () => {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>New Patient</DialogTitle>
-            <DialogDescription>Enter patient details</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={(formData.name as string) || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Full name"
-              />
-            </div>
-            <div>
-              <Label>Mobile *</Label>
-              <Input
-                value={(formData.mobile as string) || ''}
-                onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                placeholder="10-digit mobile"
-              />
-            </div>
-            <div>
-              <Label>Age</Label>
-              <Input
-                type="number"
-                value={(formData.age as string) ?? ''}
-                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                placeholder="Age"
-              />
-            </div>
-            <div>
-              <Label>Gender</Label>
-              <Select
-                value={(formData.gender as string) || ''}
-                onValueChange={(v) => setFormData({ ...formData, gender: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Address</Label>
-              <Input
-                value={(formData.address as string) || ''}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Address"
-              />
-            </div>
-            <div>
-              <Label>Medical History</Label>
-              <Textarea
-                value={(formData.medicalHistory as string) || ''}
-                onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
-                placeholder="Past conditions, allergies, etc."
-                rows={3}
-              />
-            </div>
-            <Button onClick={handleCreateOrUpdate} disabled={loading} className="w-full">
-              Save Patient
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

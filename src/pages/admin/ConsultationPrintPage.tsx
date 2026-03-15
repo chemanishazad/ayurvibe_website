@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
 import logo from '@/assets/logo.png';
+import { getBmiCategory } from '@/lib/bmi-utils';
 
 const PRINT_STORAGE_KEY = 'print_consult_';
 
@@ -56,19 +57,56 @@ const ConsultationPrintPage = () => {
   const patientAge = cons.patientAge != null ? String(cons.patientAge) : '';
   const patientGender = (cons.patientGender as string) || '';
   const consultationDate = (cons.consultationDate as string) || '';
+  const consultationTime = (cons.consultationTime as string) || '';
+  const dateTimeStr = consultationTime ? `${consultationDate} ${consultationTime}` : consultationDate;
   const patientId = (cons.patientId as string) || '';
   const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
   const doctorName = (cons.doctorName as string) || 'Dr. V.VAITHEESHWARI BAMS';
   const symptoms = (cons.symptoms as string) || '';
-  const diagnosis = (cons.diagnosis as string) || '';
+  const diagnosis = (() => {
+    const d = cons.diagnosis;
+    if (d == null || d === '') return '';
+    try {
+      const parsed = typeof d === 'string' ? JSON.parse(d) : d;
+      if (Array.isArray(parsed)) return parsed.map((x: { name?: string }) => x?.name).filter(Boolean).join('\n');
+      return String(d);
+    } catch { return String(d); }
+  })();
+  const personalHistory = (() => {
+    try {
+      const raw = cons.personalHistory as string;
+      return raw ? JSON.parse(raw) as Record<string, string[]> : null;
+    } catch { return null; }
+  })();
+  const menstrualHistory = (() => {
+    try {
+      const raw = cons.menstrualHistory as string;
+      return raw ? JSON.parse(raw) as Record<string, string | number | boolean> : null;
+    } catch { return null; }
+  })();
+  const ayurvedaExamination = (() => {
+    try {
+      const raw = cons.ayurvedaExamination as string;
+      return raw ? JSON.parse(raw) as Record<string, string> : null;
+    } catch { return null; }
+  })();
+  const patientMedicalHistory = (cons.patientMedicalHistory as string) || '';
   const dietLifestyleAdvice = (cons.dietLifestyleAdvice as string) || '';
   const followUpDate = (cons.followUpDate as string) || '';
   const weight = cons.weight != null ? String(cons.weight) : '';
+  const height = cons.height != null ? String(cons.height) : '';
   const bpSystolic = cons.bpSystolic != null ? String(cons.bpSystolic) : '';
   const bpDiastolic = cons.bpDiastolic != null ? String(cons.bpDiastolic) : '';
   const pulse = cons.pulse != null ? String(cons.pulse) : '';
   const temperature = cons.temperature != null ? String(cons.temperature) : '';
+  const spo2 = cons.spo2 != null ? String(cons.spo2) : '';
+  const cbg = cons.cbg != null ? String(cons.cbg) : '';
   const bpStr = [bpSystolic, bpDiastolic].filter(Boolean).join(' / ') || '—';
+  const w = parseFloat(weight);
+  const h = parseFloat(height);
+  const bmiVal = w > 0 && h > 0 ? w / Math.pow(h / 100, 2) : 0;
+  const bmi = bmiVal > 0 ? bmiVal.toFixed(1) : '';
+  const bmiCategory = bmiVal > 0 ? getBmiCategory(bmiVal).label : '';
 
   return (
     <div className="min-h-screen bg-white p-4 print:p-0">
@@ -108,15 +146,15 @@ const ConsultationPrintPage = () => {
           <img src={logo} alt="Logo" className="h-9 w-auto shrink-0" />
         </div>
 
-        {/* Patient Details */}
+        {/* Beneficiary Details */}
         <div className="border border-gray-300 rounded p-1.5 mb-2">
-          <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Patient Details</p>
+          <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Beneficiary Details</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-3 gap-y-0.5 text-[10px]">
             <span><strong>Name:</strong> {patientName || '—'}</span>
             <span><strong>Age:</strong> {patientAge || '—'}</span>
             <span><strong>Sex:</strong> {patientGender || '—'}</span>
-            <span><strong>Date:</strong> {consultationDate || '—'}</span>
-            <span><strong>Patient ID:</strong> {patientId ? patientId.slice(0, 8) + '…' : '—'}</span>
+            <span><strong>Date:</strong> {dateTimeStr || '—'}</span>
+            <span><strong>ID:</strong> {patientId ? patientId.slice(0, 8) + '…' : '—'}</span>
           </div>
         </div>
 
@@ -125,17 +163,111 @@ const ConsultationPrintPage = () => {
           <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Vital Signs</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-[10px]">
             <span><strong>BP:</strong> {bpStr}</span>
-            <span><strong>Weight:</strong> {weight ? `${weight} kg` : '—'}</span>
+            <span><strong>Weight:</strong> {weight ? `${weight} kgs` : '—'}</span>
+            <span><strong>Height:</strong> {height ? `${height} cm` : '—'}</span>
+            <span><strong>BMI:</strong> {bmi ? `${bmi} kg/m² (${bmiCategory})` : '—'}</span>
             <span><strong>Pulse:</strong> {pulse ? `${pulse} bpm` : '—'}</span>
-            <span><strong>Temperature:</strong> {temperature ? `${temperature} °C` : '—'}</span>
+            <span><strong>Temperature:</strong> {temperature || '—'}</span>
+            <span><strong>SpO2:</strong> {spo2 ? `${spo2}%` : '—'}</span>
+            <span><strong>CBG:</strong> {cbg ? `${cbg} mg/dL` : '—'}</span>
           </div>
         </div>
 
-        {/* Symptoms */}
+        {/* Present Complaint with duration */}
         {symptoms && (
           <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Symptoms</p>
+            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Present Complaint with duration</p>
             <p className="text-[10px] whitespace-pre-wrap border-b border-dotted border-gray-400">{symptoms}</p>
+          </div>
+        )}
+
+        {/* Personal History */}
+        {personalHistory && Object.values(personalHistory).some((arr) => arr?.length > 0) && (
+          <div className="mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Personal History</p>
+            <div className="text-[10px] space-y-0.5">
+              {personalHistory.diet?.length > 0 && <p><strong>Diet:</strong> {personalHistory.diet.join(', ')}</p>}
+              {personalHistory.exercise?.length > 0 && <p><strong>Exercise:</strong> {personalHistory.exercise.join(', ')}</p>}
+              {personalHistory.habits?.length > 0 && <p><strong>Habits/Addictions:</strong> {personalHistory.habits.join(', ')}</p>}
+              {personalHistory.bowelMovement?.length > 0 && <p><strong>Bowel Movement:</strong> {personalHistory.bowelMovement.join(', ')}</p>}
+              {personalHistory.appetite?.length > 0 && <p><strong>Appetite:</strong> {personalHistory.appetite.join(', ')}</p>}
+              {personalHistory.micturition?.length > 0 && <p><strong>Micturition:</strong> {personalHistory.micturition.join(', ')}</p>}
+              {personalHistory.sleepPattern?.length > 0 && <p><strong>Sleep Pattern:</strong> {personalHistory.sleepPattern.join(', ')}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Menstrual History (For Female Patients) */}
+        {patientGender?.toLowerCase() === 'female' && menstrualHistory && Object.values(menstrualHistory).some((v) => v != null && v !== '' && v !== false) && (
+          <div className="mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Menstrual History (For Female Patients)</p>
+            <div className="text-[10px] space-y-0.5">
+              {menstrualHistory.menstrualCycle && <p><strong>Menstrual Cycle:</strong> {menstrualHistory.menstrualCycle}</p>}
+              {menstrualHistory.lmp && <p><strong>LMP:</strong> {menstrualHistory.lmp}</p>}
+              {menstrualHistory.padsPerDay != null && menstrualHistory.padsPerDay !== '' && <p><strong>Pads per day:</strong> {String(menstrualHistory.padsPerDay)}</p>}
+              {menstrualHistory.cycleLengthDays != null && menstrualHistory.cycleLengthDays !== '' && <p><strong>Cycle Length:</strong> {String(menstrualHistory.cycleLengthDays)} days</p>}
+              {menstrualHistory.cycleCountOnVisit != null && menstrualHistory.cycleCountOnVisit !== '' && <p><strong>Cycle Count on visit:</strong> {String(menstrualHistory.cycleCountOnVisit)}</p>}
+              {menstrualHistory.clots && <p><strong>Clots:</strong> {menstrualHistory.clots}</p>}
+              {menstrualHistory.menstrualFlow && <p><strong>Menstrual Flow:</strong> {menstrualHistory.menstrualFlow}</p>}
+              {menstrualHistory.dysmenorrhea && <p><strong>Dysmenorrhea:</strong> Yes</p>}
+              {menstrualHistory.leucorrhea && <p><strong>Leucorrhea:</strong> Yes</p>}
+              {menstrualHistory.menopause && <p><strong>Menopause:</strong> Yes              {menstrualHistory.menopauseAge != null && menstrualHistory.menopauseAge !== '' ? ` (Age: ${String(menstrualHistory.menopauseAge)})` : ''}</p>}
+              {(menstrualHistory.gravida != null && menstrualHistory.gravida !== '') || (menstrualHistory.para != null && menstrualHistory.para !== '') || (menstrualHistory.abortions != null && menstrualHistory.abortions !== '') ? (
+                <p><strong>Pregnancy History:</strong> G: {menstrualHistory.gravida != null && menstrualHistory.gravida !== '' ? String(menstrualHistory.gravida) : '—'} P: {menstrualHistory.para != null && menstrualHistory.para !== '' ? String(menstrualHistory.para) : '—'} A: {menstrualHistory.abortions != null && menstrualHistory.abortions !== '' ? String(menstrualHistory.abortions) : '—'}</p>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {/* Ayurveda Examination */}
+        {ayurvedaExamination && Object.values(ayurvedaExamination).some((v) => v != null && v !== '') && (
+          <div className="mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Ayurveda Examination</p>
+            <table className="w-full text-[10px] border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="text-left py-1.5 px-2 font-semibold border-b border-r border-gray-300">Parameter</th>
+                  <th className="text-left py-1.5 px-2 font-semibold border-b border-gray-300">Observation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ayurvedaExamination.naadi && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Naadi</td><td className="py-1 px-2">{ayurvedaExamination.naadi}</td></tr>}
+                {ayurvedaExamination.malam && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Malam</td><td className="py-1 px-2">{ayurvedaExamination.malam}</td></tr>}
+                {(ayurvedaExamination.mootram || ayurvedaExamination.mootramColour) && (
+                  <tr className="border-b border-gray-200">
+                    <td className="py-1 px-2 border-r border-gray-200 font-medium">Mootram (Urine)</td>
+                    <td className="py-1 px-2">
+                      {[ayurvedaExamination.mootram, ayurvedaExamination.mootramColour].filter(Boolean).join(' · ')}
+                    </td>
+                  </tr>
+                )}
+                {ayurvedaExamination.jihwa && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Jihwa</td><td className="py-1 px-2">{ayurvedaExamination.jihwa}</td></tr>}
+                {ayurvedaExamination.shabda && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Shabda</td><td className="py-1 px-2">{ayurvedaExamination.shabda}</td></tr>}
+                {ayurvedaExamination.sparsha && (Array.isArray(ayurvedaExamination.sparsha) ? ayurvedaExamination.sparsha.length > 0 : ayurvedaExamination.sparsha) && (
+                  <tr className="border-b border-gray-200">
+                    <td className="py-1 px-2 border-r border-gray-200 font-medium">Sparsha</td>
+                    <td className="py-1 px-2">{Array.isArray(ayurvedaExamination.sparsha) ? ayurvedaExamination.sparsha.join(', ') : ayurvedaExamination.sparsha}</td>
+                  </tr>
+                )}
+                {(ayurvedaExamination.drik || ayurvedaExamination.drikColour) && (
+                  <tr className="border-b border-gray-200">
+                    <td className="py-1 px-2 border-r border-gray-200 font-medium">Drik (Eye) / Colour</td>
+                    <td className="py-1 px-2">
+                      {[ayurvedaExamination.drik, ayurvedaExamination.drikColour].filter(Boolean).join(' · ')}
+                    </td>
+                  </tr>
+                )}
+                {ayurvedaExamination.aakriti && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Aakriti</td><td className="py-1 px-2">{ayurvedaExamination.aakriti}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Medical History */}
+        {patientMedicalHistory && (
+          <div className="mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Medical History</p>
+            <p className="text-[10px] whitespace-pre-wrap border-b border-dotted border-gray-400">{patientMedicalHistory}</p>
           </div>
         )}
 

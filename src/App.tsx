@@ -15,6 +15,8 @@ import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
 import AdminShell from "./pages/admin/AdminShell";
 import DashboardPage from "./pages/admin/DashboardPage";
 import PatientsPage from "./pages/admin/PatientsPage";
+import NewPatientPage from "./pages/admin/NewPatientPage";
+import EditPatientPage from "./pages/admin/EditPatientPage";
 import ConsultationsPage from "./pages/admin/ConsultationsPage";
 import PharmacyPage from "./pages/admin/PharmacyPage";
 import ConsultationPrintPage from "./pages/admin/ConsultationPrintPage";
@@ -96,6 +98,8 @@ const App = () => (
             <Route element={<AdminRoute><AdminErrorBoundary><AdminShell /></AdminErrorBoundary></AdminRoute>}>
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="patients" element={<PatientsPage />} />
+                  <Route path="patients/new" element={<NewPatientPage />} />
+                  <Route path="patients/:id/edit" element={<EditPatientPage />} />
               <Route path="consultations" element={<ConsultationsPage />} />
               <Route path="pharmacy" element={<PharmacyPage />} />
               <Route path="treatment-plans" element={<TreatmentPlansPage />} />

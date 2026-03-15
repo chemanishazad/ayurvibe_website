@@ -41,6 +41,7 @@ export const api = {
     },
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/patients', { method: 'POST', body: JSON.stringify(data) }),
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/patients/${id}`),
+    update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/patients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     history: (id: string) => fetchApi<Record<string, unknown>[]>(`/api/patients/${id}/history`),
   },
   doctors: {

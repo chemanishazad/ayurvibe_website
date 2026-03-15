@@ -33,6 +33,7 @@ type ConsultationRow = Record<string, unknown> & {
   id: string;
   patientName: string;
   consultationDate: string;
+  consultationTime?: string | null;
   totalAmount: string;
 };
 
@@ -284,7 +285,9 @@ const PharmacyPage = () => {
                           >
                             <div className="flex flex-col">
                               <span className="font-medium">{c.patientName}</span>
-                              <span className="text-xs text-muted-foreground">{c.consultationDate} — ₹{c.totalAmount}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {c.consultationTime ? `${c.consultationDate} ${c.consultationTime}` : c.consultationDate}
+                              </span>
                             </div>
                           </CommandItem>
                         ))}

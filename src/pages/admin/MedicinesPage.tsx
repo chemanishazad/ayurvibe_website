@@ -135,7 +135,6 @@ const MedicinesPage = () => {
                   <tr className="border-b">
                     <th className="text-left py-2">Name</th>
                     <th className="text-left py-2">UOM</th>
-                    <th className="text-right py-2">Purchase</th>
                     <th className="text-right py-2">Selling</th>
                     <th className="text-right py-2">Min Stock</th>
                     {isAdmin && <th className="text-right py-2">Actions</th>}
@@ -146,7 +145,6 @@ const MedicinesPage = () => {
                     <tr key={m.id} className="border-b">
                       <td className="py-2">{m.name}</td>
                       <td className="py-2">{m.uom}</td>
-                      <td className="py-2 text-right">₹{m.purchasePrice}</td>
                       <td className="py-2 text-right">₹{m.sellingPrice}</td>
                       <td className="py-2 text-right">{m.minStockLevel}</td>
                       {isAdmin && (
