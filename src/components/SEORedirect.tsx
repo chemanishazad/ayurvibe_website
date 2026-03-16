@@ -10,8 +10,8 @@ const seoConfigs: Record<string, {
   keywords: string[];
 }> = {
   '/best-ayurveda-hospital-chennai': {
-    title: "Best Ayurveda Hospital in Chennai | #1 Sri Vinayaga Ayurvibe | Perumbakkam, OMR, Sholinganallur",
-    description: "🏆 #1 Best Ayurveda Hospital in Chennai! Sri Vinayaga Ayurvibe offers authentic Panchakarma, Abhyanga, Shirodhara treatments. Serving Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram. Expert care by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!",
+    title: "Best Ayurveda Clinic in Chennai | #1 Sri Vinayaga Ayurvibe | Perumbakkam, OMR, Sholinganallur",
+    description: "🏆 #1 Best Ayurveda Clinic in Chennai! Sri Vinayaga Ayurvibe offers authentic Panchakarma, Abhyanga, Shirodhara treatments. Serving Perumbakkam, OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram. Expert care by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!",
     keywords: ['Best Ayurveda Hospital Chennai', 'Top Ayurveda Clinic Chennai', 'Premier Ayurveda Center Chennai', 'Best Ayurveda Perumbakkam', 'Best Ayurveda OMR', 'Best Ayurveda Sholinganallur']
   },
   '/top-ayurveda-clinic-chennai': {
@@ -167,7 +167,7 @@ const SEORedirect: React.FC = () => {
   
   // Get SEO config for current path or use default
   const seoConfig = seoConfigs[currentPath] || {
-    title: "Sri Vinayaga Ayurvibe — Best Ayurveda Hospital in Chennai",
+    title: "Sri Vinayaga Ayurvibe — Best Ayurveda Clinic in Chennai",
     description: "Premier Ayurveda hospital in Chennai offering comprehensive Panchakarma, Abhyanga, Shirodhara treatments and holistic wellness care.",
     keywords: ['Ayurveda Hospital Chennai', 'Best Ayurveda Clinic', 'Panchakarma Treatment', 'Holistic Wellness']
   };

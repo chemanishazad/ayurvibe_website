@@ -30,18 +30,46 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2, Stethoscope, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { BmiDisplay } from '@/components/BmiDisplay';
 
-const DEFAULT_FEE = 250;
 
 type ConsultationRow = Record<string, unknown> & {
   id: string;
   patientName: string;
   consultationDate: string;
+  consultationTime?: string | null;
   totalAmount: string;
   parentConsultationId?: string | null;
+  parentConsultationDate?: string | null;
+  parentConsultationTime?: string | null;
+  parentDiagnosis?: string | null;
+  followUpRequired?: number;
+  followUpDate?: string | null;
+};
+
+const fmtDateWithTime = (date: string, time?: string | null) =>
+  time ? `${format(new Date(date + 'T00:00:00'), 'dd-MM-yyyy')} ${time}` : format(new Date(date + 'T00:00:00'), 'dd-MM-yyyy');
+
+/** Restrict numeric input: max N digits whole part, optional decimal places. */
+const restrictVital = (v: string, maxWhole = 3, maxDecimal = 2): string => {
+  if (!v) return '';
+  const parts = v.replace(/[^\d.]/g, '').split('.');
+  const whole = parts[0]?.slice(0, maxWhole) ?? '';
+  if (parts.length === 1) return whole;
+  const dec = parts[1]?.slice(0, maxDecimal) ?? '';
+  return maxDecimal ? `${whole}.${dec}` : whole;
+};
+
+const diagnosisDisplay = (d: unknown): string => {
+  if (d == null || d === '') return '';
+  try {
+    const parsed = typeof d === 'string' ? JSON.parse(d) : d;
+    if (Array.isArray(parsed)) return parsed.map((x: { name?: string }) => x?.name).filter(Boolean).join(', ');
+  } catch {}
+  return String(d);
 };
 
 const ConsultationsPage = () => {
@@ -54,32 +82,93 @@ const ConsultationsPage = () => {
 
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
-  const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
+  const [medicinesMaster, setMedicinesMaster] = useState<{ id: string; name: string }[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState('');
+  const defaultPersonalHistory = () => ({
+    diet: [] as string[],
+    exercise: [] as string[],
+    habits: [] as string[],
+    bowelMovement: [] as string[],
+    appetite: [] as string[],
+    micturition: [] as string[],
+    sleepPattern: [] as string[],
+  });
+  const defaultMenstrualHistory = () => ({
+    menstrualCycle: '' as '' | 'Regular' | 'Irregular',
+    lmp: '',
+    padsPerDay: '' as string | number,
+    cycleLengthDays: '' as string | number,
+    cycleCountOnVisit: '' as string | number,
+    clots: '' as '' | 'Yes' | 'No',
+    menstrualFlow: '' as '' | 'Normal' | 'Heavy' | 'Scanty',
+    dysmenorrhea: false,
+    leucorrhea: false,
+    menopause: false,
+    menopauseAge: '' as string | number,
+    gravida: '' as string | number,
+    para: '' as string | number,
+    abortions: '' as string | number,
+  });
+  const defaultAyurvedaExamination = () => ({
+    naadi: '' as '' | 'V' | 'P' | 'K' | 'VP' | 'VK' | 'PK',
+    malam: '' as '' | 'Regular' | 'Constipated',
+    mootram: '' as '' | 'Regular' | 'Irregular',
+    mootramColour: '' as '' | 'Clear' | 'White' | 'Yellow'| 'Red' ,
+    jihwa: '' as '' | 'Lipta' | 'Alipta',
+    shabda: '' as '' | 'Normal' | 'Abnormal',
+    sparsha: [] as string[],
+    drik: '' as '' | 'Normal' | 'Abnormal',
+    drikColour: '' as '' | 'White' | 'Pink' | 'Red' | 'Yellow',
+    aakriti: '' as '' | 'Heena' | 'Madhyama' | 'Sthula',
+  });
   const [form, setForm] = useState({
     patientId: patientIdFromState || '',
     patientName: '',
+    patientMedicalHistory: '',
+    patientGender: '',
     doctorId: '',
     consultationDate: format(new Date(), 'yyyy-MM-dd'),
+    consultationTime: format(new Date(), 'HH:mm'),
     followUpDate: '',
     symptoms: '',
+    personalHistory: defaultPersonalHistory(),
     diagnosis: '',
     notes: '',
-    consultationFee: DEFAULT_FEE,
     followUpRequired: false,
     parentConsultationId: '',
-    medicines: [] as { inventoryId: string; medicineId: string; medicineName: string; quantity: number; unitPrice: number }[],
+    weight: '' as string | number,
+    height: '' as string | number,
+    bpSystolic: '' as string | number,
+    bpDiastolic: '' as string | number,
+    temperature: '' as string | number,
+    pulse: '' as string | number,
+    spo2: '' as string | number,
+    cbg: '' as string | number,
+    dietLifestyleAdvice: '',
+    menstrualHistory: defaultMenstrualHistory(),
+    ayurvedaExamination: defaultAyurvedaExamination(),
+    prescription: [] as { medicineId: string; medicineName: string; dosage: string; durationDays: string | number }[],
   });
-  const [medicineOpen, setMedicineOpen] = useState<number | null>(null);
+  const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
   const [followUpDateOpen, setFollowUpDateOpen] = useState(false);
-  const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [patientSearchOpen, setPatientSearchOpen] = useState(false);
   const [patientSearchResults, setPatientSearchResults] = useState<{ id: string; name: string; mobile: string }[]>([]);
   const [patientSearching, setPatientSearching] = useState(false);
+  const [consultationErrors, setConsultationErrors] = useState<string[]>([]);
   const { toast } = useToast();
+
+  const consultationFormErrors = (): string[] => {
+    const errs: string[] = [];
+    if (!form.patientId?.trim()) errs.push('Beneficiary is required');
+    if (!form.doctorId?.trim()) errs.push('Doctor is required');
+    if (!targetClinicId) errs.push('Clinic is required');
+    if (!form.consultationDate?.trim()) errs.push('Consultation date is required');
+    return errs;
+  };
 
   const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
 
@@ -88,8 +177,13 @@ const ConsultationsPage = () => {
   }, [patientIdFromState]);
 
   useEffect(() => {
-    if (form.patientId && !form.patientName) {
-      api.patients.get(form.patientId).then((p) => setForm((f) => ({ ...f, patientName: (p.name as string) || '' }))).catch(() => {});
+    if (form.patientId) {
+      api.patients.get(form.patientId).then((p) => setForm((f) => ({
+        ...f,
+        patientName: (p.name as string) || '',
+        patientMedicalHistory: (p.medicalHistory as string) || '',
+        patientGender: (p.gender as string) || '',
+      }))).catch(() => {});
     }
   }, [form.patientId]);
 
@@ -97,25 +191,66 @@ const ConsultationsPage = () => {
   useEffect(() => {
     if (!parentConsultationIdFromState || !isReview) return;
     api.consultations.get(parentConsultationIdFromState).then((cons) => {
-      const meds = (cons.medicines as { inventoryId?: string; medicineId?: string; medicineName: string; quantity: number; unitPrice: string }[]) || [];
+      const presc = (cons.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
       if (user?.role === 'admin' && cons.clinicId) setClinicId(cons.clinicId as string);
+      let ph = defaultPersonalHistory();
+      try {
+        const raw = cons.personalHistory as string;
+        if (raw) ph = { ...defaultPersonalHistory(), ...JSON.parse(raw) };
+      } catch {}
+      let mh = defaultMenstrualHistory();
+      try {
+        const rawMh = cons.menstrualHistory as string;
+        if (rawMh) mh = { ...defaultMenstrualHistory(), ...JSON.parse(rawMh) };
+      } catch {}
+      let ae = defaultAyurvedaExamination();
+      try {
+        const rawAe = cons.ayurvedaExamination as string;
+        if (rawAe) {
+          const parsed = JSON.parse(rawAe) as Record<string, unknown>;
+          ae = { ...defaultAyurvedaExamination(), ...parsed };
+          if (parsed.sparsha != null && !Array.isArray(parsed.sparsha)) ae.sparsha = [String(parsed.sparsha)];
+        }
+      } catch {}
+      let diagnosisText = '';
+      try {
+        const d = cons.diagnosis as string;
+        if (d?.startsWith('[')) {
+          const arr = JSON.parse(d) as { name?: string }[];
+          diagnosisText = arr.map((x) => x?.name).filter(Boolean).join('\n');
+        } else if (d) diagnosisText = d;
+      } catch { diagnosisText = (cons.diagnosis as string) || ''; }
       setForm((f) => ({
         ...f,
         parentConsultationId: parentConsultationIdFromState,
         patientId: cons.patientId as string,
+        patientGender: (cons.patientGender as string) || '',
+        patientMedicalHistory: (cons.patientMedicalHistory as string) || (f.patientMedicalHistory || ''),
         doctorId: cons.doctorId as string,
+        consultationDate: format(new Date(), 'yyyy-MM-dd'),
+        consultationTime: format(new Date(), 'HH:mm'),
         symptoms: (cons.symptoms as string) || '',
-        diagnosis: (cons.diagnosis as string) || '',
+        personalHistory: ph,
+        menstrualHistory: mh,
+        ayurvedaExamination: ae,
+        diagnosis: diagnosisText,
         notes: (cons.notes as string) || '',
-        consultationFee: Number(cons.consultationFee) || DEFAULT_FEE,
         followUpRequired: true,
         followUpDate: (cons.followUpDate as string) || '',
-        medicines: meds.filter((m) => m.inventoryId && m.medicineId).map((m) => ({
-          inventoryId: m.inventoryId!,
-          medicineId: m.medicineId!,
-          medicineName: m.medicineName || 'Medicine',
-          quantity: m.quantity,
-          unitPrice: parseFloat(m.unitPrice) || 0,
+        weight: cons.weight != null ? String(cons.weight) : '',
+        height: cons.height != null ? String(cons.height) : '',
+        bpSystolic: cons.bpSystolic != null ? String(cons.bpSystolic) : '',
+        bpDiastolic: cons.bpDiastolic != null ? String(cons.bpDiastolic) : '',
+        temperature: cons.temperature != null ? String(cons.temperature) : '',
+        pulse: cons.pulse != null ? String(cons.pulse) : '',
+        spo2: cons.spo2 != null ? String(cons.spo2) : '',
+        cbg: cons.cbg != null ? String(cons.cbg) : '',
+        dietLifestyleAdvice: (cons.dietLifestyleAdvice as string) || '',
+        prescription: presc.filter((p) => p.medicineId).map((p) => ({
+          medicineId: p.medicineId!,
+          medicineName: p.medicineName || 'Medicine',
+          dosage: p.dosage || '',
+          durationDays: p.durationDays ?? '',
         })),
       }));
     }).catch((err) => {
@@ -136,18 +271,13 @@ const ConsultationsPage = () => {
       if (user?.role === 'admin' && data.length > 0) setClinicId((c) => c || data[0].id);
     }).catch(() => setClinics([]));
     api.doctors.list().then(setDoctors).catch(() => setDoctors([]));
+    api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
   }, [user?.role]);
 
-  useEffect(() => {
-    if (targetClinicId) {
-      api.inventory.list(targetClinicId).then(setInventory).catch(() => setInventory([]));
-    } else setInventory([]);
-  }, [targetClinicId]);
-
   const loadConsultations = () => {
-    if (user?.role === 'admin' && !targetClinicId) return;
     setListLoading(true);
-    const params: Record<string, string> = user?.role === 'admin' ? { clinicId: targetClinicId } : {};
+    const params: Record<string, string> = {};
+    if (user?.role === 'admin' && targetClinicId) params.clinicId = targetClinicId;
     if (form.patientId?.trim()) params.patientId = form.patientId.trim();
     api.consultations.list(params)
       .then((data) => setConsultations(data as ConsultationRow[]))
@@ -159,43 +289,44 @@ const ConsultationsPage = () => {
     loadConsultations();
   }, [targetClinicId, user?.role, form.patientId]);
 
-  const addMedicine = () => {
-    const inv = inventory[0] as { id: string; medicineId: string; medicineName: string; sellingPrice: string };
-    if (!inv) return;
+  const addPrescription = () => {
+    const first = medicinesMaster[0];
+    if (!first) return;
     setForm((f) => ({
       ...f,
-      medicines: [...f.medicines, { inventoryId: inv.id, medicineId: inv.medicineId, medicineName: inv.medicineName || 'Medicine', quantity: 1, unitPrice: parseFloat(inv.sellingPrice as string) || 0 }],
+      prescription: [...f.prescription, { medicineId: first.id, medicineName: first.name, dosage: '', durationDays: '' }],
     }));
-    setMedicineOpen(form.medicines.length);
+    setPrescriptionOpen(form.prescription.length);
   };
 
-  const selectMedicine = (idx: number, inv: { id: string; medicineId: string; medicineName: string; sellingPrice: string; currentStock?: number }) => {
+  const selectPrescription = (idx: number, med: { id: string; name: string }) => {
     setForm((f) => ({
       ...f,
-      medicines: f.medicines.map((m, i) =>
-        i === idx ? { ...m, inventoryId: inv.id, medicineId: inv.medicineId, medicineName: inv.medicineName || 'Medicine', unitPrice: parseFloat(inv.sellingPrice as string) || 0 } : m
+      prescription: f.prescription.map((p, i) =>
+        i === idx ? { ...p, medicineId: med.id, medicineName: med.name } : p
       ),
     }));
-    setMedicineOpen(null);
+    setPrescriptionOpen(null);
   };
 
-  const removeMedicine = (idx: number) => {
-    setForm((f) => ({ ...f, medicines: f.medicines.filter((_, i) => i !== idx) }));
+  const removePrescription = (idx: number) => {
+    setForm((f) => ({ ...f, prescription: f.prescription.filter((_, i) => i !== idx) }));
   };
 
-  const updateMedicine = (idx: number, field: string, value: number | string) => {
+  const updatePrescription = (idx: number, field: string, value: string | number) => {
     setForm((f) => ({
       ...f,
-      medicines: f.medicines.map((m, i) => (i === idx ? { ...m, [field]: value } : m)),
+      prescription: f.prescription.map((p, i) => (i === idx ? { ...p, [field]: value } : p)),
     }));
   };
 
-  const medicineTotal = form.medicines.reduce((s, m) => s + m.quantity * m.unitPrice, 0);
-  const totalAmount = form.consultationFee + medicineTotal;
+  const toNum = (v: string | number) => (v === '' || v == null ? undefined : Number(v));
 
   const handleSubmit = async () => {
-    if (!form.patientId || !form.doctorId || !targetClinicId) {
-      toast({ title: 'Missing fields', description: 'Patient, doctor and clinic required', variant: 'destructive' });
+    const errs = consultationFormErrors();
+    setConsultationErrors(errs);
+    if (errs.length > 0) {
+      toast({ title: 'Validation error', description: errs[0], variant: 'destructive' });
       return;
     }
     setLoading(true);
@@ -205,36 +336,64 @@ const ConsultationsPage = () => {
         doctorId: form.doctorId,
         clinicId: targetClinicId,
         consultationDate: form.consultationDate,
+        consultationTime: form.consultationTime || undefined,
+        patientMedicalHistory: form.patientMedicalHistory,
         symptoms: form.symptoms || undefined,
-        diagnosis: form.diagnosis || undefined,
+        personalHistory: form.personalHistory,
+        diagnosis: form.diagnosis?.trim() || undefined,
         notes: form.notes || undefined,
-        consultationFee: form.consultationFee,
+        consultationFee: 0,
         followUpRequired: form.followUpRequired,
         followUpDate: form.followUpDate || undefined,
         parentConsultationId: form.parentConsultationId || undefined,
-        medicines: form.medicines.map((m) => ({
-          inventoryId: m.inventoryId,
-          medicineId: m.medicineId,
-          quantity: m.quantity,
-          unitPrice: m.unitPrice,
+        weight: toNum(form.weight),
+        height: toNum(form.height),
+        bpSystolic: toNum(form.bpSystolic),
+        bpDiastolic: toNum(form.bpDiastolic),
+        temperature: toNum(form.temperature),
+        pulse: toNum(form.pulse),
+        spo2: toNum(form.spo2),
+        cbg: toNum(form.cbg),
+        dietLifestyleAdvice: form.dietLifestyleAdvice || undefined,
+        menstrualHistory: form.patientGender?.toLowerCase() === 'female' ? form.menstrualHistory : undefined,
+        ayurvedaExamination: form.ayurvedaExamination,
+        prescription: form.prescription.filter((p) => p.medicineId).map((p) => ({
+          medicineId: p.medicineId,
+          dosage: p.dosage || undefined,
+          durationDays: toNum(p.durationDays),
         })),
       }) as { id?: string };
-      toast({ title: 'Consultation saved', description: `Total: ₹${totalAmount}` });
+      setConsultationErrors([]);
+      toast({ title: 'Consultation saved', description: 'Prescription recorded. Add fee & medicines at Pharmacy.' });
       const savedPatientId = form.patientId;
       const savedPatientName = form.patientName;
       setForm({
         patientId: savedPatientId,
         patientName: savedPatientName,
+        patientMedicalHistory: form.patientMedicalHistory,
+        patientGender: form.patientGender,
         doctorId: '',
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
+        consultationTime: format(new Date(), 'HH:mm'),
         followUpDate: '',
         symptoms: '',
+        personalHistory: defaultPersonalHistory(),
+        menstrualHistory: defaultMenstrualHistory(),
+        ayurvedaExamination: defaultAyurvedaExamination(),
         diagnosis: '',
         notes: '',
-        consultationFee: DEFAULT_FEE,
         followUpRequired: false,
         parentConsultationId: '',
-        medicines: [],
+        weight: '',
+        height: '',
+        bpSystolic: '',
+        bpDiastolic: '',
+        temperature: '',
+        pulse: '',
+        spo2: '',
+        cbg: '',
+        dietLifestyleAdvice: '',
+        prescription: [],
       });
       loadConsultations();
       if (created?.id) {
@@ -261,58 +420,164 @@ const ConsultationsPage = () => {
 
   const openNewConsultation = () => {
     setActiveConsId(null);
+    setConsultationErrors([]);
     setForm({
       patientId: '',
       patientName: '',
+      patientMedicalHistory: '',
+      patientGender: '',
       doctorId: '',
       consultationDate: format(new Date(), 'yyyy-MM-dd'),
+      consultationTime: format(new Date(), 'HH:mm'),
       followUpDate: '',
       symptoms: '',
+      personalHistory: defaultPersonalHistory(),
+      menstrualHistory: defaultMenstrualHistory(),
+      ayurvedaExamination: defaultAyurvedaExamination(),
       diagnosis: '',
       notes: '',
-      consultationFee: DEFAULT_FEE,
       followUpRequired: false,
       parentConsultationId: '',
-      medicines: [],
+      weight: '',
+      height: '',
+      bpSystolic: '',
+      bpDiastolic: '',
+      temperature: '',
+      pulse: '',
+      spo2: '',
+      cbg: '',
+      dietLifestyleAdvice: '',
+      prescription: [],
     });
   };
 
-  const openReviewFromConsultation = (cons: ConsultationRow) => {
-    api.consultations.get(cons.id).then((data) => {
-      const meds = (data.medicines as { inventoryId?: string; medicineId?: string; medicineName: string; quantity: number; unitPrice: string }[]) || [];
-      setActiveConsId(cons.id);
-      setForm({
+  const loadConsultationForFollowUp = (consultationId: string) => {
+    api.consultations.get(consultationId).then((data) => {
+      const presc = (data.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
+      const d = data as Record<string, unknown>;
+      let ph = defaultPersonalHistory();
+      try {
+        const raw = d.personalHistory as string;
+        if (raw) ph = { ...defaultPersonalHistory(), ...JSON.parse(raw) };
+      } catch {}
+      let mh = defaultMenstrualHistory();
+      try {
+        const rawMh = d.menstrualHistory as string;
+        if (rawMh) mh = { ...defaultMenstrualHistory(), ...JSON.parse(rawMh) };
+      } catch {}
+      let ae = defaultAyurvedaExamination();
+      try {
+        const rawAe = d.ayurvedaExamination as string;
+        if (rawAe) {
+          const parsed = JSON.parse(rawAe) as Record<string, unknown>;
+          ae = { ...defaultAyurvedaExamination(), ...parsed };
+          if (parsed.sparsha != null && !Array.isArray(parsed.sparsha)) ae.sparsha = [String(parsed.sparsha)];
+        }
+      } catch {}
+      let diagnosisText = '';
+      try {
+        const diag = d.diagnosis as string;
+        if (diag?.startsWith('[')) {
+          const arr = JSON.parse(diag) as { name?: string }[];
+          diagnosisText = arr.map((x) => x?.name).filter(Boolean).join('\n');
+        } else if (diag) diagnosisText = diag;
+      } catch { diagnosisText = (d.diagnosis as string) || ''; }
+      setForm((f) => ({
+        ...f,
         patientId: data.patientId as string,
         patientName: data.patientName as string,
+        patientMedicalHistory: (d.patientMedicalHistory as string) || f.patientMedicalHistory || '',
+        patientGender: (d.patientGender as string) || '',
+        menstrualHistory: mh,
+        ayurvedaExamination: ae,
         doctorId: data.doctorId as string,
+        parentConsultationId: consultationId,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
-        followUpDate: '',
-        symptoms: (data.symptoms as string) || '',
-        diagnosis: (data.diagnosis as string) || '',
-        notes: (data.notes as string) || '',
-        consultationFee: Number(data.consultationFee) || DEFAULT_FEE,
+        consultationTime: format(new Date(), 'HH:mm'),
         followUpRequired: true,
-        parentConsultationId: cons.id,
-        medicines: meds.filter((m) => m.inventoryId && m.medicineId).map((m) => ({
-          inventoryId: m.inventoryId!,
-          medicineId: m.medicineId!,
-          medicineName: m.medicineName || 'Medicine',
-          quantity: m.quantity,
-          unitPrice: parseFloat(m.unitPrice) || 0,
+        symptoms: (data.symptoms as string) || '',
+        personalHistory: ph,
+        diagnosis: diagnosisText,
+        notes: (data.notes as string) || '',
+        weight: d.weight != null ? String(d.weight) : '',
+        height: d.height != null ? String(d.height) : '',
+        bpSystolic: d.bpSystolic != null ? String(d.bpSystolic) : '',
+        bpDiastolic: d.bpDiastolic != null ? String(d.bpDiastolic) : '',
+        temperature: d.temperature != null ? String(d.temperature) : '',
+        pulse: d.pulse != null ? String(d.pulse) : '',
+        spo2: d.spo2 != null ? String(d.spo2) : '',
+        cbg: d.cbg != null ? String(d.cbg) : '',
+        dietLifestyleAdvice: (d.dietLifestyleAdvice as string) || '',
+        prescription: presc.filter((p) => p.medicineId).map((p) => ({
+          medicineId: p.medicineId!,
+          medicineName: p.medicineName || 'Medicine',
+          dosage: p.dosage || '',
+          durationDays: p.durationDays ?? '',
         })),
-      });
+      }));
     }).catch(() => toast({ title: 'Failed to load details', variant: 'destructive' }));
   };
 
-  const openFollowUp = (cons: ConsultationRow) => {
-    openReviewFromConsultation(cons);
-  };
-
   const viewConsultationDetails = (cons: ConsultationRow) => {
-    openReviewFromConsultation(cons);
+    setActiveConsId(cons.id);
+    loadConsultationForFollowUp(cons.id);
   };
 
-  const invList = inventory as { id: string; medicineId: string; medicineName: string; sellingPrice: string; currentStock?: number }[];
+  const openFollowUp = (cons: ConsultationRow) => {
+    viewConsultationDetails(cons);
+  };
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  /** Upcoming follow-ups: consultations with followUpRequired and followUpDate >= today. */
+  const upcomingFollowUps = React.useMemo(() => {
+    return consultations
+      .filter((c) => c.followUpRequired === 1 && c.followUpDate && c.followUpDate >= todayStr)
+      .sort((a, b) => ((a.followUpDate as string) || '').localeCompare((b.followUpDate as string) || ''));
+  }, [consultations]);
+
+  /** Group consultations: initial visits with follow-ups nested. Orphan follow-ups grouped by parent. */
+  const { consultationGroups, orphanGroups } = React.useMemo(() => {
+    const initials = consultations.filter((c) => !c.parentConsultationId).sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    const initialIds = new Set(initials.map((i) => i.id));
+    const byParent = new Map<string, ConsultationRow[]>();
+    const orphanByParent = new Map<string, ConsultationRow[]>();
+    for (const c of consultations) {
+      if (c.parentConsultationId) {
+        const parentId = c.parentConsultationId as string;
+        if (initialIds.has(parentId)) {
+          const list = byParent.get(parentId) || [];
+          list.push(c);
+          byParent.set(parentId, list);
+        } else {
+          const list = orphanByParent.get(parentId) || [];
+          list.push(c);
+          orphanByParent.set(parentId, list);
+        }
+      }
+    }
+    for (const list of byParent.values()) {
+      list.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    }
+    for (const list of orphanByParent.values()) {
+      list.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    }
+    const groups = initials.map((init) => ({ initial: init, followUps: byParent.get(init.id) || [] }));
+    const orphanGroupsList = Array.from(orphanByParent.entries()).map(([parentId, followUps]) => {
+      const first = followUps[0];
+      const parentInfo: ConsultationRow = {
+        id: parentId,
+        patientName: first?.patientName ?? '',
+        consultationDate: first?.parentConsultationDate ?? '',
+        consultationTime: first?.parentConsultationTime ?? null,
+        diagnosis: first?.parentDiagnosis ?? null,
+        parentConsultationId: null,
+        totalAmount: '0',
+      };
+      return { parent: parentInfo, followUps };
+    });
+    return { consultationGroups: groups, orphanGroups: orphanGroupsList };
+  }, [consultations]);
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const searchPatients = (term: string) => {
@@ -339,11 +604,11 @@ const ConsultationsPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <PageHeader title="Consultations" description="View consultations and create new or follow-up" />
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center justify-between gap-4 mb-3 shrink-0">
+        <PageHeader title="Consultations" />
         {user?.role === 'admin' && clinics.length > 0 && (
-          <Select value={clinicId || undefined} onValueChange={setClinicId}>
+          <Select value={clinicId || undefined} onValueChange={(v) => { setClinicId(v); setConsultationErrors((e) => e.filter((x) => !x.includes('Clinic'))); }}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select clinic" />
             </SelectTrigger>
@@ -356,17 +621,17 @@ const ConsultationsPage = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(400px,1.5fr)] gap-6 flex-1 min-h-0">
-        {/* Left: Recent Consultations (filtered by patient when selected) */}
-        <Card className="flex flex-col min-h-0">
-          <CardHeader className="pb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(400px,1.5fr)] gap-4 flex-1 min-h-0 overflow-hidden">
+        {/* Left: Old records — select for follow-up or new consult */}
+        <Card className="flex flex-col min-h-0 overflow-hidden">
+          <CardHeader className="pb-2 shrink-0">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">
-                  {form.patientId ? form.patientName || 'Patient' : 'Recent Consultations'}
+                  {form.patientId ? form.patientName || 'Beneficiary' : 'Consultation Records'}
                 </CardTitle>
                 <CardDescription className="mt-0.5">
-                  {form.patientId ? 'This patient only. ' : ''}Click row to add review
+                  {form.patientId ? 'This patient only. ' : ''}Click a record to view, add follow-up, or start new consult.
                 </CardDescription>
               </div>
               {form.patientId && (
@@ -376,11 +641,11 @@ const ConsultationsPage = () => {
               )}
             </div>
           </CardHeader>
-          <CardContent className="flex-1 min-h-0 overflow-y-auto p-4">
+          <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
             {listLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
-                <p className="text-sm text-muted-foreground">Loading consultations...</p>
+                <p className="text-sm text-muted-foreground">Loading records...</p>
               </div>
             ) : consultations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -388,44 +653,214 @@ const ConsultationsPage = () => {
                   <User className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <p className="font-medium text-muted-foreground">No consultations yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Select a patient to filter or create a new consultation</p>
+                <p className="text-sm text-muted-foreground mt-1">Select a beneficiary to filter or create a new consultation</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {consultations.map((c) => (
-                  <div
-                    key={c.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => viewConsultationDetails(c)}
-                    onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(c)}
-                    className={cn(
-                      'flex items-center justify-between gap-3 rounded-lg border p-3.5 cursor-pointer transition-all duration-200',
-                      activeConsId === c.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-sm">{form.patientId ? c.consultationDate : c.patientName}</p>
-                        {c.parentConsultationId ? (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 font-medium">Review</span>
-                        ) : (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 font-medium">Consult</span>
+              <div className="space-y-4">
+                {upcomingFollowUps.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 px-1 mb-1 flex items-center gap-1">
+                      <CalendarIcon className="h-3.5 w-3.5" /> Upcoming follow-ups ({upcomingFollowUps.length})
+                    </p>
+                    {upcomingFollowUps.map((f) => (
+                      <div
+                        key={f.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => viewConsultationDetails(f)}
+                        onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                        className={cn(
+                          'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/30',
+                          activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 shadow-sm' : 'hover:bg-amber-100/50 dark:hover:bg-amber-900/20'
                         )}
+                      >
+                        <div className="flex-1 min-w-0 text-right">
+                          <div className="flex items-center gap-2 flex-wrap justify-end">
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-semibold border border-amber-300/60">
+                              <CalendarIcon className="h-3 w-3" /> Due {f.followUpDate ? format(new Date(f.followUpDate + 'T00:00:00'), 'dd-MM-yyyy') : ''}
+                            </span>
+                            <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                          </div>
+                          {f.diagnosis && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                            <Printer className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {!form.patientId && `${c.consultationDate} · `}<span className="font-medium text-foreground">₹{c.totalAmount}</span>
-                      </p>
-                      {c.diagnosis && <p className="text-xs text-muted-foreground mt-0.5 truncate">{String(c.diagnosis)}</p>}
+                    ))}
+                  </div>
+                )}
+                {orphanGroups.filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id))).length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-xs font-medium text-muted-foreground px-1 mb-1">Other follow-ups (parent not in list)</p>
+                    {orphanGroups
+                      .filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id)))
+                      .map(({ parent, followUps }) => (
+                        <div key={parent.id} className="space-y-1">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); } }}
+                            className={cn(
+                              'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
+                              activeConsId === parent.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-sm">
+                                  {parent.consultationDate ? fmtDateWithTime(parent.consultationDate as string, parent.consultationTime) : 'Parent consultation'}
+                                </p>
+                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
+                                  <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
+                                </span>
+                              </div>
+                              {parent.diagnosis && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">{diagnosisDisplay(parent.diagnosis)}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); }} title="Add follow-up">
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(parent.id)} title="Print">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
+                            {followUps
+                              .filter((f) => !upcomingFollowUps.some((u) => u.id === f.id))
+                              .map((f) => (
+                                <div
+                                  key={f.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => viewConsultationDetails(f)}
+                                  onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                                  className={cn(
+                                    'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
+                                    activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                                  )}
+                                >
+                                  <div className="flex-1 min-w-0 text-right">
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
+                                        <FileText className="h-3 w-3" /> Follow-up
+                                      </span>
+                                      {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
+                                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium border border-amber-200/60">
+                                          Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                        </span>
+                                      )}
+                                      <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                                    </div>
+                                    {f.diagnosis && (
+                                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                                      <Printer className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {consultationGroups.map(({ initial, followUps }) => (
+                  <div key={initial.id} className="space-y-1">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => viewConsultationDetails(initial)}
+                      onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(initial)}
+                      className={cn(
+                        'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
+                        activeConsId === initial.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
+                      )}
+                    >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm">{form.patientId ? fmtDateWithTime(initial.consultationDate as string, initial.consultationTime) : initial.patientName}</p>
+                          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
+                            <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
+                          </span>
+                          {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
+                              Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                            </span>
+                          )}
+                        </div>
+                        {initial.diagnosis && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(initial.diagnosis)}</p>
+                        )}
+                        </div>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(initial)} title="Add follow-up">
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(initial.id)} title="Print">
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(c)} title="Add review">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(c.id)} title="Print">
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {followUps.length > 0 && (
+                      <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
+                        {followUps.map((f) => (
+                          <div
+                            key={f.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => viewConsultationDetails(f)}
+                            onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                            className={cn(
+                              'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
+                              activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                            )}
+                          >
+                            <div className="flex-1 min-w-0 text-right">
+                              <div className="flex items-center gap-2 flex-wrap justify-end">
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold border border-amber-200/60">
+                                  <FileText className="h-3 w-3" /> Follow-up
+                                </span>
+                                {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
+                                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
+                                    Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                  </span>
+                                )}
+                                <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                              </div>
+                              {f.diagnosis && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -433,34 +868,43 @@ const ConsultationsPage = () => {
           </CardContent>
         </Card>
 
-        {/* Right: New/Review form */}
-        <Card className="flex flex-col min-h-0 border-l-0 lg:border-l">
-          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
+        {/* Right: New/Edit form */}
+        <Card className="flex flex-col min-h-0 overflow-hidden border-l-0 lg:border-l">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3 shrink-0">
             <div>
               <CardTitle className="text-lg">
-                {form.parentConsultationId ? 'Add Review' : 'New Consult'}
+                {form.parentConsultationId ? 'Add Follow-up' : 'New Initial Visit'}
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {form.parentConsultationId
-                  ? 'Data copied from previous. Edit and save as new review.'
-                  : 'Select patient, doctor, date and medicines.'}
+                  ? 'Data copied from previous visit. Edit symptoms, vitals, diagnosis and save as follow-up.'
+                  : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
               </CardDescription>
             </div>
             <Button onClick={openNewConsultation} disabled={!targetClinicId} size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" /> New Consult
+              <Plus className="h-4 w-4 mr-1.5" /> New Initial Visit
             </Button>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
           <div className="space-y-4">
+            {consultationErrors.length > 0 && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                <ul className="list-disc list-inside space-y-0.5">
+                  {consultationErrors.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div>
               <Label className="flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5" /> Patient <span className="text-destructive">*</span>
+                <User className="h-3.5 w-3.5" /> Beneficiary <span className="text-destructive">*</span>
               </Label>
               <div className="flex gap-2 mt-1.5">
                 <Popover open={patientSearchOpen} onOpenChange={(open) => { setPatientSearchOpen(open); if (open) loadRecentPatients(); }}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className={cn('flex-1 justify-between font-normal h-10', !form.patientName && 'text-muted-foreground')}>
-                      <span className="truncate">{form.patientName || 'Search patient by name...'}</span>
+                    <Button variant="outline" role="combobox" className={cn('flex-1 justify-between font-normal h-10', !form.patientName && 'text-muted-foreground', consultationErrors.some((e) => e.includes('Beneficiary')) && 'border-destructive')}>
+                      <span className="truncate">{form.patientName || 'Search beneficiary by name...'}</span>
                       <Search className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -478,7 +922,7 @@ const ConsultationsPage = () => {
                       )}
                       {!patientSearching && (
                         <>
-                          <CommandEmpty>No patient found. Try different search.</CommandEmpty>
+                          <CommandEmpty>No beneficiary found. Try different search.</CommandEmpty>
                           <CommandGroup>
                             {patientSearchResults.map((p) => (
                               <CommandItem
@@ -487,6 +931,7 @@ const ConsultationsPage = () => {
                                 onSelect={() => {
                                   setForm((f) => ({ ...f, patientId: p.id, patientName: p.name }));
                                   setPatientSearchOpen(false);
+                                  setConsultationErrors((e) => e.filter((x) => !x.includes('Beneficiary')));
                                 }}
                               >
                                 <div className="flex flex-col">
@@ -503,17 +948,17 @@ const ConsultationsPage = () => {
                 </PopoverContent>
               </Popover>
               {form.patientName && (
-                <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10" onClick={() => setForm((f) => ({ ...f, patientId: '', patientName: '' }))} title="Clear patient">
+                <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10" onClick={() => { setForm((f) => ({ ...f, patientId: '', patientName: '', patientMedicalHistory: '', patientGender: '', menstrualHistory: defaultMenstrualHistory(), ayurvedaExamination: defaultAyurvedaExamination() })); setConsultationErrors((e) => e.filter((x) => !x.includes('Beneficiary'))); }} title="Clear beneficiary">
                   <X className="h-4 w-4" />
                 </Button>
               )}
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label>Doctor <span className="text-destructive">*</span></Label>
-                <Select value={form.doctorId} onValueChange={(v) => setForm((f) => ({ ...f, doctorId: v }))}>
-                  <SelectTrigger className="h-10"><SelectValue placeholder="Select doctor" /></SelectTrigger>
+                <Select value={form.doctorId} onValueChange={(v) => { setForm((f) => ({ ...f, doctorId: v })); setConsultationErrors((e) => e.filter((x) => !x.includes('Doctor'))); }}>
+                  <SelectTrigger className={cn('h-10', consultationErrors.some((e) => e.includes('Doctor')) && 'border-destructive')}><SelectValue placeholder="Select doctor" /></SelectTrigger>
                   <SelectContent>
                     {doctors.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -522,27 +967,485 @@ const ConsultationsPage = () => {
                 </Select>
               </div>
               <div>
-                <Label>Date</Label>
+                <Label>Date <span className="text-destructive">*</span></Label>
                 <Input
                   type="date"
-                  className="h-10"
+                  className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
                   value={form.consultationDate}
-                  onChange={(e) => setForm((f) => ({ ...f, consultationDate: e.target.value }))}
+                  onChange={(e) => { setForm((f) => ({ ...f, consultationDate: e.target.value })); setConsultationErrors((e) => e.filter((x) => !x.includes('date'))); }}
                 />
+              </div>
+              <div>
+                <Label>Time</Label>
+                <Input
+                  type="time"
+                  className="h-10"
+                  value={form.consultationTime}
+                  onChange={(e) => setForm((f) => ({ ...f, consultationTime: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
+              <div>
+                <Label className="text-xs">Weight (kgs)</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: restrictVital(e.target.value, 3, 2) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Height (cm)</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: restrictVital(e.target.value, 3, 2) }))} />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-2 min-w-0">
+                <BmiDisplay weight={toNum(form.weight)} height={toNum(form.height)} compact />
+              </div>
+              <div>
+                <Label className="text-xs">BP (mmHg)</Label>
+                <div className="flex gap-1 items-center">
+                  <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpSystolic} onChange={(e) => setForm((f) => ({ ...f, bpSystolic: restrictVital(e.target.value, 3, 0) }))} />
+                  <span className="text-muted-foreground">/</span>
+                  <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpDiastolic} onChange={(e) => setForm((f) => ({ ...f, bpDiastolic: restrictVital(e.target.value, 3, 0) }))} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Temperature</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.temperature} onChange={(e) => setForm((f) => ({ ...f, temperature: restrictVital(e.target.value, 3, 2) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Pulse (bpm)</Label>
+                <Input type="text" inputMode="numeric" className="h-9" placeholder="—" value={form.pulse} onChange={(e) => setForm((f) => ({ ...f, pulse: restrictVital(e.target.value, 3, 0) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">SpO2 (%)</Label>
+                <Input type="text" inputMode="numeric" className="h-9" placeholder="—" value={form.spo2} onChange={(e) => setForm((f) => ({ ...f, spo2: restrictVital(e.target.value, 3, 0) }))} />
+              </div>
+              <div>
+                <Label className="text-xs">CBG (mg/dL)</Label>
+                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.cbg} onChange={(e) => setForm((f) => ({ ...f, cbg: restrictVital(e.target.value, 3, 2) }))} />
               </div>
             </div>
             <div className="pt-4 border-t space-y-4">
             <div>
-              <Label>Symptoms</Label>
-              <Textarea value={form.symptoms} onChange={(e) => setForm((f) => ({ ...f, symptoms: e.target.value }))} placeholder="Patient symptoms" rows={2} className="resize-none" />
+              <Label>Present Complaint with duration</Label>
+              <Textarea value={form.symptoms} onChange={(e) => setForm((f) => ({ ...f, symptoms: e.target.value }))} placeholder="Describe complaint and duration (e.g. Headache for 3 days)" rows={2} className="resize-none" />
+            </div>
+            <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+              <Label className="text-sm font-semibold">Personal History</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Diet</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Vegetarian', 'Non-Vegetarian', 'Eggetarian'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.diet.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              diet: e.target.checked ? [...f.personalHistory.diet, opt] : f.personalHistory.diet.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Exercise / Physical Activity</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Regular', 'Moderate', 'Minimal', 'None'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.exercise.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              exercise: e.target.checked ? [...f.personalHistory.exercise, opt] : f.personalHistory.exercise.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Habits / Addictions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Alcohol', 'Smoking', 'Tobacco', 'None'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.habits.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              habits: e.target.checked ? [...f.personalHistory.habits, opt] : f.personalHistory.habits.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Bowel Movement</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Regular', 'Irregular', 'Constipation'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.bowelMovement.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              bowelMovement: e.target.checked ? [...f.personalHistory.bowelMovement, opt] : f.personalHistory.bowelMovement.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Appetite</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Good', 'Moderate', 'Poor'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.appetite.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              appetite: e.target.checked ? [...f.personalHistory.appetite, opt] : f.personalHistory.appetite.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Micturition (Urination)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Regular', 'Irregular', 'Burning', 'Frequent'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.micturition.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              micturition: e.target.checked ? [...f.personalHistory.micturition, opt] : f.personalHistory.micturition.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Sleep Pattern</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Sound', 'Disturbed', 'Insomnia'].map((opt) => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={form.personalHistory.sleepPattern.includes(opt)} onChange={(e) => {
+                          setForm((f) => ({
+                            ...f,
+                            personalHistory: {
+                              ...f.personalHistory,
+                              sleepPattern: e.target.checked ? [...f.personalHistory.sleepPattern, opt] : f.personalHistory.sleepPattern.filter((x) => x !== opt),
+                            },
+                          }));
+                        }} className="rounded border-input" />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {form.patientGender?.toLowerCase() === 'female' && (
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/30 border-rose-200">
+                <Label className="text-sm font-semibold">Menstrual History</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Menstrual Cycle</p>
+                    <div className="flex gap-4">
+                      {(['Regular', 'Irregular'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="menstrualCycle" checked={form.menstrualHistory.menstrualCycle === opt} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menstrualCycle: opt } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Last Menstrual Period (LMP)</Label>
+                    <Input type="date" className="h-9 mt-0.5" value={form.menstrualHistory.lmp} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, lmp: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Per day pads count (During Period)</Label>
+                    <Input type="number" className="h-9 mt-0.5" min={0} placeholder="—" value={form.menstrualHistory.padsPerDay} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, padsPerDay: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Cycle Length (days)</Label>
+                    <Input type="number" className="h-9 mt-0.5 w-20" min={1} max={99} placeholder="—" value={form.menstrualHistory.cycleLengthDays} onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') return setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleLengthDays: '' } }));
+                      const n = parseInt(v, 10);
+                      if (isNaN(n) || n < 1) return;
+                      setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleLengthDays: n > 99 ? 99 : v } }));
+                    }} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Day's of Cycle</Label>
+                    <Input type="number" className="h-9 mt-0.5 w-20" min={1} max={99} placeholder="—" value={form.menstrualHistory.cycleCountOnVisit} onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '') return setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleCountOnVisit: '' } }));
+                      const n = parseInt(v, 10);
+                      if (isNaN(n) || n < 1) return;
+                      setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, cycleCountOnVisit: n > 99 ? 99 : v } }));
+                    }} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Clots</p>
+                    <div className="flex gap-4">
+                      {(['Yes', 'No'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="clots" checked={form.menstrualHistory.clots === opt} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, clots: opt } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Menstrual Flow</p>
+                    <div className="flex gap-3 flex-wrap">
+                      {(['Normal', 'Heavy', 'Scanty'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="menstrualFlow" checked={form.menstrualHistory.menstrualFlow === opt} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menstrualFlow: opt } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={form.menstrualHistory.dysmenorrhea} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, dysmenorrhea: e.target.checked } }))} className="rounded border-input" />
+                      <span>Dysmenorrhea (Pain During Periods)</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={form.menstrualHistory.leucorrhea} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, leucorrhea: e.target.checked } }))} className="rounded border-input" />
+                      <span>Leucorrhea (White Discharge)</span>
+                    </label>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Menopause</p>
+                    <div className="flex gap-4">
+                      {(['No', 'Yes'] as const).map((opt) => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="menopause" checked={(opt === 'Yes') === form.menstrualHistory.menopause} onChange={() => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menopause: opt === 'Yes' } }))} className="rounded border-input" />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {form.menstrualHistory.menopause && (
+                    <div>
+                      <Label className="text-xs">Age at Menopause</Label>
+                      <Input type="number" className="h-9 mt-0.5" min={0} placeholder="—" value={form.menstrualHistory.menopauseAge} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, menopauseAge: e.target.value } }))} />
+                    </div>
+                  )}
+                  <div className="sm:col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Pregnancy History (if applicable)</p>
+                    <div className="flex gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Gravida:</Label>
+                        <Input type="number" className="h-9 w-16" min={0} value={form.menstrualHistory.gravida} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, gravida: e.target.value } }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Para:</Label>
+                        <Input type="number" className="h-9 w-16" min={0} value={form.menstrualHistory.para} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, para: e.target.value } }))} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Abortions:</Label>
+                        <Input type="number" className="h-9 w-16" min={0} value={form.menstrualHistory.abortions} onChange={(e) => setForm((f) => ({ ...f, menstrualHistory: { ...f.menstrualHistory, abortions: e.target.value } }))} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+              <Label className="text-sm font-semibold">Ayurvedic Examinations</Label>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-2 font-medium">Parameter</th>
+                      <th className="text-left py-2 px-2 font-medium">Observation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Naadi (Pulse)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-2">
+                          {(['V', 'P', 'K', 'VP', 'VK', 'PK'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="naadi" checked={form.ayurvedaExamination.naadi === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, naadi: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Malam (Stool)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Regular', 'Constipated'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="malam" checked={form.ayurvedaExamination.malam === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, malam: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Mootram (Urine)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Flow:</span>
+                            {(['Regular', 'Irregular'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="mootram" checked={form.ayurvedaExamination.mootram === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, mootram: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Colour:</span>
+                            {(['Clear', 'White', 'Yellow', 'Red'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="mootramColour" checked={form.ayurvedaExamination.mootramColour === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, mootramColour: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Jihwa (Tongue)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Lipta', 'Alipta'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="jihwa" checked={form.ayurvedaExamination.jihwa === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, jihwa: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Shabda (Voice)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Normal', 'Abnormal'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="shabda" checked={form.ayurvedaExamination.shabda === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, shabda: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Sparsha (Touch)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-2">
+                          {(['Ushna', 'Sheeta', 'Ruksha', 'Mrudu'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="checkbox" checked={(Array.isArray(form.ayurvedaExamination.sparsha) ? form.ayurvedaExamination.sparsha : []).includes(opt)} onChange={(e) => {
+                                const arr = Array.isArray(form.ayurvedaExamination.sparsha) ? form.ayurvedaExamination.sparsha : [];
+                                setForm((f) => ({
+                                  ...f,
+                                  ayurvedaExamination: {
+                                    ...f.ayurvedaExamination,
+                                    sparsha: e.target.checked ? [...arr, opt] : arr.filter((x) => x !== opt),
+                                  },
+                                }));
+                              }} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Drik (Eyes)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Status:</span>
+                            {(['Normal', 'Abnormal'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="drik" checked={form.ayurvedaExamination.drik === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, drik: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 items-center">
+                            <span className="text-xs text-muted-foreground">Colour:</span>
+                            {(['White', 'Pink', 'Red', 'Yellow'] as const).map((opt) => (
+                              <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                <input type="radio" name="drikColour" checked={form.ayurvedaExamination.drikColour === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, drikColour: opt } }))} className="rounded border-input" />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="py-1.5 px-2 font-medium">Aakriti (Physique)</td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex gap-3">
+                          {(['Heena', 'Madhyama', 'Sthula'] as const).map((opt) => (
+                            <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                              <input type="radio" name="aakriti" checked={form.ayurvedaExamination.aakriti === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, aakriti: opt } }))} className="rounded border-input" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <Label>Medical History</Label>
+              <Textarea value={form.patientMedicalHistory} onChange={(e) => setForm((f) => ({ ...f, patientMedicalHistory: e.target.value }))} placeholder="From beneficiary record" rows={2} className="resize-none" />
             </div>
             <div>
               <Label>Diagnosis</Label>
-              <Textarea value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis" rows={2} />
+              <Textarea value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis (one or more lines)" rows={3} className="resize-none" />
             </div>
             <div>
               <Label>Notes</Label>
               <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Notes" />
+            </div>
+            <div>
+              <Label>Diet / Lifestyle Advice</Label>
+              <Textarea value={form.dietLifestyleAdvice} onChange={(e) => setForm((f) => ({ ...f, dietLifestyleAdvice: e.target.value }))} placeholder="Diet advice, lifestyle recommendations..." rows={2} className="resize-none" />
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -581,74 +1484,82 @@ const ConsultationsPage = () => {
             {consultations.length > 0 && !form.parentConsultationId && (
               <div>
                 <Label>Link to previous (follow-up)</Label>
-                <Select value={form.parentConsultationId || '__none__'} onValueChange={(v) => setForm((f) => ({ ...f, parentConsultationId: v === '__none__' ? '' : v }))}>
+                <Select value={form.parentConsultationId || '__none__'} onValueChange={(v) => {
+                  const id = v === '__none__' ? '' : v;
+                  setForm((f) => ({ ...f, parentConsultationId: id }));
+                  if (id) loadConsultationForFollowUp(id);
+                }}>
                   <SelectTrigger><SelectValue placeholder="None (new consultation)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None – new consultation</SelectItem>
                     {consultations.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.patientName} – {c.consultationDate}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{c.patientName} – {fmtDateWithTime(c.consultationDate as string, c.consultationTime)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
             </div>
-            <div>
-              <Label>Consultation Fee (₹)</Label>
-              <Input type="number" value={form.consultationFee} onChange={(e) => setForm((f) => ({ ...f, consultationFee: Number(e.target.value) || DEFAULT_FEE }))} />
-            </div>
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between mb-2">
-                <Label className="text-muted-foreground">Medicines</Label>
-                <Button size="sm" variant="outline" onClick={addMedicine} disabled={!targetClinicId || inventory.length === 0}>
-                  <Plus className="h-4 w-4 mr-1" /> Add medicine
+                <Label className="text-muted-foreground">Section 1 — Prescription (what doctor prescribes)</Label>
+                <Button size="sm" variant="outline" onClick={addPrescription} disabled={medicinesMaster.length === 0}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
-              {form.medicines.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {form.medicines.map((m, i) => (
-                    <div key={i} className="flex gap-2 items-center rounded border p-2">
-                      <Popover open={medicineOpen === i} onOpenChange={(o) => setMedicineOpen(o ? i : null)}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="flex-1 justify-between font-normal">
-                            {m.medicineName || 'Select medicine'}
-                            <span className="text-muted-foreground ml-1">({invList.find((x) => x.id === m.inventoryId)?.currentStock ?? 0} left)</span>
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[300px] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search medicine..." />
-                            <CommandList>
-                              <CommandEmpty>No medicine found</CommandEmpty>
-                              <CommandGroup>
-                                {invList
-                                  .filter((inv) => inv.currentStock !== undefined && inv.currentStock > 0)
-                                  .map((inv) => (
-                                    <CommandItem key={inv.id} value={inv.medicineName} onSelect={() => selectMedicine(i, inv)}>
-                                      {inv.medicineName} (Stock: {inv.currentStock}) – ₹{inv.sellingPrice}
-                                    </CommandItem>
-                                  ))}
-                                {invList.filter((inv) => (inv.currentStock ?? 0) > 0).length === 0 && (
-                                  <CommandItem disabled>No stock available</CommandItem>
-                                )}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <Input type="number" className="w-16" value={m.quantity} onChange={(e) => updateMedicine(i, 'quantity', Number(e.target.value) || 1)} min={1} />
-                      <Input type="number" className="w-20" value={m.unitPrice} onChange={(e) => updateMedicine(i, 'unitPrice', Number(e.target.value) || 0)} />
-                      <span className="text-sm">₹{m.quantity * m.unitPrice}</span>
-                      <Button size="icon" variant="ghost" onClick={() => removeMedicine(i)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                  ))}
+              {form.prescription.length > 0 && (
+                <div className="mt-2 rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b">
+                        <th className="text-left py-2 px-3 font-medium">Medicine</th>
+                        <th className="text-left py-2 px-3 font-medium">Dosage</th>
+                        <th className="text-left py-2 px-3 font-medium w-20">Duration</th>
+                        <th className="w-10" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.prescription.map((p, i) => (
+                        <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="py-2 px-3">
+                            <Popover open={prescriptionOpen === i} onOpenChange={(o) => setPrescriptionOpen(o ? i : null)}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" size="sm" className="w-full justify-between font-normal">
+                                  {p.medicineName || 'Select medicine'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Search medicine..." />
+                                  <CommandList>
+                                    <CommandEmpty>No medicine found</CommandEmpty>
+                                    <CommandGroup>
+                                      {medicinesMaster.map((med) => (
+                                        <CommandItem key={med.id} value={med.name} onSelect={() => selectPrescription(i, med)}>
+                                          {med.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input className="h-8 w-28" placeholder="e.g. 1 tab BD" value={p.dosage} onChange={(e) => updatePrescription(i, 'dosage', e.target.value)} />
+                          </td>
+                          <td className="py-2 px-3">
+                            <Input type="number" className="h-8 w-16" placeholder="days" value={p.durationDays} onChange={(e) => updatePrescription(i, 'durationDays', e.target.value)} min={0} />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removePrescription(i)}><Trash2 className="h-4 w-4" /></Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </div>
-            <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Consultation Fee</span><span>₹{form.consultationFee}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Medicines</span><span>₹{medicineTotal}</span></div>
-              <div className="flex justify-between font-semibold text-base pt-2 border-t"><span>Total</span><span className="text-primary">₹{totalAmount}</span></div>
             </div>
             <Button onClick={handleSubmit} disabled={loading || !targetClinicId} className="w-full h-11 font-medium" size="lg">
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save & Print'}

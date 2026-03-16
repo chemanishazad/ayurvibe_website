@@ -14,17 +14,27 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle, Plus, Truck } from 'lucide-react';
 
 const InventoryPage = () => {
   const user = getAuthUser();
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [medicines, setMedicines] = useState<{ id: string; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
   const [lowStock, setLowStock] = useState<Record<string, unknown>[]>([]);
   const [clinicId, setClinicId] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ medicineId: '', currentStock: '', purchasePrice: '', sellingPrice: '' });
+  const [showPurchase, setShowPurchase] = useState(false);
+  const [form, setForm] = useState({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '' });
+  const [purchaseForm, setPurchaseForm] = useState({
+    medicineId: '',
+    supplierId: '',
+    quantity: '',
+    unitPurchasePrice: '',
+    sellingPrice: '',
+    purchaseDate: new Date().toISOString().slice(0, 10),
+  });
   const { toast } = useToast();
 
   const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
@@ -32,6 +42,7 @@ const InventoryPage = () => {
   useEffect(() => {
     api.clinics.list().then(setClinics).catch(() => setClinics([]));
     api.medicines.list().then((data) => setMedicines(data as { id: string; name: string }[])).catch(() => setMedicines([]));
+    api.suppliers.list().then((data) => setSuppliers(data as { id: string; name: string }[])).catch(() => setSuppliers([]));
   }, []);
 
   useEffect(() => {
@@ -49,17 +60,54 @@ const InventoryPage = () => {
       toast({ title: 'Clinic and medicine required', variant: 'destructive' });
       return;
     }
+    const qty = parseInt(form.quantity, 10) || 0;
+    if (qty < 1) {
+      toast({ title: 'Quantity must be at least 1', variant: 'destructive' });
+      return;
+    }
     try {
       await api.inventory.update({
         clinicId: targetClinicId,
         medicineId: form.medicineId,
-        currentStock: parseInt(form.currentStock, 10) || 0,
+        quantity: qty,
         purchasePrice: form.purchasePrice || '0',
         sellingPrice: form.sellingPrice || '0',
       });
-      toast({ title: 'Inventory updated' });
+      toast({ title: 'Stock added' });
       setShowForm(false);
-      setForm({ medicineId: '', currentStock: '', purchasePrice: '', sellingPrice: '' });
+      setForm({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '' });
+      api.inventory.list(targetClinicId).then(setInventory);
+      api.inventory.lowStock(targetClinicId).then(setLowStock);
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!targetClinicId || !purchaseForm.medicineId || !purchaseForm.supplierId || !purchaseForm.quantity || !purchaseForm.unitPurchasePrice) {
+      toast({ title: 'Clinic, medicine, supplier, quantity and purchase price required', variant: 'destructive' });
+      return;
+    }
+    try {
+      await api.purchases.create({
+        clinicId: targetClinicId,
+        medicineId: purchaseForm.medicineId,
+        supplierId: purchaseForm.supplierId,
+        quantity: parseInt(purchaseForm.quantity, 10) || 0,
+        unitPurchasePrice: parseFloat(purchaseForm.unitPurchasePrice) || 0,
+        sellingPrice: purchaseForm.sellingPrice ? parseFloat(purchaseForm.sellingPrice) : undefined,
+        purchaseDate: purchaseForm.purchaseDate || undefined,
+      });
+      toast({ title: 'Purchase recorded' });
+      setShowPurchase(false);
+      setPurchaseForm({
+        medicineId: '',
+        supplierId: '',
+        quantity: '',
+        unitPurchasePrice: '',
+        sellingPrice: '',
+        purchaseDate: new Date().toISOString().slice(0, 10),
+      });
       api.inventory.list(targetClinicId).then(setInventory);
       api.inventory.lowStock(targetClinicId).then(setLowStock);
     } catch (e) {
@@ -86,10 +134,16 @@ const InventoryPage = () => {
             </Select>
           )}
           {targetClinicId && (
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add / Update Stock
-            </Button>
+            <>
+              <Button variant="default" onClick={() => setShowPurchase(true)}>
+                <Truck className="h-4 w-4 mr-2" />
+                Purchase (Supplier)
+              </Button>
+              <Button variant="outline" onClick={() => setShowForm(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Manual Stock
+              </Button>
+            </>
           )}
         </div>
       </PageHeader>
@@ -153,11 +207,92 @@ const InventoryPage = () => {
         </CardContent>
       </Card>
 
+      {showPurchase && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Purchase from Supplier</CardTitle>
+            <CardDescription>Add stock with supplier. FIFO: first bought first sold.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Medicine</Label>
+              <Select value={purchaseForm.medicineId} onValueChange={(v) => setPurchaseForm((f) => ({ ...f, medicineId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select medicine" />
+                </SelectTrigger>
+                <SelectContent>
+                  {medicines.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Supplier</Label>
+              <Select value={purchaseForm.supplierId} onValueChange={(v) => setPurchaseForm((f) => ({ ...f, supplierId: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  value={purchaseForm.quantity}
+                  onChange={(e) => setPurchaseForm((f) => ({ ...f, quantity: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Purchase Price (₹)</Label>
+                <Input
+                  type="number"
+                  value={purchaseForm.unitPurchasePrice}
+                  onChange={(e) => setPurchaseForm((f) => ({ ...f, unitPurchasePrice: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Selling Price (₹)</Label>
+                <Input
+                  type="number"
+                  value={purchaseForm.sellingPrice}
+                  onChange={(e) => setPurchaseForm((f) => ({ ...f, sellingPrice: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Purchase Date</Label>
+                <Input
+                  type="date"
+                  value={purchaseForm.purchaseDate}
+                  onChange={(e) => setPurchaseForm((f) => ({ ...f, purchaseDate: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handlePurchase}>Record Purchase</Button>
+              <Button variant="outline" onClick={() => setShowPurchase(false)}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>Add / Update Stock</CardTitle>
-            <CardDescription>Set stock for a medicine at this clinic</CardDescription>
+            <CardTitle>Manual Stock</CardTitle>
+            <CardDescription>Add quantity to stock (no supplier tracking). Purchase and selling only update stock.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -176,11 +311,13 @@ const InventoryPage = () => {
               </Select>
             </div>
             <div>
-              <Label>Current Stock</Label>
+              <Label>Quantity to Add</Label>
               <Input
                 type="number"
-                value={form.currentStock}
-                onChange={(e) => setForm((f) => ({ ...f, currentStock: e.target.value }))}
+                min={1}
+                value={form.quantity}
+                onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
+                placeholder="e.g. 50"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -202,7 +339,7 @@ const InventoryPage = () => {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleAddStock}>Save</Button>
+              <Button onClick={handleAddStock}>Add Stock</Button>
               <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             </div>
           </CardContent>

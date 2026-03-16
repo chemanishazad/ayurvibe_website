@@ -37,10 +37,10 @@ import {
   Package,
   FileText,
   Building2,
-  ShoppingCart,
   ClipboardList,
   Menu,
   ChevronDown,
+  Truck,
 } from 'lucide-react';
 import { getAuthToken, getAuthUser, setAdminAuthenticated, setAuthUser } from '@/pages/Login';
 import { api } from '@/lib/api';
@@ -63,14 +63,15 @@ const navGroups = [
     items: [
       { path: '/admin/patients', label: 'Patients', icon: Users },
       { path: '/admin/consultations', label: 'Consultations', icon: Stethoscope },
+      { path: '/admin/pharmacy', label: 'Pharmacy', icon: Pill },
       { path: '/admin/treatment-plans', label: 'Treatment Plans', icon: ClipboardList },
     ],
   },
   {
     label: 'Commerce',
     items: [
-      { path: '/admin/direct-sales', label: 'Direct Sales', icon: ShoppingCart },
       { path: '/admin/medicines', label: 'Medicines', icon: Pill },
+      { path: '/admin/suppliers', label: 'Suppliers', icon: Truck },
       { path: '/admin/inventory', label: 'Inventory', icon: Package },
     ],
   },
@@ -99,7 +100,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
   React.useEffect(() => {
     const token = getAuthToken();
     if (!token) return;
-    fetch(`${API_URL}/api/clinics`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_URL}/api/clinics`, { cache: 'no-store', headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then((data: Clinic[]) => setClinics(Array.isArray(data) ? data : []))
       .catch(() => setClinics([]));
@@ -250,8 +251,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
             </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
-          <div className="mx-auto max-w-7xl">{children}</div>
+        <main className="flex-1 flex flex-col min-h-0 overflow-auto p-3">
+          <div className="mx-auto w-full max-w-[1600px] flex-1 flex flex-col min-h-0">{children}</div>
         </main>
       </SidebarInset>
     </SidebarProvider>
