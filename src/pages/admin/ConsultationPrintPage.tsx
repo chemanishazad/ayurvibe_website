@@ -345,7 +345,7 @@ const ConsultationPrintPage = () => {
           rel="noopener noreferrer"
           className="px-5 py-2.5 font-medium rounded-lg border-2 border-green-600 text-green-700 hover:bg-green-50"
         >
-          Print Pharmacy Bill
+          Print Invoice
         </Link>
         <p className="text-xs text-gray-500 w-full mt-2">Uses A5 paper. Set Margins to &quot;None&quot; for full page.</p>
       </div>

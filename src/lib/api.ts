@@ -90,8 +90,30 @@ export const api = {
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/direct-sales${q ? `?${q}` : ''}`);
     },
-    create: (data: { clinicId: string; saleDate: string; items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice: number }> }) =>
+    create: (data: { clinicId: string; saleDate: string; customerName: string; customerMobile?: string; items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice: number }>; discount?: number }) =>
       fetchApi<Record<string, unknown>>('/api/direct-sales', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  whatsapp: {
+    sendBill: (data: {
+      mobile: string;
+      countryCode?: string;
+      billData: {
+        customerName: string;
+        medicines: Array<{ medicineName: string; quantity: number; unitPrice: string; total: string }>;
+        consultationFee?: number;
+        treatments?: Array<{ name: string; price: string }>;
+        medicineTotal: string;
+        treatmentTotal: string;
+        grandTotal: string;
+        paymentMode?: string;
+        date?: string;
+        clinicName?: string;
+      };
+    }) =>
+      fetchApi<{ success: boolean; sent?: boolean; error?: string }>('/api/whatsapp/send-bill', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
   treatmentPlans: {
     list: (consultationId?: string) => fetchApi<Record<string, unknown>[]>(`/api/treatment-plans${consultationId ? `?consultationId=${consultationId}` : ''}`),

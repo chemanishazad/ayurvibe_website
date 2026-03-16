@@ -37,8 +37,6 @@ const MedicinesPage = () => {
   const [form, setForm] = useState({
     name: '',
     uom: 'tablet',
-    purchasePrice: '',
-    sellingPrice: '',
     minStockLevel: '10',
     description: '',
   });
@@ -58,14 +56,12 @@ const MedicinesPage = () => {
       await api.medicines.create({
         name: form.name.trim(),
         uom: form.uom,
-        purchasePrice: parseFloat(form.purchasePrice) || 0,
-        sellingPrice: parseFloat(form.sellingPrice) || 0,
         minStockLevel: parseInt(form.minStockLevel, 10) || 10,
         description: form.description || undefined,
       });
       toast({ title: 'Medicine added' });
       setShowForm(false);
-      setForm({ name: '', uom: 'tablet', purchasePrice: '', sellingPrice: '', minStockLevel: '10', description: '' });
+      setForm({ name: '', uom: 'tablet', minStockLevel: '10', description: '' });
       api.medicines.list().then((data) => setMedicines(data as Medicine[]));
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -81,8 +77,6 @@ const MedicinesPage = () => {
       await api.medicines.update(editing.id, {
         name: form.name.trim(),
         uom: form.uom,
-        purchasePrice: parseFloat(form.purchasePrice) || 0,
-        sellingPrice: parseFloat(form.sellingPrice) || 0,
         minStockLevel: parseInt(form.minStockLevel, 10) || 10,
         description: form.description || undefined,
       });
@@ -101,8 +95,6 @@ const MedicinesPage = () => {
     setForm({
       name: m.name,
       uom: m.uom,
-      purchasePrice: m.purchasePrice,
-      sellingPrice: m.sellingPrice,
       minStockLevel: String(m.minStockLevel),
       description: m.description || '',
     });
@@ -112,7 +104,7 @@ const MedicinesPage = () => {
     <div className="space-y-8">
       <PageHeader title="Medicine Master" description="Manage medicine catalog (Admin only for add/edit)">
         {isAdmin && (
-          <Button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', uom: 'tablet', purchasePrice: '', sellingPrice: '', minStockLevel: '10', description: '' }); }}>
+          <Button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', uom: 'tablet', minStockLevel: '10', description: '' }); }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Medicine
           </Button>
@@ -135,7 +127,6 @@ const MedicinesPage = () => {
                   <tr className="border-b">
                     <th className="text-left py-2">Name</th>
                     <th className="text-left py-2">UOM</th>
-                    <th className="text-right py-2">Selling</th>
                     <th className="text-right py-2">Min Stock</th>
                     {isAdmin && <th className="text-right py-2">Actions</th>}
                   </tr>
@@ -145,7 +136,6 @@ const MedicinesPage = () => {
                     <tr key={m.id} className="border-b">
                       <td className="py-2">{m.name}</td>
                       <td className="py-2">{m.uom}</td>
-                      <td className="py-2 text-right">₹{m.sellingPrice}</td>
                       <td className="py-2 text-right">{m.minStockLevel}</td>
                       {isAdmin && (
                         <td className="py-2 text-right">
@@ -197,16 +187,6 @@ const MedicinesPage = () => {
               <Label>UOM</Label>
               <Input value={form.uom} onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))} placeholder="tablet, bottle, strip" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Purchase Price (₹)</Label>
-                <Input type="number" value={form.purchasePrice} onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Selling Price (₹)</Label>
-                <Input type="number" value={form.sellingPrice} onChange={(e) => setForm((f) => ({ ...f, sellingPrice: e.target.value }))} />
-              </div>
-            </div>
             <div>
               <Label>Min Stock Level</Label>
               <Input type="number" value={form.minStockLevel} onChange={(e) => setForm((f) => ({ ...f, minStockLevel: e.target.value }))} />
@@ -234,19 +214,13 @@ const MedicinesPage = () => {
               <Label>UOM</Label>
               <Input value={form.uom} onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Purchase Price (₹)</Label>
-                <Input type="number" value={form.purchasePrice} onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Selling Price (₹)</Label>
-                <Input type="number" value={form.sellingPrice} onChange={(e) => setForm((f) => ({ ...f, sellingPrice: e.target.value }))} />
-              </div>
-            </div>
             <div>
               <Label>Min Stock Level</Label>
               <Input type="number" value={form.minStockLevel} onChange={(e) => setForm((f) => ({ ...f, minStockLevel: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
             </div>
             <Button onClick={handleUpdate} disabled={loading} className="w-full">Update</Button>
           </div>

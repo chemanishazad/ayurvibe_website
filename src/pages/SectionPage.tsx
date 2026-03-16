@@ -29,7 +29,7 @@ const SectionPage = ({ sectionId, title, description, canonical }: SectionPagePr
         title={title} 
         description={description} 
         canonical={canonical}
-        locationKeywords={['Perumbakkam', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai']}
+        locationKeywords={['Perumbakkam', 'Perungalathur', 'OMR', 'Sholinganallur', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Chennai']}
       />
       <Index />
     </>

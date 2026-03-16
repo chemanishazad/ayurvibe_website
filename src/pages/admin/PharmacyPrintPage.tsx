@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
+import { Leaf } from 'lucide-react';
 import logo from '@/assets/logo.png';
 
 const PRINT_STORAGE_KEY = 'print_pharmacy_';
@@ -15,7 +16,7 @@ const PharmacyPrintPage = () => {
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `Pharmacy-${id || 'bill'}`,
+    documentTitle: `Pharmacy-${id || 'invoice'}`,
     pageStyle: `
       @page { size: A5; margin: 0; }
       @media print {
@@ -46,7 +47,7 @@ const PharmacyPrintPage = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white p-8">
         <p className="text-lg text-muted-foreground text-center">No print data found.</p>
-        <p className="text-sm text-muted-foreground mt-2 text-center">Open the Consultation Bill first, then click &quot;Print Pharmacy Bill&quot;.</p>
+        <p className="text-sm text-muted-foreground mt-2 text-center">Open the Pharmacy page first, then save to print the invoice.</p>
       </div>
     );
   }
@@ -57,16 +58,26 @@ const PharmacyPrintPage = () => {
   }));
   const treatments = (cons.treatments as { name: string; price: string }[]) || [];
   const consultationFee = parseFloat(treatments.find((t) => t.name === 'Consultation')?.price || '0');
+  const medicineDiscount = treatments.find((t) => t.name === 'Medicine Discount');
+  const medicineDiscountAmount = medicineDiscount ? parseFloat(medicineDiscount.price || '0') : 0;
   const treatmentsExcludingFee = treatments.filter((t) => t.name !== 'Consultation');
   const patientName = (cons.patientName as string) || '';
+  const rawMobile = (cons.patientMobile as string) || '';
+  const digitsOnly = rawMobile.replace(/\D/g, '');
+  const patientMobile = digitsOnly.length === 10 && !rawMobile.includes('+')
+    ? `+91 ${digitsOnly}`
+    : rawMobile;
   const consultationDate = (cons.consultationDate as string) || '';
   const consultationTime = (cons.consultationTime as string) || '';
   const dateTimeStr = consultationTime ? `${consultationDate} ${consultationTime}` : consultationDate;
   const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
-  const doctorName = (cons.doctorName as string) || 'Dr. V.VAITHEESHWARI BAMS';
+  const hospitalName = 'Sri Vinayaga Ayurvibe';
+  const branchName = 'Perumbakkam Branch';
+  const doctorName = (cons.doctorName as string) || 'Dr.V.VAITHEESHWARI BAMS';
   const medicineTotal = parseFloat((cons.medicineTotal as string) || '0') || medicines.reduce((s, m) => s + parseFloat(m.total || '0'), 0);
   const treatmentTotal = parseFloat((cons.treatmentTotal as string) || '0') || treatments.reduce((s, t) => s + parseFloat(t.price || '0'), 0);
   const grandTotal = medicineTotal + treatmentTotal;
+  const paymentMode = (cons.paymentMode as string) || 'Cash';
 
   return (
     <div className="min-h-screen bg-white p-4 print:p-0">
@@ -89,30 +100,47 @@ const PharmacyPrintPage = () => {
 
       <div className="relative pl-[10%] pr-[10%] py-3">
         {/* Header */}
-        <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-start justify-between gap-4 mb-3">
           <div>
-            <h1 className="text-base font-bold tracking-wide uppercase" style={{ color: '#15803d' }}>
-              {clinicName}
+            <h1 className="text-lg font-bold tracking-wide" style={{ color: '#15803d' }}>
+              {hospitalName}
             </h1>
-            <p className="text-[10px] font-medium mt-0.5" style={{ color: '#166534' }}>{doctorName}</p>
-            <p className="text-[9px] text-gray-600">8122339197 | svayurvibe@gmail.com</p>
+            <p className="text-[11px] font-semibold mt-0.5 uppercase" style={{ color: '#166534' }}>{branchName}</p>
+            <p className="text-[10px] font-medium mt-1" style={{ color: '#166534' }}>{doctorName}</p>
+            <p className="text-[9px] text-gray-600 mt-0.5">+91 8122339197 | svayurvibe@gmail.com</p>
           </div>
-          <img src={logo} alt="Logo" className="h-9 w-auto shrink-0" />
+          <img src={logo} alt="Logo" className="h-20 w-auto shrink-0 object-contain drop-shadow-sm" />
         </div>
 
         {/* Beneficiary */}
-        <div className="mb-2 text-[10px]">
-          <p><strong>Beneficiary:</strong> {patientName || '—'}</p>
-          <p><strong>Date:</strong> {dateTimeStr || '—'}</p>
+        <div className="mb-3 text-[10px]">
+          <table className="w-full max-w-xs">
+            <tbody>
+              <tr>
+                <td className="py-0.5 pr-4 font-semibold align-top w-20">Beneficiary</td>
+                <td className="py-0.5 align-top">{patientName || '—'}</td>
+              </tr>
+              {patientMobile && (
+                <tr>
+                  <td className="py-0.5 pr-4 font-semibold align-top">Mobile</td>
+                  <td className="py-0.5 align-top">{patientMobile}</td>
+                </tr>
+              )}
+              <tr>
+                <td className="py-0.5 pr-4 font-semibold align-top">Date</td>
+                <td className="py-0.5 align-top">{dateTimeStr || '—'}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        {/* Bill: Consultation + Treatments + Medicines */}
+        {/* Invoice: Consultation + Treatments + Medicines */}
         <div>
-          <p className="text-xs font-bold mb-1.5 uppercase" style={{ color: '#15803d' }}>Bill</p>
+          <p className="text-xs font-bold mb-1.5 uppercase" style={{ color: '#15803d' }}>Invoice</p>
           <table className="w-full text-[10px] border border-gray-300">
             <thead>
               <tr className="bg-gray-100">
-                <th className="text-left py-2 px-2 font-semibold border-b border-r border-gray-300">Item</th>
+                <th className="text-left py-2 px-2 font-semibold border-b border-r border-gray-300">Description</th>
                 <th className="text-right py-2 px-2 font-semibold border-b border-r border-gray-300 w-16">Qty</th>
                 <th className="text-right py-2 px-2 font-semibold border-b border-r border-gray-300 w-20">Price (₹)</th>
                 <th className="text-right py-2 px-2 font-semibold border-b border-gray-300 w-24">Total (₹)</th>
@@ -149,16 +177,26 @@ const PharmacyPrintPage = () => {
           <div className="mt-3 print:mt-2 flex justify-end">
             <div className="text-right space-y-0.5">
               {consultationFee > 0 && <p className="text-xs">Consultation: ₹{consultationFee.toFixed(2)}</p>}
-              {treatmentsExcludingFee.length > 0 && <p className="text-xs">Treatments: ₹{treatmentsExcludingFee.reduce((s, t) => s + parseFloat(t.price || '0'), 0).toFixed(2)}</p>}
+              {treatmentsExcludingFee.filter((t) => t.name !== 'Medicine Discount').length > 0 && (
+                <p className="text-xs">Treatments: ₹{treatmentsExcludingFee.filter((t) => t.name !== 'Medicine Discount').reduce((s, t) => s + parseFloat(t.price || '0'), 0).toFixed(2)}</p>
+              )}
               {medicineTotal > 0 && <p className="text-xs">Medicines: ₹{medicineTotal.toFixed(2)}</p>}
+              {medicineDiscountAmount < 0 && <p className="text-xs text-green-600">Discount: ₹{medicineDiscountAmount.toFixed(2)}</p>}
               <p className="text-sm font-bold pt-1">Grand Total: ₹{grandTotal.toFixed(2)}</p>
+              <p className="text-xs pt-1.5 text-gray-600">Payment: {paymentMode}</p>
             </div>
           </div>
         </div>
 
+        {/* Quote */}
+        <div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-medium" style={{ color: '#15803d' }}>
+          <Leaf className="h-5 w-5 shrink-0" strokeWidth={2.5} />
+          <p className="italic">In the path of Ayurveda, towards Perfect Health</p>
+        </div>
+
         {/* Footer */}
-        <div className="mt-6 text-[9px] text-gray-500 text-center">
-          <p>Reg No: 2055 | No : 17/587, Main Road, Nethaji Nagar, Perumbakkam (Nookampalayam), Chennai - 600141</p>
+        <div className="mt-4 text-[9px] text-gray-500 text-center">
+          <p>No : 12/597, Mainroad, Nethaji nagar, Perumbakkam, Chennai - 600131.</p>
         </div>
       </div>
       </div>
@@ -170,7 +208,7 @@ const PharmacyPrintPage = () => {
           className="px-5 py-2.5 text-white font-medium rounded-lg hover:opacity-90"
           style={{ backgroundColor: '#22c55e' }}
         >
-            Print Pharmacy Bill
+            Print Invoice
         </button>
           <p className="text-xs text-gray-500 mt-2">Uses A5 paper. Set Margins to &quot;None&quot; for full page.</p>
       </div>

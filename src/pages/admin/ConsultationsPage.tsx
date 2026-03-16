@@ -43,6 +43,11 @@ type ConsultationRow = Record<string, unknown> & {
   consultationTime?: string | null;
   totalAmount: string;
   parentConsultationId?: string | null;
+  parentConsultationDate?: string | null;
+  parentConsultationTime?: string | null;
+  parentDiagnosis?: string | null;
+  followUpRequired?: number;
+  followUpDate?: string | null;
 };
 
 const fmtDateWithTime = (date: string, time?: string | null) =>
@@ -522,29 +527,56 @@ const ConsultationsPage = () => {
     viewConsultationDetails(cons);
   };
 
-  /** Group consultations: initial visits with follow-ups nested. Orphan follow-ups shown separately. */
-  const { consultationGroups, orphanFollowUps } = React.useMemo(() => {
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  /** Upcoming follow-ups: consultations with followUpRequired and followUpDate >= today. */
+  const upcomingFollowUps = React.useMemo(() => {
+    return consultations
+      .filter((c) => c.followUpRequired === 1 && c.followUpDate && c.followUpDate >= todayStr)
+      .sort((a, b) => ((a.followUpDate as string) || '').localeCompare((b.followUpDate as string) || ''));
+  }, [consultations]);
+
+  /** Group consultations: initial visits with follow-ups nested. Orphan follow-ups grouped by parent. */
+  const { consultationGroups, orphanGroups } = React.useMemo(() => {
     const initials = consultations.filter((c) => !c.parentConsultationId).sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
     const initialIds = new Set(initials.map((i) => i.id));
     const byParent = new Map<string, ConsultationRow[]>();
-    const orphans: ConsultationRow[] = [];
+    const orphanByParent = new Map<string, ConsultationRow[]>();
     for (const c of consultations) {
       if (c.parentConsultationId) {
-        if (initialIds.has(c.parentConsultationId as string)) {
-          const list = byParent.get(c.parentConsultationId as string) || [];
+        const parentId = c.parentConsultationId as string;
+        if (initialIds.has(parentId)) {
+          const list = byParent.get(parentId) || [];
           list.push(c);
-          byParent.set(c.parentConsultationId as string, list);
+          byParent.set(parentId, list);
         } else {
-          orphans.push(c);
+          const list = orphanByParent.get(parentId) || [];
+          list.push(c);
+          orphanByParent.set(parentId, list);
         }
       }
     }
     for (const list of byParent.values()) {
       list.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
     }
-    orphans.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    for (const list of orphanByParent.values()) {
+      list.sort((a, b) => (b.consultationDate as string).localeCompare(a.consultationDate as string));
+    }
     const groups = initials.map((init) => ({ initial: init, followUps: byParent.get(init.id) || [] }));
-    return { consultationGroups: groups, orphanFollowUps: orphans };
+    const orphanGroupsList = Array.from(orphanByParent.entries()).map(([parentId, followUps]) => {
+      const first = followUps[0];
+      const parentInfo: ConsultationRow = {
+        id: parentId,
+        patientName: first?.patientName ?? '',
+        consultationDate: first?.parentConsultationDate ?? '',
+        consultationTime: first?.parentConsultationTime ?? null,
+        diagnosis: first?.parentDiagnosis ?? null,
+        parentConsultationId: null,
+        totalAmount: '0',
+      };
+      return { parent: parentInfo, followUps };
+    });
+    return { consultationGroups: groups, orphanGroups: orphanGroupsList };
   }, [consultations]);
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -625,10 +657,12 @@ const ConsultationsPage = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {orphanFollowUps.length > 0 && (
+                {upcomingFollowUps.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground px-1 mb-1">Other follow-ups</p>
-                    {orphanFollowUps.map((f) => (
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 px-1 mb-1 flex items-center gap-1">
+                      <CalendarIcon className="h-3.5 w-3.5" /> Upcoming follow-ups ({upcomingFollowUps.length})
+                    </p>
+                    {upcomingFollowUps.map((f) => (
                       <div
                         key={f.id}
                         role="button"
@@ -636,19 +670,19 @@ const ConsultationsPage = () => {
                         onClick={() => viewConsultationDetails(f)}
                         onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
                         className={cn(
-                          'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
-                          activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                          'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/30',
+                          activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 shadow-sm' : 'hover:bg-amber-100/50 dark:hover:bg-amber-900/20'
                         )}
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
-                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
-                              <FileText className="h-3 w-3" /> Follow-up
+                        <div className="flex-1 min-w-0 text-right">
+                          <div className="flex items-center gap-2 flex-wrap justify-end">
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-semibold border border-amber-300/60">
+                              <CalendarIcon className="h-3 w-3" /> Due {f.followUpDate ? format(new Date(f.followUpDate + 'T00:00:00'), 'dd-MM-yyyy') : ''}
                             </span>
+                            <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
                           </div>
                           {f.diagnosis && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(f.diagnosis)}</p>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
                           )}
                         </div>
                         <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -663,6 +697,91 @@ const ConsultationsPage = () => {
                     ))}
                   </div>
                 )}
+                {orphanGroups.filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id))).length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-xs font-medium text-muted-foreground px-1 mb-1">Other follow-ups (parent not in list)</p>
+                    {orphanGroups
+                      .filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id)))
+                      .map(({ parent, followUps }) => (
+                        <div key={parent.id} className="space-y-1">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); } }}
+                            className={cn(
+                              'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
+                              activeConsId === parent.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-sm">
+                                  {parent.consultationDate ? fmtDateWithTime(parent.consultationDate as string, parent.consultationTime) : 'Parent consultation'}
+                                </p>
+                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
+                                  <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
+                                </span>
+                              </div>
+                              {parent.diagnosis && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">{diagnosisDisplay(parent.diagnosis)}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); }} title="Add follow-up">
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(parent.id)} title="Print">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
+                            {followUps
+                              .filter((f) => !upcomingFollowUps.some((u) => u.id === f.id))
+                              .map((f) => (
+                                <div
+                                  key={f.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => viewConsultationDetails(f)}
+                                  onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                                  className={cn(
+                                    'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
+                                    activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                                  )}
+                                >
+                                  <div className="flex-1 min-w-0 text-right">
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
+                                        <FileText className="h-3 w-3" /> Follow-up
+                                      </span>
+                                      {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
+                                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium border border-amber-200/60">
+                                          Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                        </span>
+                                      )}
+                                      <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                                    </div>
+                                    {f.diagnosis && (
+                                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                                      <Printer className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
                 {consultationGroups.map(({ initial, followUps }) => (
                   <div key={initial.id} className="space-y-1">
                     <div
@@ -675,17 +794,22 @@ const ConsultationsPage = () => {
                         activeConsId === initial.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
                       )}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-sm">{form.patientId ? fmtDateWithTime(initial.consultationDate as string, initial.consultationTime) : initial.patientName}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm">{form.patientId ? fmtDateWithTime(initial.consultationDate as string, initial.consultationTime) : initial.patientName}</p>
                           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
                             <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
                           </span>
+                          {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
+                              Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                            </span>
+                          )}
                         </div>
                         {initial.diagnosis && (
                           <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(initial.diagnosis)}</p>
                         )}
-                      </div>
+                        </div>
                       <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(initial)} title="Add follow-up">
                           <RotateCcw className="h-4 w-4" />
@@ -709,15 +833,20 @@ const ConsultationsPage = () => {
                               activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
                             )}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                            <div className="flex-1 min-w-0 text-right">
+                              <div className="flex items-center gap-2 flex-wrap justify-end">
                                 <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold border border-amber-200/60">
                                   <FileText className="h-3 w-3" /> Follow-up
                                 </span>
+                                {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
+                                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
+                                    Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                  </span>
+                                )}
+                                <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
                               </div>
                               {f.diagnosis && (
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(f.diagnosis)}</p>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -748,7 +877,7 @@ const ConsultationsPage = () => {
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {form.parentConsultationId
-                  ? 'Data copied from previous visit. Edit and save as follow-up.'
+                  ? 'Data copied from previous visit. Edit symptoms, vitals, diagnosis and save as follow-up.'
                   : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
               </CardDescription>
             </div>
