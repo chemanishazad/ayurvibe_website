@@ -60,7 +60,8 @@ const PharmacyPage = () => {
     treatments: [] as { name: string; price: number }[],
     items: [] as { inventoryId: string; medicineId: string; medicineName: string; quantity: number; unitPrice: number }[],
     medicineDiscount: null as { type: 'percent' | 'fixed'; value: number } | null,
-    paymentMode: 'Cash' as (typeof PAYMENT_MODES)[number],
+    paymentMode: 'Cash' as (typeof PAYMENT_MODES)[number] | 'Split',
+    paymentSplit: [] as { mode: (typeof PAYMENT_MODES)[number]; amount: number }[],
     customerName: '',
     customerMobile: '',
     customerCountryCode: '91',
@@ -160,6 +161,16 @@ const PharmacyPage = () => {
     }));
   };
 
+  const getPaymentDisplay = () => {
+    if (form.paymentMode === 'Split' && form.paymentSplit.length > 0) {
+      const splitSum = form.paymentSplit.reduce((s, p) => s + p.amount, 0);
+      if (Math.abs(splitSum - grandTotal) < 0.01) {
+        return form.paymentSplit.map((p) => `${p.mode}: ₹${p.amount.toFixed(2)}`).join(', ');
+      }
+    }
+    return form.paymentMode;
+  };
+
   const medicineSubtotal = form.items.reduce((s, m) => s + m.quantity * m.unitPrice, 0);
   const discountAmount = form.medicineDiscount
     ? form.medicineDiscount.type === 'percent'
@@ -191,6 +202,13 @@ const PharmacyPage = () => {
       toast({ title: 'Missing data', description: 'Add consultation fee, treatments, or medicines', variant: 'destructive' });
       return;
     }
+    if (form.paymentMode === 'Split') {
+      const splitSum = form.paymentSplit.reduce((s, p) => s + p.amount, 0);
+      if (form.paymentSplit.length === 0 || Math.abs(splitSum - grandTotal) > 0.01) {
+        toast({ title: 'Invalid split', description: `Split amounts must total ₹${grandTotal.toFixed(2)}. Current sum: ₹${splitSum.toFixed(2)}`, variant: 'destructive' });
+        return;
+      }
+    }
     setLoading(true);
     try {
       if (isConsultationBill) {
@@ -212,7 +230,7 @@ const PharmacyPage = () => {
         toast({ title: 'Invoice saved', description: `Total: ₹${grandTotal}` });
         setForm((f) => ({ ...f, items: [], consultationFee: 0, treatments: [], medicineDiscount: null }));
         const consId = form.consultationId;
-        const paymentMode = form.paymentMode;
+        const paymentMode = getPaymentDisplay();
         api.consultations.get(consId).then((data) => {
           try { localStorage.setItem(`print_pharmacy_${consId}`, JSON.stringify({ ...data, paymentMode })); } catch {}
           window.open(`${window.location.origin}/print/pharmacy/${consId}`, '_blank', 'noopener,noreferrer');
@@ -295,7 +313,7 @@ const PharmacyPage = () => {
           consultationTime: null,
           clinicName,
           doctorName: 'Dr.V.VAITHEESHWARI BAMS.',
-          paymentMode: form.paymentMode,
+          paymentMode: getPaymentDisplay(),
           medicines: billMedicines,
           treatments: billTreatments,
           consultationFee: 0,
@@ -315,7 +333,7 @@ const PharmacyPage = () => {
               medicineTotal: billMedicineTotal,
               treatmentTotal: billTreatmentTotal,
               grandTotal: billGrandTotal,
-              paymentMode: form.paymentMode,
+              paymentMode: getPaymentDisplay(),
               date: saleDate,
               clinicName,
             },
@@ -335,7 +353,7 @@ const PharmacyPage = () => {
 
   const handlePrint = (id: string) => {
     api.consultations.get(id).then((data) => {
-      try { localStorage.setItem(`print_pharmacy_${id}`, JSON.stringify({ ...data, paymentMode: form.paymentMode })); } catch {}
+      try { localStorage.setItem(`print_pharmacy_${id}`, JSON.stringify({ ...data, paymentMode: getPaymentDisplay() })); } catch {}
       window.open(`${window.location.origin}/print/pharmacy/${id}`, '_blank', 'noopener,noreferrer');
     }).catch(() => toast({ title: 'Failed to load', variant: 'destructive' }));
   };
@@ -642,21 +660,112 @@ const PharmacyPage = () => {
             )}
 
             <div className="pt-4 border-t space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-40 space-y-2">
-                  <Label className="text-sm">Payment mode</Label>
-                  <Select value={form.paymentMode} onValueChange={(v) => setForm((f) => ({ ...f, paymentMode: v as typeof form.paymentMode }))}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAYMENT_MODES.map((mode) => (
-                        <SelectItem key={mode} value={mode}>{mode}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Payment mode</Label>
+                <Select value={form.paymentMode} onValueChange={(v) => setForm((f) => ({
+                  ...f,
+                  paymentMode: v as typeof form.paymentMode,
+                  paymentSplit: v === 'Split' ? (f.paymentSplit.length > 0 ? f.paymentSplit : [{ mode: 'Cash' as const, amount: 0 }, { mode: 'UPI' as const, amount: 0 }]) : [],
+                }))}>
+                  <SelectTrigger className="h-9 w-full max-w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_MODES.map((mode) => (
+                      <SelectItem key={mode} value={mode}>{mode}</SelectItem>
+                    ))}
+                    <SelectItem value="Split">Split payment</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {form.paymentMode === 'Split' && (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Split payment — Total: ₹{grandTotal.toFixed(2)}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={() => setForm((f) => ({ ...f, paymentSplit: [...f.paymentSplit, { mode: 'Cash' as const, amount: 0 }] }))}
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" /> Add row
+                    </Button>
+                  </div>
+
+                  {form.paymentSplit.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        {form.paymentSplit.map((p, i) => {
+                          const sumSoFar = form.paymentSplit.slice(0, i).reduce((s, x) => s + x.amount, 0);
+                          const isLast = i === form.paymentSplit.length - 1;
+                          const remaining = Math.round((grandTotal - sumSoFar) * 100) / 100;
+                          const canAutoFill = isLast && form.paymentSplit.length > 1 && p.amount === 0 && remaining > 0;
+                          return (
+                            <div key={i} className="flex gap-2 items-center">
+                              <Select
+                                value={p.mode}
+                                onValueChange={(v) => setForm((f) => ({
+                                  ...f,
+                                  paymentSplit: f.paymentSplit.map((s, j) => j === i ? { ...s, mode: v as typeof s.mode } : s),
+                                }))}
+                              >
+                                <SelectTrigger className="h-9 w-[130px] shrink-0">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {PAYMENT_MODES.map((mode) => (
+                                    <SelectItem key={mode} value={mode}>{mode}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                className="h-9 w-24"
+                                placeholder="0"
+                                min={0}
+                                step={0.01}
+                                value={p.amount || ''}
+                                onChange={(e) => setForm((f) => ({
+                                  ...f,
+                                  paymentSplit: f.paymentSplit.map((s, j) => j === i ? { ...s, amount: Number(e.target.value) || 0 } : s),
+                                }))}
+                              />
+                              {canAutoFill && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-9 px-2 text-xs shrink-0"
+                                  onClick={() => setForm((f) => ({
+                                    ...f,
+                                    paymentSplit: f.paymentSplit.map((s, j) => j === i ? { ...s, amount: remaining } : s),
+                                  }))}
+                                >
+                                  Use remaining ₹{remaining}
+                                </Button>
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => setForm((f) => ({ ...f, paymentSplit: f.paymentSplit.filter((_, j) => j !== i) }))}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className={`flex items-center justify-between text-sm py-1.5 px-2 rounded ${Math.abs(form.paymentSplit.reduce((s, p) => s + p.amount, 0) - grandTotal) < 0.01 ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-destructive/10 text-destructive'}`}>
+                        <span>Total entered: ₹{form.paymentSplit.reduce((s, p) => s + p.amount, 0).toFixed(2)}</span>
+                        {Math.abs(form.paymentSplit.reduce((s, p) => s + p.amount, 0) - grandTotal) < 0.01
+                          ? <span className="font-medium">✓ Balanced</span>
+                          : <span>Need ₹{(grandTotal - form.paymentSplit.reduce((s, p) => s + p.amount, 0)).toFixed(2)} more</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="text-sm text-muted-foreground mt-2 space-y-0.5">
                 {isConsultationBill && form.consultationFee > 0 && <p>Consultation: ₹{form.consultationFee}</p>}
                 {isConsultationBill && treatmentTotal > 0 && <p>Treatments: ₹{treatmentTotal}</p>}
@@ -769,7 +878,7 @@ const PharmacyPage = () => {
                                       medicineTotal: String(medicineSubtotal),
                                       treatmentTotal: discountAmount < 0 ? String(discountAmount) : '0',
                                       grandTotal: grandTotal.toFixed(2),
-                                      paymentMode: form.paymentMode,
+                                      paymentMode: getPaymentDisplay(),
                                       date: sale.saleDate,
                                       clinicName: clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic',
                                     },
@@ -800,7 +909,7 @@ const PharmacyPage = () => {
                                   consultationTime: null,
                                   clinicName,
                                   doctorName: 'Dr.V.VAITHEESHWARI B.A.M.S.,',
-                                  paymentMode: form.paymentMode,
+                                  paymentMode: getPaymentDisplay(),
                                   medicines: medicineItems.map((m: Record<string, unknown>) => ({
                                     medicineName: m.medicineName,
                                     quantity: m.quantity,
