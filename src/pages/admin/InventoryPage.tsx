@@ -37,7 +37,7 @@ const InventoryPage = () => {
   });
   const { toast } = useToast();
 
-  const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
+  const targetClinicId = user?.clinicId || clinicId;
 
   useEffect(() => {
     api.clinics.list().then(setClinics).catch(() => setClinics([]));
@@ -119,20 +119,6 @@ const InventoryPage = () => {
     <div className="space-y-8">
       <PageHeader title="Inventory" description="Clinic-wise medicine stock">
         <div className="flex items-center gap-2">
-          {user?.role === 'admin' && clinics.length > 1 && (
-            <Select value={clinicId} onValueChange={setClinicId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select clinic" />
-              </SelectTrigger>
-              <SelectContent>
-                {clinics.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           {targetClinicId && (
             <>
               <Button variant="default" onClick={() => setShowPurchase(true)}>

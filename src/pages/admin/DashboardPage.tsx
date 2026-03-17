@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
@@ -152,8 +151,6 @@ const FilterBar = ({
 const DashboardPage = () => {
   const user = getAuthUser();
   const isAdmin = user?.role === 'admin';
-  const outletContext = useOutletContext<{ filterClinicId?: string }>();
-  const filterClinicId = outletContext?.filterClinicId ?? '__all__';
   const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const initialRange = getDateRangeForPeriod('daily');
   const [dateFrom, setDateFrom] = useState(initialRange.from);
@@ -171,19 +168,18 @@ const DashboardPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const clinicIdParam = filterClinicId !== '__all__' ? filterClinicId : undefined;
       const dateParams = { from: appliedFrom, to: appliedTo };
       if (isAdmin) {
         const [admin, analytics, medicineSales] = await Promise.all([
           api.dashboard.admin(dateParams),
-          api.dashboard.analytics({ clinicId: clinicIdParam, period: chartPeriod, from: appliedFrom, to: appliedTo }),
-          api.reports.medicineSales({ clinicId: clinicIdParam, from: appliedFrom, to: appliedTo }),
+          api.dashboard.analytics({ period: chartPeriod, from: appliedFrom, to: appliedTo }),
+          api.reports.medicineSales({ from: appliedFrom, to: appliedTo }),
         ]);
         setAdminData(admin);
         setAnalyticsData(analytics);
         setMedicineSalesData(medicineSales);
       } else {
-        const clinicId = user?.clinicId || clinicIdParam;
+        const clinicId = user?.clinicId;
         const [clinic, analytics, medicineSales] = await Promise.all([
           api.dashboard.clinic(clinicId, dateParams),
           api.dashboard.analytics({ clinicId, period: chartPeriod, from: appliedFrom, to: appliedTo }),
@@ -198,7 +194,7 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, filterClinicId, user?.clinicId, chartPeriod, appliedFrom, appliedTo]);
+  }, [isAdmin, user?.clinicId, chartPeriod, appliedFrom, appliedTo]);
 
   const handlePeriodChange = useCallback((period: 'daily' | 'weekly' | 'monthly') => {
     setChartPeriod(period);

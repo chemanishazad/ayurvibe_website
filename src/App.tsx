@@ -26,6 +26,7 @@ import MedicinesPage from "./pages/admin/MedicinesPage";
 import SuppliersPage from "./pages/admin/SuppliersPage";
 import InventoryPage from "./pages/admin/InventoryPage";
 import ReportsPage from "./pages/admin/ReportsPage";
+import UpcomingFollowUpsPage from "./pages/admin/UpcomingFollowUpsPage";
 import SEORedirect from "./components/SEORedirect";
 import SEO from "@/components/SEO";
 
@@ -102,12 +103,15 @@ const App = () => (
                   <Route path="patients/new" element={<NewPatientPage />} />
                   <Route path="patients/:id/edit" element={<EditPatientPage />} />
               <Route path="consultations" element={<ConsultationsPage />} />
+              <Route path="consultations/new" element={<ConsultationsPage />} />
+              <Route path="consultations/:id" element={<ConsultationsPage />} />
               <Route path="pharmacy" element={<PharmacyPage />} />
               <Route path="treatment-plans" element={<TreatmentPlansPage />} />
               <Route path="medicines" element={<MedicinesPage />} />
               <Route path="suppliers" element={<SuppliersPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="upcoming-follow-ups" element={<UpcomingFollowUpsPage />} />
             </Route>
           </Route>
 

@@ -38,7 +38,7 @@ const ReportsPage = () => {
   const [lowStock, setLowStock] = useState<Record<string, unknown>[]>([]);
   const [profit, setProfit] = useState<{ dailyProfit: number; monthlyProfit: number; clinicProfit: { clinicId: string; clinicName: string; profit: number }[] } | null>(null);
 
-  const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
+  const targetClinicId = user?.clinicId || clinicId;
 
   useEffect(() => {
     api.clinics.list().then(setClinics).catch(() => setClinics([]));
@@ -64,21 +64,6 @@ const ReportsPage = () => {
     <div className="space-y-8">
       <PageHeader title="Reports" description="Analytics and reports">
         <div className="flex flex-wrap items-center gap-4">
-          {user?.role === 'admin' && clinics.length > 1 && (
-            <Select value={clinicId} onValueChange={setClinicId}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All clinics" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All clinics</SelectItem>
-                {clinics.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
           <div className="flex gap-2 items-center">
             <Label>From</Label>
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />

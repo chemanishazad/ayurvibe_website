@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -100,6 +101,10 @@ const MedicinesPage = () => {
     });
   };
 
+  if (loading) {
+    return <FullScreenLoader label="Loading medicines..." />;
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader title="Medicine Master" description="Manage medicine catalog (Admin only for add/edit)">
@@ -116,9 +121,7 @@ const MedicinesPage = () => {
           <CardDescription>All medicines in the system</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
-          ) : medicines.length === 0 ? (
+          {medicines.length === 0 ? (
             <p className="text-muted-foreground">No medicines. Add one to get started.</p>
           ) : (
             <div className="overflow-x-auto">

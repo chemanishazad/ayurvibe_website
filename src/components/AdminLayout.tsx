@@ -25,7 +25,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -41,12 +40,9 @@ import {
   Menu,
   ChevronDown,
   Truck,
+  CalendarClock,
 } from 'lucide-react';
-import { getAuthToken, getAuthUser, setAdminAuthenticated, setAuthUser } from '@/pages/Login';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { getAuthUser, setAdminAuthenticated } from '@/pages/Login';
 
 interface Clinic {
   id: string;
@@ -65,6 +61,7 @@ const navGroups = [
       { path: '/admin/consultations', label: 'Consultations', icon: Stethoscope },
       { path: '/admin/pharmacy', label: 'Pharmacy', icon: Pill },
       { path: '/admin/treatment-plans', label: 'Treatment Plans', icon: ClipboardList },
+      { path: '/admin/upcoming-follow-ups', label: 'Upcoming Follow Ups', icon: CalendarClock },
     ],
   },
   {
@@ -81,47 +78,12 @@ const navGroups = [
   },
 ];
 
-interface AdminLayoutProps {
-  children: React.ReactNode;
-  filterClinicId?: string;
-  onFilterClinicChange?: (id: string) => void;
-}
-
-const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '__all__', onFilterClinicChange }) => {
+const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = getAuthUser();
-  const [clinics, setClinics] = React.useState<Clinic[]>([]);
-
   const isAdmin = user?.role === 'admin';
-  const staffClinicCount = !isAdmin ? clinics.length : 0;
-  const currentClinicName = clinics.find((c) => c.id === (filterClinicId !== '__all__' ? filterClinicId : user?.clinicId))?.name;
-
-  React.useEffect(() => {
-    const token = getAuthToken();
-    if (!token) return;
-    fetch(`${API_URL}/api/clinics`, { cache: 'no-store', headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.json())
-      .then((data: Clinic[]) => setClinics(Array.isArray(data) ? data : []))
-      .catch(() => setClinics([]));
-  }, [isAdmin, user?.clinicId]);
-
-  const handleClinicChange = async (newClinicId: string) => {
-    if (isAdmin) {
-      onFilterClinicChange?.(newClinicId);
-      return;
-    }
-    if (staffClinicCount > 1 && newClinicId !== user?.clinicId) {
-      try {
-        const { token, user: updatedUser } = await api.auth.switchClinic(newClinicId);
-        sessionStorage.setItem('auth_token', token);
-        setAuthUser(updatedUser);
-        onFilterClinicChange?.(newClinicId);
-      } catch {
-        // Keep current selection on error
-      }
-    }
-  };
+  const currentClinicName = !isAdmin ? user?.clinicId : undefined;
 
   const handleLogout = () => {
     setAdminAuthenticated(false);
@@ -130,33 +92,45 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
 
   return (
     <SidebarProvider>
-      <Sidebar className="border-r">
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-          <Link to="/admin/dashboard" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+      <Sidebar className="border-r bg-sidebar">
+        <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
+          <Link to="/admin/dashboard" className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 shadow-sm">
               <Stethoscope className="h-5 w-5 text-primary" />
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold text-sidebar-foreground">Ayurvibe</span>
-              <span className="text-xs text-sidebar-foreground/70">Clinic Admin</span>
+              <span className="font-semibold text-sm tracking-tight text-sidebar-foreground">
+                Sri Vinayaga Ayurvibe
+              </span>
+              <span className="text-[11px] uppercase tracking-[0.12em] text-sidebar-foreground/60">
+                Clinic Admin
+              </span>
             </div>
           </Link>
         </SidebarHeader>
-        <SidebarContent>
-          {navGroups.map((group) => (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+        <SidebarContent className="px-1 py-2">
+          {navGroups.map((group, groupIdx) => (
+            <SidebarGroup key={group.label} className={groupIdx > 0 ? 'mt-1 pt-1 border-t border-sidebar-border/60' : ''}>
+              <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-[0.16em] text-sidebar-foreground/60">
+                {group.label}
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                    const isActive =
+                      location.pathname === item.path ||
+                      location.pathname.startsWith(item.path + '/');
                     return (
                       <SidebarMenuItem key={item.path}>
-                        <SidebarMenuButton asChild isActive={isActive}>
-                          <Link to={item.path}>
-                            <Icon className="h-4 w-4" />
-                            <span>{item.label}</span>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          className="px-3 py-2.5 rounded-lg text-sm transition-all data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:shadow-sm hover:bg-sidebar-accent/60"
+                        >
+                          <Link to={item.path} className="flex items-center gap-2.5">
+                            <Icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{item.label}</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -167,12 +141,19 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
             </SidebarGroup>
           ))}
         </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border p-2">
-          <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground/70">
-            <span className="truncate">{user?.username}</span>
-            <span className="rounded bg-sidebar-accent px-1.5 py-0.5 text-[10px] font-medium">
-              {isAdmin ? 'Admin' : 'Staff'}
-            </span>
+        <SidebarFooter className="border-t border-sidebar-border px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/60 px-3 py-1.5 text-xs text-sidebar-foreground/80">
+            <Avatar className="h-6 w-6">
+              <AvatarFallback className="bg-primary/15 text-primary text-[11px] font-medium">
+                {(user?.username || 'U').charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-[12px] font-medium">{user?.username}</p>
+              <p className="text-[11px] text-sidebar-foreground/70">
+                {isAdmin ? 'Administrator' : 'Clinic staff'}
+              </p>
+            </div>
           </div>
         </SidebarFooter>
       </Sidebar>
@@ -183,44 +164,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, filterClinicId = '_
           </SidebarTrigger>
           <Separator orientation="vertical" className="h-6" />
           <div className="flex flex-1 items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              {isAdmin && clinics.length > 0 && onFilterClinicChange && (
-                <Select value={filterClinicId} onValueChange={handleClinicChange}>
-                  <SelectTrigger className="w-[180px]">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Filter by clinic" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[100]">
-                    <SelectItem value="__all__">All clinics</SelectItem>
-                    {clinics.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {!isAdmin && staffClinicCount === 1 && currentClinicName && (
-                <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 text-sm font-medium">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  {currentClinicName}
-                </div>
-              )}
-              {!isAdmin && staffClinicCount > 1 && onFilterClinicChange && (
-                <Select value={filterClinicId} onValueChange={handleClinicChange}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select clinic" />
-                  </SelectTrigger>
-                  <SelectContent position="popper" className="z-[100]">
-                    {clinics.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            <div className="flex items-center gap-2" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 pl-2 pr-3">

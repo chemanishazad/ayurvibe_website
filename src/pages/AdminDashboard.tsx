@@ -6,8 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Logo } from '@/components/Logo';
 import { LogOut, LayoutDashboard, Building2 } from 'lucide-react';
 import { getAuthToken, getAuthUser, setAdminAuthenticated } from './Login';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { api } from '@/lib/api';
 
 interface Clinic {
   id: string;
@@ -24,13 +23,10 @@ const AdminDashboard = () => {
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (!token) return;
-    fetch(`${API_URL}/api/clinics`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data: Clinic[]) => {
+    if (!getAuthToken()) return;
+    api.clinics
+      .list()
+      .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setClinics(list);
         if (!isAdmin && list.length === 1) setFilterClinicId(list[0].id);
