@@ -226,7 +226,14 @@ const ConsultationPrintPage = () => {
               {menstrualHistory.menstrualFlow && <p><strong>Menstrual Flow:</strong> {menstrualHistory.menstrualFlow}</p>}
               {menstrualHistory.dysmenorrhea && <p><strong>Dysmenorrhea:</strong> Yes</p>}
               {menstrualHistory.leucorrhea && <p><strong>Leucorrhea:</strong> Yes</p>}
-              {menstrualHistory.menopause && <p><strong>Menopause:</strong> Yes              {menstrualHistory.menopauseAge != null && menstrualHistory.menopauseAge !== '' ? ` (Age: ${String(menstrualHistory.menopauseAge)})` : ''}</p>}
+              {menstrualHistory.menopause && (
+                <p>
+                  <strong>Menopause:</strong> Yes
+                  {menstrualHistory.menopauseAge != null && menstrualHistory.menopauseAge !== ''
+                    ? ` (Age: ${String(menstrualHistory.menopauseAge)})`
+                    : ''}
+                </p>
+              )}
               {(menstrualHistory.gravida != null && menstrualHistory.gravida !== '') || (menstrualHistory.para != null && menstrualHistory.para !== '') || (menstrualHistory.abortions != null && menstrualHistory.abortions !== '') ? (
                 <p><strong>Pregnancy History:</strong> G: {menstrualHistory.gravida != null && menstrualHistory.gravida !== '' ? String(menstrualHistory.gravida) : '—'} P: {menstrualHistory.para != null && menstrualHistory.para !== '' ? String(menstrualHistory.para) : '—'} A: {menstrualHistory.abortions != null && menstrualHistory.abortions !== '' ? String(menstrualHistory.abortions) : '—'}</p>
               ) : null}
