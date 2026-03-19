@@ -30,6 +30,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Calendar } from 'lucide-react';
+import FullScreenLoader from '@/components/FullScreenLoader';
 type PatientRow = Record<string, unknown> & { isReturning?: boolean; consultationCount?: number; lastConsultationId?: string };
 
 const PAGE_SIZES = [10, 20, 50];
@@ -72,6 +73,10 @@ const PatientsPage = () => {
   const handleEdit = (patientId: string) => {
     navigate(`/admin/patients/${patientId}/edit`);
   };
+
+  if (loading) {
+    return <FullScreenLoader label="Loading patients..." />;
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -134,13 +139,7 @@ const PatientsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
-                ) : rawPatients.length === 0 ? (
+                {rawPatients.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       No patients found. Add a new patient to get started.

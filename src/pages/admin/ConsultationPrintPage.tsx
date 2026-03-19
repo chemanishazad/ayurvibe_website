@@ -6,7 +6,20 @@ import { getBmiCategory } from '@/lib/bmi-utils';
 
 const PRINT_STORAGE_KEY = 'print_consult_';
 
-type PrescriptionRow = { medicineName: string; dosage?: string; durationDays?: number };
+type PrescriptionRow = {
+  medicineName: string;
+  dosage?: string;
+  durationDays?: number;
+  timeMorning?: boolean;
+  timeAfternoon?: boolean;
+  timeNight?: boolean;
+  foodRelation?: 'before_food' | 'after_food';
+  quantity?: string;
+  withHotWater?: boolean;
+  withMilk?: boolean;
+  withHoney?: boolean;
+  withGhee?: boolean;
+};
 
 const ConsultationPrintPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -294,7 +307,28 @@ const ConsultationPrintPage = () => {
               {prescription.length > 0 ? prescription.map((m, i) => (
                 <tr key={i} className="border-b border-gray-200">
                   <td className="py-1 pr-2">{m.medicineName}</td>
-                  <td className="py-1 pr-2">{m.dosage || '—'}</td>
+                  <td className="py-1 pr-2">
+                    {m.dosage || '—'}
+                    {(() => {
+                      const times: string[] = [];
+                      if (m.timeMorning) times.push('M');
+                      if (m.timeAfternoon) times.push('A');
+                      if (m.timeNight) times.push('N');
+                      const food = m.foodRelation === 'before_food' ? 'Before food' : m.foodRelation === 'after_food' ? 'After food' : '';
+                      const withItems: string[] = [];
+                      if (m.withHotWater) withItems.push('Hot water');
+                      if (m.withMilk) withItems.push('Milk');
+                      if (m.withHoney) withItems.push('Honey');
+                      if (m.withGhee) withItems.push('Ghee');
+                      const extra = [
+                        times.length ? `(${times.join('/')})` : '',
+                        food,
+                        m.quantity ? `Qty: ${m.quantity}` : '',
+                        withItems.length ? `With ${withItems.join(', ')}` : '',
+                      ].filter(Boolean).join(' • ');
+                      return extra ? <div className="text-[9px] text-gray-600 mt-0.5">{extra}</div> : null;
+                    })()}
+                  </td>
                   <td className="py-1">{m.durationDays ? `${m.durationDays} days` : '—'}</td>
                 </tr>
               )) : (

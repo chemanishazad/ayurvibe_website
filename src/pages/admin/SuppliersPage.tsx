@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -100,6 +101,10 @@ const SuppliersPage = () => {
     });
   };
 
+  if (loading) {
+    return <FullScreenLoader label="Loading suppliers..." />;
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader title="Suppliers" description="Manage suppliers. Same product can have different prices per supplier.">
@@ -116,9 +121,7 @@ const SuppliersPage = () => {
           <CardDescription>All suppliers. Use Purchase flow in Inventory to add stock with supplier & price.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
-          ) : suppliers.length === 0 ? (
+          {suppliers.length === 0 ? (
             <p className="text-muted-foreground">No suppliers. Add one to get started.</p>
           ) : (
             <div className="overflow-x-auto">

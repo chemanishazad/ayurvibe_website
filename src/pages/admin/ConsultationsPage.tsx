@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,11 +30,14 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2, Stethoscope, FileText } from 'lucide-react';
+import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2, Stethoscope, FileText, Link2, HeartPulse } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { BmiDisplay } from '@/components/BmiDisplay';
@@ -48,6 +55,22 @@ type ConsultationRow = Record<string, unknown> & {
   parentDiagnosis?: string | null;
   followUpRequired?: number;
   followUpDate?: string | null;
+};
+
+type PrescriptionItem = {
+  medicineId: string;
+  medicineName: string;
+  dosage: string;
+  durationDays: string | number;
+  timeMorning: boolean;
+  timeAfternoon: boolean;
+  timeNight: boolean;
+  foodRelation: '' | 'before_food' | 'after_food';
+  quantity: string;
+  withHotWater: boolean;
+  withMilk: boolean;
+  withHoney: boolean;
+  withGhee: boolean;
 };
 
 const fmtDateWithTime = (date: string, time?: string | null) =>
@@ -75,6 +98,13 @@ const diagnosisDisplay = (d: unknown): string => {
 const ConsultationsPage = () => {
   const user = getAuthUser();
   const location = useLocation();
+  const navigate = useNavigate();
+  const params = useParams<{ id?: string }>();
+  const consultationIdFromRoute = params.id;
+  const isNewRoute = location.pathname.endsWith('/consultations/new');
+  const isViewRoute = Boolean(consultationIdFromRoute);
+  const isFormRoute = isNewRoute;
+  const isListRoute = !isViewRoute && !isFormRoute;
   const state = location.state as { patientId?: string; parentConsultationId?: string; isReview?: boolean } | null;
   const patientIdFromState = state?.patientId;
   const parentConsultationIdFromState = state?.parentConsultationId;
@@ -87,6 +117,8 @@ const ConsultationsPage = () => {
   const [listLoading, setListLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [activeConsId, setActiveConsId] = useState<string | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewConsultation, setViewConsultation] = useState<Record<string, unknown> | null>(null);
   const [clinicId, setClinicId] = useState('');
   const defaultPersonalHistory = () => ({
     diet: [] as string[],
@@ -151,7 +183,7 @@ const ConsultationsPage = () => {
     dietLifestyleAdvice: '',
     menstrualHistory: defaultMenstrualHistory(),
     ayurvedaExamination: defaultAyurvedaExamination(),
-    prescription: [] as { medicineId: string; medicineName: string; dosage: string; durationDays: string | number }[],
+    prescription: [] as PrescriptionItem[],
   });
   const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
   const [followUpDateOpen, setFollowUpDateOpen] = useState(false);
@@ -187,11 +219,38 @@ const ConsultationsPage = () => {
     }
   }, [form.patientId]);
 
+  useEffect(() => {
+    if (!consultationIdFromRoute) {
+      setViewConsultation(null);
+      return;
+    }
+    setViewLoading(true);
+    api.consultations.get(consultationIdFromRoute)
+      .then((data) => setViewConsultation(data as unknown as Record<string, unknown>))
+      .catch(() => setViewConsultation(null))
+      .finally(() => setViewLoading(false));
+  }, [consultationIdFromRoute]);
+
 
   useEffect(() => {
     if (!parentConsultationIdFromState || !isReview) return;
     api.consultations.get(parentConsultationIdFromState).then((cons) => {
-      const presc = (cons.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
+      const presc =
+        (cons.prescription as Array<{
+          medicineId?: string;
+          medicineName?: string;
+          dosage?: string;
+          durationDays?: number;
+          timeMorning?: boolean;
+          timeAfternoon?: boolean;
+          timeNight?: boolean;
+          foodRelation?: 'before_food' | 'after_food';
+          quantity?: string;
+          withHotWater?: boolean;
+          withMilk?: boolean;
+          withHoney?: boolean;
+          withGhee?: boolean;
+        }>) || [];
       if (user?.role === 'admin' && cons.clinicId) setClinicId(cons.clinicId as string);
       let ph = defaultPersonalHistory();
       try {
@@ -251,6 +310,15 @@ const ConsultationsPage = () => {
           medicineName: p.medicineName || 'Medicine',
           dosage: p.dosage || '',
           durationDays: p.durationDays ?? '',
+          timeMorning: Boolean(p.timeMorning),
+          timeAfternoon: Boolean(p.timeAfternoon),
+          timeNight: Boolean(p.timeNight),
+          foodRelation: (p.foodRelation as 'before_food' | 'after_food' | undefined) || '',
+          quantity: p.quantity || '',
+          withHotWater: Boolean(p.withHotWater),
+          withMilk: Boolean(p.withMilk),
+          withHoney: Boolean(p.withHoney),
+          withGhee: Boolean(p.withGhee),
         })),
       }));
     }).catch((err) => {
@@ -294,7 +362,24 @@ const ConsultationsPage = () => {
     if (!first) return;
     setForm((f) => ({
       ...f,
-      prescription: [...f.prescription, { medicineId: first.id, medicineName: first.name, dosage: '', durationDays: '' }],
+      prescription: [
+        ...f.prescription,
+        {
+          medicineId: first.id,
+          medicineName: first.name,
+          dosage: '',
+          durationDays: '',
+          timeMorning: false,
+          timeAfternoon: false,
+          timeNight: false,
+          foodRelation: '',
+          quantity: '',
+          withHotWater: false,
+          withMilk: false,
+          withHoney: false,
+          withGhee: false,
+        },
+      ],
     }));
     setPrescriptionOpen(form.prescription.length);
   };
@@ -313,7 +398,7 @@ const ConsultationsPage = () => {
     setForm((f) => ({ ...f, prescription: f.prescription.filter((_, i) => i !== idx) }));
   };
 
-  const updatePrescription = (idx: number, field: string, value: string | number) => {
+  const updatePrescription = (idx: number, field: string, value: string | number | boolean) => {
     setForm((f) => ({
       ...f,
       prescription: f.prescription.map((p, i) => (i === idx ? { ...p, [field]: value } : p)),
@@ -361,6 +446,15 @@ const ConsultationsPage = () => {
           medicineId: p.medicineId,
           dosage: p.dosage || undefined,
           durationDays: toNum(p.durationDays),
+          timeMorning: p.timeMorning,
+          timeAfternoon: p.timeAfternoon,
+          timeNight: p.timeNight,
+          foodRelation: p.foodRelation || undefined,
+          quantity: p.quantity || undefined,
+          withHotWater: p.withHotWater,
+          withMilk: p.withMilk,
+          withHoney: p.withHoney,
+          withGhee: p.withGhee,
         })),
       }) as { id?: string };
       setConsultationErrors([]);
@@ -453,7 +547,22 @@ const ConsultationsPage = () => {
 
   const loadConsultationForFollowUp = (consultationId: string) => {
     api.consultations.get(consultationId).then((data) => {
-      const presc = (data.prescription as { medicineId?: string; medicineName?: string; dosage?: string; durationDays?: number }[]) || [];
+      const presc =
+        (data.prescription as Array<{
+          medicineId?: string;
+          medicineName?: string;
+          dosage?: string;
+          durationDays?: number;
+          timeMorning?: boolean;
+          timeAfternoon?: boolean;
+          timeNight?: boolean;
+          foodRelation?: 'before_food' | 'after_food';
+          quantity?: string;
+          withHotWater?: boolean;
+          withMilk?: boolean;
+          withHoney?: boolean;
+          withGhee?: boolean;
+        }>) || [];
       const d = data as Record<string, unknown>;
       let ph = defaultPersonalHistory();
       try {
@@ -513,18 +622,26 @@ const ConsultationsPage = () => {
           medicineName: p.medicineName || 'Medicine',
           dosage: p.dosage || '',
           durationDays: p.durationDays ?? '',
+          timeMorning: Boolean(p.timeMorning),
+          timeAfternoon: Boolean(p.timeAfternoon),
+          timeNight: Boolean(p.timeNight),
+          foodRelation: (p.foodRelation as 'before_food' | 'after_food' | undefined) || '',
+          quantity: p.quantity || '',
+          withHotWater: Boolean(p.withHotWater),
+          withMilk: Boolean(p.withMilk),
+          withHoney: Boolean(p.withHoney),
+          withGhee: Boolean(p.withGhee),
         })),
       }));
     }).catch(() => toast({ title: 'Failed to load details', variant: 'destructive' }));
   };
 
-  const viewConsultationDetails = (cons: ConsultationRow) => {
-    setActiveConsId(cons.id);
-    loadConsultationForFollowUp(cons.id);
+  const openConsultationRecord = (cons: ConsultationRow) => {
+    navigate(`/admin/consultations/${cons.id}`);
   };
 
   const openFollowUp = (cons: ConsultationRow) => {
-    viewConsultationDetails(cons);
+    navigate('/admin/consultations/new', { state: { parentConsultationId: cons.id, isReview: true } });
   };
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -605,40 +722,54 @@ const ConsultationsPage = () => {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {(listLoading || viewLoading || loading) && (
+        <FullScreenLoader label="Loading consultations..." />
+      )}
       <div className="flex items-center justify-between gap-4 mb-3 shrink-0">
         <PageHeader title="Consultations" />
-        {user?.role === 'admin' && clinics.length > 0 && (
-          <Select value={clinicId || undefined} onValueChange={(v) => { setClinicId(v); setConsultationErrors((e) => e.filter((x) => !x.includes('Clinic'))); }}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select clinic" />
-            </SelectTrigger>
-            <SelectContent>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex items-center gap-2">
+          {isListRoute && (
+            <Button onClick={() => navigate('/admin/consultations/new')} disabled={!targetClinicId} size="sm" className="shrink-0">
+              <Plus className="h-4 w-4 mr-1.5" /> New consult
+            </Button>
+          )}
+          {(isViewRoute || isFormRoute) && (
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/consultations')} className="shrink-0">
+              Back to records
+            </Button>
+          )}
+          {user?.role === 'admin' && clinics.length > 0 && (
+            <Select value={clinicId || undefined} onValueChange={(v) => { setClinicId(v); setConsultationErrors((e) => e.filter((x) => !x.includes('Clinic'))); }}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select clinic" />
+              </SelectTrigger>
+              <SelectContent>
+                {clinics.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_minmax(400px,1.5fr)] gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Left: Old records — select for follow-up or new consult */}
+      {isListRoute && (
         <Card className="flex flex-col min-h-0 overflow-hidden">
           <CardHeader className="pb-2 shrink-0">
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-lg">
-                  {form.patientId ? form.patientName || 'Beneficiary' : 'Consultation Records'}
+                  Consultation Records
                 </CardTitle>
                 <CardDescription className="mt-0.5">
-                  {form.patientId ? 'This patient only. ' : ''}Click a record to view, add follow-up, or start new consult.
+                  Click a record to view full details. Use the refresh icon to reload.
                 </CardDescription>
               </div>
-              {form.patientId && (
-                <Button size="sm" variant="outline" onClick={() => setForm((f) => ({ ...f, patientId: '', patientName: '' }))} className="shrink-0">
-                  Show all
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="icon" variant="outline" onClick={loadConsultations} className="shrink-0" title="Refresh">
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
-              )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
@@ -667,8 +798,8 @@ const ConsultationsPage = () => {
                         key={f.id}
                         role="button"
                         tabIndex={0}
-                        onClick={() => viewConsultationDetails(f)}
-                        onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                        onClick={() => openConsultationRecord(f)}
+                        onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(f)}
                         className={cn(
                           'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/30',
                           activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 shadow-sm' : 'hover:bg-amber-100/50 dark:hover:bg-amber-900/20'
@@ -697,6 +828,7 @@ const ConsultationsPage = () => {
                     ))}
                   </div>
                 )}
+
                 {orphanGroups.filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id))).length > 0 && (
                   <div className="space-y-4">
                     <p className="text-xs font-medium text-muted-foreground px-1 mb-1">Other follow-ups (parent not in list)</p>
@@ -707,8 +839,8 @@ const ConsultationsPage = () => {
                           <div
                             role="button"
                             tabIndex={0}
-                            onClick={() => { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); }}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); } }}
+                            onClick={() => openConsultationRecord(parent)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') openConsultationRecord(parent); }}
                             className={cn(
                               'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
                               activeConsId === parent.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
@@ -728,7 +860,7 @@ const ConsultationsPage = () => {
                               )}
                             </div>
                             <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setActiveConsId(parent.id); loadConsultationForFollowUp(parent.id); }} title="Add follow-up">
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(parent)} title="Add follow-up">
                                 <RotateCcw className="h-3.5 w-3.5" />
                               </Button>
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(parent.id)} title="Print">
@@ -744,8 +876,8 @@ const ConsultationsPage = () => {
                                   key={f.id}
                                   role="button"
                                   tabIndex={0}
-                                  onClick={() => viewConsultationDetails(f)}
-                                  onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                                  onClick={() => openConsultationRecord(f)}
+                                  onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(f)}
                                   className={cn(
                                     'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
                                     activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
@@ -782,39 +914,51 @@ const ConsultationsPage = () => {
                       ))}
                   </div>
                 )}
+
                 {consultationGroups.map(({ initial, followUps }) => (
                   <div key={initial.id} className="space-y-1">
                     <div
                       role="button"
                       tabIndex={0}
-                      onClick={() => viewConsultationDetails(initial)}
-                      onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(initial)}
+                      onClick={() => openConsultationRecord(initial)}
+                      onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(initial)}
                       className={cn(
-                        'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
+                        'flex items-start justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-4 cursor-pointer transition-all duration-200 bg-primary/5',
                         activeConsId === initial.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
                       )}
                     >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-sm">{form.patientId ? fmtDateWithTime(initial.consultationDate as string, initial.consultationTime) : initial.patientName}</p>
-                          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
-                            <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
-                          </span>
-                          {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
-                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
-                              Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-base leading-6 truncate">
+                              {initial.patientName}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {fmtDateWithTime(initial.consultationDate as string, initial.consultationTime)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
+                              <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
                             </span>
-                          )}
+                            {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
+                                Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {initial.diagnosis && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{diagnosisDisplay(initial.diagnosis)}</p>
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2 whitespace-pre-wrap">
+                            {diagnosisDisplay(initial.diagnosis)}
+                          </p>
                         )}
-                        </div>
-                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(initial)} title="Add follow-up">
+                      </div>
+                      <div className="flex gap-1 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openFollowUp(initial)} title="Add follow-up">
                           <RotateCcw className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(initial.id)} title="Print">
+                        <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => handlePrint(initial.id)} title="Print">
                           <Printer className="h-4 w-4" />
                         </Button>
                       </div>
@@ -826,15 +970,22 @@ const ConsultationsPage = () => {
                             key={f.id}
                             role="button"
                             tabIndex={0}
-                            onClick={() => viewConsultationDetails(f)}
-                            onKeyDown={(e) => e.key === 'Enter' && viewConsultationDetails(f)}
+                            onClick={() => openConsultationRecord(f)}
+                            onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(f)}
                             className={cn(
-                              'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
+                              'flex items-start justify-between gap-3 rounded-lg border p-3.5 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400 bg-background',
                               activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
                             )}
                           >
-                            <div className="flex-1 min-w-0 text-right">
-                              <div className="flex items-center gap-2 flex-wrap justify-end">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm leading-5 truncate">{f.patientName}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {fmtDateWithTime(f.consultationDate as string, f.consultationTime)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
                                 <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold border border-amber-200/60">
                                   <FileText className="h-3 w-3" /> Follow-up
                                 </span>
@@ -843,17 +994,17 @@ const ConsultationsPage = () => {
                                     Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
                                   </span>
                                 )}
-                                <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                                </div>
                               </div>
                               {f.diagnosis && (
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
+                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2 whitespace-pre-wrap">{diagnosisDisplay(f.diagnosis)}</p>
                               )}
                             </div>
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
+                            <div className="flex gap-1 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(f)} title="Add follow-up">
                                 <RotateCcw className="h-3.5 w-3.5" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(f.id)} title="Print">
                                 <Printer className="h-3.5 w-3.5" />
                               </Button>
                             </div>
@@ -867,13 +1018,14 @@ const ConsultationsPage = () => {
             )}
           </CardContent>
         </Card>
+      )}
 
-        {/* Right: New/Edit form */}
-        <Card className="flex flex-col min-h-0 overflow-hidden border-l-0 lg:border-l">
+      {isFormRoute && (
+        <Card className="flex flex-col min-h-0 overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3 shrink-0">
             <div>
               <CardTitle className="text-lg">
-                {form.parentConsultationId ? 'Add Follow-up' : 'New Initial Visit'}
+                {form.parentConsultationId ? 'Add Follow-up' : 'New consult'}
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {form.parentConsultationId
@@ -882,7 +1034,7 @@ const ConsultationsPage = () => {
               </CardDescription>
             </div>
             <Button onClick={openNewConsultation} disabled={!targetClinicId} size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" /> New Initial Visit
+              <Plus className="h-4 w-4 mr-1.5" /> New consult
             </Button>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
@@ -1508,27 +1660,20 @@ const ConsultationsPage = () => {
                 </Button>
               </div>
               {form.prescription.length > 0 && (
-                <div className="mt-2 rounded-lg border overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-muted/50 border-b">
-                        <th className="text-left py-2 px-3 font-medium">Medicine</th>
-                        <th className="text-left py-2 px-3 font-medium">Dosage</th>
-                        <th className="text-left py-2 px-3 font-medium w-20">Duration</th>
-                        <th className="w-10" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.prescription.map((p, i) => (
-                        <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="py-2 px-3">
+                <div className="mt-2 space-y-3">
+                  {form.prescription.map((p, i) => (
+                    <div key={i} className="rounded-xl border bg-gradient-to-b from-white to-emerald-50/20 p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <Label className="text-xs text-muted-foreground">Medicine</Label>
+                          <div className="mt-1">
                             <Popover open={prescriptionOpen === i} onOpenChange={(o) => setPrescriptionOpen(o ? i : null)}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" size="sm" className="w-full justify-between font-normal">
-                                  {p.medicineName || 'Select medicine'}
+                                  <span className="truncate">{p.medicineName || 'Select medicine'}</span>
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-[300px] p-0" align="start">
+                              <PopoverContent className="w-[320px] p-0" align="start">
                                 <Command>
                                   <CommandInput placeholder="Search medicine..." />
                                   <CommandList>
@@ -1544,20 +1689,86 @@ const ConsultationsPage = () => {
                                 </Command>
                               </PopoverContent>
                             </Popover>
-                          </td>
-                          <td className="py-2 px-3">
-                            <Input className="h-8 w-28" placeholder="e.g. 1 tab BD" value={p.dosage} onChange={(e) => updatePrescription(i, 'dosage', e.target.value)} />
-                          </td>
-                          <td className="py-2 px-3">
-                            <Input type="number" className="h-8 w-16" placeholder="days" value={p.durationDays} onChange={(e) => updatePrescription(i, 'durationDays', e.target.value)} min={0} />
-                          </td>
-                          <td className="py-2 px-2">
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removePrescription(i)}><Trash2 className="h-4 w-4" /></Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                        </div>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removePrescription(i)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Dosage</Label>
+                          <Input className="h-9 mt-1" placeholder="e.g. 1 tab" value={p.dosage} onChange={(e) => updatePrescription(i, 'dosage', e.target.value)} />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Duration (days)</Label>
+                          <Input type="number" className="h-9 mt-1" placeholder="e.g. 7" value={p.durationDays} onChange={(e) => updatePrescription(i, 'durationDays', e.target.value)} min={0} />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Quantity</Label>
+                          <Input className="h-9 mt-1" placeholder="e.g. 10 tabs" value={p.quantity} onChange={(e) => updatePrescription(i, 'quantity', e.target.value)} />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                        <div className="rounded-lg border bg-white/60 p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Time</p>
+                          <div className="grid grid-cols-3 gap-3">
+                            {([
+                              ['Morning', 'timeMorning'],
+                              ['Afternoon', 'timeAfternoon'],
+                              ['Night', 'timeNight'],
+                            ] as const).map(([label, key]) => (
+                              <label key={key} className="flex items-center gap-2 text-sm">
+                                <Checkbox checked={Boolean(p[key])} onCheckedChange={(v) => updatePrescription(i, key, Boolean(v))} />
+                                <span>{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border bg-white/60 p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Food</p>
+                          <RadioGroup
+                            value={p.foodRelation || 'none'}
+                            onValueChange={(v) => updatePrescription(i, 'foodRelation', v === 'none' ? '' : v)}
+                            className="grid grid-cols-1 gap-2"
+                          >
+                            <label className="flex items-center gap-2 text-sm">
+                              <RadioGroupItem value="before_food" />
+                              Before food
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                              <RadioGroupItem value="after_food" />
+                              After food
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <RadioGroupItem value="none" />
+                              Not specified
+                            </label>
+                          </RadioGroup>
+                        </div>
+
+                        <div className="rounded-lg border bg-white/60 p-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">With</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {([
+                              ['Hot water', 'withHotWater'],
+                              ['Milk', 'withMilk'],
+                              ['Honey', 'withHoney'],
+                              ['Ghee', 'withGhee'],
+                            ] as const).map(([label, key]) => (
+                              <label key={key} className="flex items-center gap-2 text-sm">
+                                <Checkbox checked={Boolean(p[key])} onCheckedChange={(v) => updatePrescription(i, key, Boolean(v))} />
+                                <span>{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1567,7 +1778,492 @@ const ConsultationsPage = () => {
           </div>
           </CardContent>
         </Card>
-      </div>
+      )}
+
+      {isViewRoute && (
+        <Card className="flex flex-col min-h-0 overflow-hidden">
+          <CardHeader className="pb-3 shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg">Consultation</CardTitle>
+                <CardDescription className="mt-0.5">
+                  View details. You can print or start a follow-up.
+                </CardDescription>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/admin/consultations/new', { state: { parentConsultationId: consultationIdFromRoute, isReview: true } })}
+                  disabled={!consultationIdFromRoute}
+                >
+                  <RotateCcw className="h-4 w-4 mr-1.5" /> Add follow-up
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => consultationIdFromRoute && handlePrint(consultationIdFromRoute)}
+                  disabled={!consultationIdFromRoute}
+                >
+                  <Printer className="h-4 w-4 mr-1.5" /> Print
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
+            {viewLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">Loading consultation...</p>
+              </div>
+            ) : !viewConsultation ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="rounded-full bg-muted p-4 mb-3">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="font-medium text-muted-foreground">Consultation not found</p>
+                <p className="text-sm text-muted-foreground mt-1">It may have been removed or you may not have access.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {(() => {
+                  const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
+                  const parseMaybeJson = (v: unknown): unknown => {
+                    if (typeof v !== 'string') return v;
+                    const s = v.trim();
+                    if (!s) return v;
+                    if (!(s.startsWith('{') || s.startsWith('['))) return v;
+                    try { return JSON.parse(s); } catch { return v; }
+                  };
+                  const personalHistory = asObj(parseMaybeJson(viewConsultation.personalHistory));
+                  const menstrualHistory = asObj(parseMaybeJson(viewConsultation.menstrualHistory));
+                  const ayurvedaExamination = asObj(parseMaybeJson(viewConsultation.ayurvedaExamination));
+                  const followUpRequired = viewConsultation.followUpRequired === 1 || viewConsultation.followUpRequired === true;
+                  const followUpDate = viewConsultation.followUpDate ? String(viewConsultation.followUpDate) : '';
+                  const parentConsultationId = viewConsultation.parentConsultationId ? String(viewConsultation.parentConsultationId) : '';
+                  const patientName = String(viewConsultation.patientName ?? '') || '—';
+                  const doctorName = (() => {
+                    const id = String(viewConsultation.doctorId ?? '');
+                    return doctors.find((d) => d.id === id)?.name || id || '—';
+                  })();
+                  const dateTime = viewConsultation.consultationDate
+                    ? fmtDateWithTime(String(viewConsultation.consultationDate), (viewConsultation.consultationTime as string | null | undefined))
+                    : '—';
+
+                  const pill = (label: string) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center rounded-md border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                    >
+                      {label}
+                    </span>
+                  );
+
+                  const listFrom = (v: unknown): string[] => {
+                    if (Array.isArray(v)) return v.map((x) => String(x)).filter(Boolean);
+                    if (typeof v === 'string' && v.trim()) return [v.trim()];
+                    return [];
+                  };
+
+                  const InfoItem = ({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) => (
+                    <div className="rounded-lg border bg-card/60 p-3 shadow-sm hover:shadow transition-shadow">
+                      <div className="flex items-start gap-2">
+                        {icon ? <div className="mt-0.5 text-emerald-700">{icon}</div> : null}
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                          <p className="font-medium mt-0.5 truncate">{value}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+
+                  const Empty = ({ text }: { text: string }) => (
+                    <div className="rounded-md border border-dashed bg-muted/15 p-4 text-sm text-muted-foreground">{text}</div>
+                  );
+
+                  const Section = ({
+                    title,
+                    description,
+                    icon,
+                    children,
+                  }: {
+                    title: string;
+                    description?: string;
+                    icon?: React.ReactNode;
+                    children: React.ReactNode;
+                  }) => (
+                    <div className="rounded-lg border bg-card shadow-sm">
+                      <div className="p-3 sm:p-4 border-b bg-gradient-to-r from-emerald-50/70 to-transparent">
+                        <div className="flex items-start gap-2">
+                          <div className="mt-0.5 h-4 w-1.5 rounded-full bg-emerald-500/80" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              {icon ? <div className="text-emerald-700">{icon}</div> : null}
+                              <p className="text-sm font-semibold text-foreground">{title}</p>
+                            </div>
+                        {description ? <p className="text-xs text-muted-foreground mt-0.5">{description}</p> : null}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-3 sm:p-4">{children}</div>
+                    </div>
+                  );
+
+                  return (
+                    <>
+                      {/* Summary */}
+                      <div className="rounded-lg border bg-gradient-to-br from-emerald-50/70 via-background to-background shadow-sm">
+                        <div className="p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-muted-foreground">Beneficiary</p>
+                              <p className="text-lg font-semibold truncate">{patientName}</p>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Stethoscope className="h-4 w-4 text-emerald-700" />
+                                  {doctorName}
+                                </span>
+                                <span className="text-muted-foreground/60">•</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <CalendarIcon className="h-4 w-4 text-emerald-700" />
+                                  {dateTime}
+                                </span>
+                                {parentConsultationId ? (
+                                  <>
+                                    <span className="text-muted-foreground/60">•</span>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 border-emerald-200 hover:bg-emerald-50"
+                                      onClick={() => navigate(`/admin/consultations/${parentConsultationId}`)}
+                                    >
+                                      <Link2 className="h-4 w-4 mr-1 text-emerald-700" />
+                                      Consult
+                                    </Button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge
+                                variant="default"
+                                className={cn(
+                                  followUpRequired
+                                    ? 'bg-emerald-600 hover:bg-emerald-600/90 text-white'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                )}
+                              >
+                                {followUpRequired ? 'Follow-up required' : 'No follow-up'}
+                              </Badge>
+                              {followUpRequired && followUpDate ? (
+                                <Badge variant="outline" className="border-emerald-200/70 bg-white/60 text-emerald-800">
+                                  Follow-up: {format(new Date(followUpDate + 'T00:00:00'), 'dd-MM-yyyy')}
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <Tabs defaultValue="clinical" className="w-full">
+                        <div className="rounded-xl border bg-gradient-to-r from-emerald-50/70 via-background to-background p-1.5 shadow-sm">
+                          <TabsList className="w-full justify-start gap-1 overflow-x-auto bg-transparent p-0 h-auto">
+                            <TabsTrigger
+                              value="clinical"
+                              className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 group-data-[state=active]:bg-white" />
+                              Clinical
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="vitals"
+                              className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-sky-500 group-data-[state=active]:bg-white" />
+                              Vitals
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="history"
+                              className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-amber-500 group-data-[state=active]:bg-white" />
+                              History
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="prescription"
+                              className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-violet-500 group-data-[state=active]:bg-white" />
+                              Prescription
+                            </TabsTrigger>
+                          </TabsList>
+                        </div>
+
+                        <TabsContent value="clinical" className="mt-4 space-y-3">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            <Section title="Present Complaint" description="Symptoms & duration." icon={<FileText className="h-4 w-4" />}>
+                              {String(viewConsultation.symptoms ?? '') ? (
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.symptoms)}</p>
+                              ) : (
+                                <Empty text="No complaint recorded." />
+                              )}
+                            </Section>
+                            <Section title="Diagnosis" icon={<Stethoscope className="h-4 w-4" />}>
+                              {diagnosisDisplay(viewConsultation.diagnosis) ? (
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">{diagnosisDisplay(viewConsultation.diagnosis)}</p>
+                              ) : (
+                                <Empty text="No diagnosis recorded." />
+                              )}
+                            </Section>
+                            <Section title="Medical History" icon={<HeartPulse className="h-4 w-4" />}>
+                              {String(viewConsultation.patientMedicalHistory ?? '') ? (
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.patientMedicalHistory)}</p>
+                              ) : (
+                                <Empty text="No medical history recorded." />
+                              )}
+                            </Section>
+                            <Section title="Notes" icon={<FileText className="h-4 w-4" />}>
+                              {String(viewConsultation.notes ?? '') ? (
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.notes)}</p>
+                              ) : (
+                                <Empty text="No notes." />
+                              )}
+                            </Section>
+                          </div>
+                          <Section title="Diet / Lifestyle Advice" icon={<FileText className="h-4 w-4" />}>
+                            {String(viewConsultation.dietLifestyleAdvice ?? '') ? (
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.dietLifestyleAdvice)}</p>
+                            ) : (
+                              <Empty text="No advice recorded." />
+                            )}
+                          </Section>
+                        </TabsContent>
+
+                        <TabsContent value="vitals" className="mt-4 space-y-3">
+                          <Section title="Vitals" description="Recorded at the time of consultation.">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <InfoItem label="Weight" value={viewConsultation.weight != null ? `${String(viewConsultation.weight)} kg` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
+                              <InfoItem label="Height" value={viewConsultation.height != null ? `${String(viewConsultation.height)} cm` : '—'} icon={<User className="h-4 w-4" />} />
+                              <InfoItem label="BP" value={`${viewConsultation.bpSystolic != null ? String(viewConsultation.bpSystolic) : '—'}/${viewConsultation.bpDiastolic != null ? String(viewConsultation.bpDiastolic) : '—'}`} icon={<HeartPulse className="h-4 w-4" />} />
+                              <InfoItem label="Temperature" value={viewConsultation.temperature != null ? String(viewConsultation.temperature) : '—'} icon={<HeartPulse className="h-4 w-4" />} />
+                              <InfoItem label="Pulse" value={viewConsultation.pulse != null ? `${String(viewConsultation.pulse)} bpm` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
+                              <InfoItem label="SpO2" value={viewConsultation.spo2 != null ? `${String(viewConsultation.spo2)}%` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
+                              <InfoItem label="CBG" value={viewConsultation.cbg != null ? `${String(viewConsultation.cbg)} mg/dL` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
+                            </div>
+                            <div className="mt-4">
+                              <BmiDisplay
+                                weight={viewConsultation.weight != null ? Number(viewConsultation.weight) : undefined}
+                                height={viewConsultation.height != null ? Number(viewConsultation.height) : undefined}
+                                className="max-w-md"
+                              />
+                            </div>
+                          </Section>
+                        </TabsContent>
+
+                        <TabsContent value="history" className="mt-4 space-y-3">
+                          <Section title="History" description="Personal history and examination findings.">
+                            <Accordion
+                              type="multiple"
+                              className="w-full overflow-hidden rounded-xl border border-emerald-100/70 bg-gradient-to-b from-emerald-50/50 to-background shadow-sm"
+                            >
+                              <AccordionItem value="personal" className="px-4">
+                                <AccordionTrigger className="py-3 hover:no-underline rounded-lg data-[state=open]:bg-white/70 data-[state=open]:shadow-sm px-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                                    <span>Personal History</span>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-3 pb-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {(['diet', 'exercise', 'habits', 'bowelMovement', 'appetite', 'micturition', 'sleepPattern'] as const).map((k) => {
+                                      const labels: Record<string, string> = {
+                                        diet: 'Diet',
+                                        exercise: 'Exercise / Physical Activity',
+                                        habits: 'Habits / Addictions',
+                                        bowelMovement: 'Bowel Movement',
+                                        appetite: 'Appetite',
+                                        micturition: 'Micturition (Urination)',
+                                        sleepPattern: 'Sleep Pattern',
+                                      };
+                                      const items = listFrom(personalHistory[k]);
+                                      return (
+                                        <div key={k} className="rounded-lg border bg-white/60 p-3 shadow-sm">
+                                          <p className="text-xs font-medium text-muted-foreground">{labels[k]}</p>
+                                          <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {items.length > 0 ? items.map(pill) : <span className="text-sm text-muted-foreground">—</span>}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+
+                              <AccordionItem value="ayurveda" className="px-4">
+                                <AccordionTrigger className="py-3 hover:no-underline rounded-lg data-[state=open]:bg-white/70 data-[state=open]:shadow-sm px-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    <span>Ayurvedic Examination</span>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-3 pb-4">
+                                  <div className="overflow-x-auto rounded-lg border bg-white/60 shadow-sm p-3">
+                                    <table className="w-full text-sm">
+                                      <tbody className="[&>tr:not(:last-child)]:border-b">
+                                        {([
+                                          ['Naadi (Pulse)', ayurvedaExamination.naadi],
+                                          ['Malam (Stool)', ayurvedaExamination.malam],
+                                          ['Mootram (Urine)', ayurvedaExamination.mootram],
+                                          ['Mootram Colour', ayurvedaExamination.mootramColour],
+                                          ['Jihwa (Tongue)', ayurvedaExamination.jihwa],
+                                          ['Shabda (Voice)', ayurvedaExamination.shabda],
+                                          ['Sparsha (Touch)', ayurvedaExamination.sparsha],
+                                          ['Drik (Eyes)', ayurvedaExamination.drik],
+                                          ['Drik Colour', ayurvedaExamination.drikColour],
+                                          ['Aakriti (Physique)', ayurvedaExamination.aakriti],
+                                        ] as Array<[string, unknown]>).map(([label, value]) => {
+                                          const values = listFrom(value);
+                                          return (
+                                            <tr key={label} className="odd:bg-white even:bg-emerald-50/30">
+                                              <td className="py-2.5 px-3 align-top text-muted-foreground whitespace-nowrap font-medium">{label}</td>
+                                              <td className="py-2.5 px-3">
+                                                <div className="flex flex-wrap gap-1.5">
+                                                  {values.length > 0 ? values.map(pill) : <span className="text-muted-foreground">—</span>}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+
+                              {Object.keys(menstrualHistory).length > 0 ? (
+                                <AccordionItem value="menstrual" className="px-4">
+                                  <AccordionTrigger className="py-3 hover:no-underline rounded-lg data-[state=open]:bg-white/70 data-[state=open]:shadow-sm px-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+                                      <span>Menstrual History</span>
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <div className="overflow-x-auto rounded-lg border bg-white/60 shadow-sm">
+                                      <table className="w-full text-sm">
+                                        <tbody className="[&>tr:not(:last-child)]:border-b">
+                                          {([
+                                            ['Menstrual Cycle', menstrualHistory.menstrualCycle],
+                                            ['LMP', menstrualHistory.lmp],
+                                            ['Pads per day', menstrualHistory.padsPerDay],
+                                            ['Cycle length (days)', menstrualHistory.cycleLengthDays],
+                                            ['Day of cycle', menstrualHistory.cycleCountOnVisit],
+                                            ['Clots', menstrualHistory.clots],
+                                            ['Menstrual flow', menstrualHistory.menstrualFlow],
+                                            ['Dysmenorrhea', menstrualHistory.dysmenorrhea],
+                                            ['Leucorrhea', menstrualHistory.leucorrhea],
+                                            ['Menopause', menstrualHistory.menopause],
+                                            ['Menopause age', menstrualHistory.menopauseAge],
+                                            ['Gravida', menstrualHistory.gravida],
+                                            ['Para', menstrualHistory.para],
+                                            ['Abortions', menstrualHistory.abortions],
+                                          ] as Array<[string, unknown]>).map(([label, value]) => (
+                                            <tr key={label} className="odd:bg-white even:bg-emerald-50/30">
+                                              <td className="py-2.5 px-3 align-top text-muted-foreground whitespace-nowrap font-medium">{label}</td>
+                                              <td className="py-2.5 px-3">{value != null && String(value) !== '' ? String(value) : '—'}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              ) : null}
+                            </Accordion>
+                          </Section>
+                        </TabsContent>
+
+                        <TabsContent value="prescription" className="mt-4 space-y-3">
+                          <Section title="Prescription" description="Medicines and instructions.">
+                            {Array.isArray(viewConsultation.prescription) && viewConsultation.prescription.length > 0 ? (
+                              <div className="space-y-2">
+                                {(viewConsultation.prescription as Record<string, unknown>[]).map((p, i) => (
+                                  <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border bg-gradient-to-b from-white to-emerald-50/20 p-3 shadow-sm">
+                                    <div className="flex items-start gap-3 min-w-0">
+                                      <div className="mt-1 h-7 w-1.5 rounded-full bg-emerald-500/80" />
+                                      <div className="min-w-0">
+                                        <div className="font-semibold truncate">{String(p.medicineName ?? p.medicineId ?? 'Medicine')}</div>
+                                        <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                          {String(p.dosage ?? '') ? (
+                                            <Badge variant="outline" className="border-emerald-200/70 bg-white/60 text-emerald-800">
+                                              {String(p.dosage)}
+                                            </Badge>
+                                          ) : (
+                                            <span>—</span>
+                                          )}
+                                          {p.durationDays != null ? (
+                                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 border border-slate-200">
+                                              {String(p.durationDays)} days
+                                            </Badge>
+                                          ) : null}
+                                          {String(p.quantity ?? '') ? (
+                                            <Badge variant="outline" className="border-slate-200 bg-white/60 text-slate-700">
+                                              Qty: {String(p.quantity)}
+                                            </Badge>
+                                          ) : null}
+                                          {(() => {
+                                            const times: string[] = [];
+                                            if (p.timeMorning) times.push('Morning');
+                                            if (p.timeAfternoon) times.push('Afternoon');
+                                            if (p.timeNight) times.push('Night');
+                                            return times.length > 0 ? (
+                                              <Badge variant="outline" className="border-emerald-200/70 bg-white/60 text-emerald-800">
+                                                {times.join(', ')}
+                                              </Badge>
+                                            ) : null;
+                                          })()}
+                                          {p.foodRelation === 'before_food' ? (
+                                            <Badge variant="secondary" className="bg-amber-50 text-amber-800 border border-amber-200">
+                                              Before food
+                                            </Badge>
+                                          ) : p.foodRelation === 'after_food' ? (
+                                            <Badge variant="secondary" className="bg-amber-50 text-amber-800 border border-amber-200">
+                                              After food
+                                            </Badge>
+                                          ) : null}
+                                          {(() => {
+                                            const withItems: string[] = [];
+                                            if (p.withHotWater) withItems.push('Hot water');
+                                            if (p.withMilk) withItems.push('Milk');
+                                            if (p.withHoney) withItems.push('Honey');
+                                            if (p.withGhee) withItems.push('Ghee');
+                                            return withItems.length > 0 ? (
+                                              <Badge variant="secondary" className="bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                With: {withItems.join(', ')}
+                                              </Badge>
+                                            ) : null;
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <Empty text="No prescription recorded." />
+                            )}
+                          </Section>
+                        </TabsContent>
+                      </Tabs>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

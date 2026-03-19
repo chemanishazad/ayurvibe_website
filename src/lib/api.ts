@@ -4,6 +4,30 @@ function getToken(): string | null {
   return sessionStorage.getItem('auth_token');
 }
 
+function clearSessionAndRedirectToLogin(): void {
+  try {
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_user');
+  } catch {
+    // ignore storage errors
+  }
+  // Force a clean auth state by reloading the login route.
+  if (window.location.pathname !== '/admin') {
+    window.location.assign('/admin');
+  }
+}
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
@@ -16,7 +40,23 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText || 'Request failed');
+  if (!res.ok) {
+    const message = (data?.error as string | undefined) || res.statusText || 'Request failed';
+    const code = (data?.code as string | undefined) || undefined;
+
+    // If session is invalid/expired, log out immediately.
+    const looksLikeSessionError =
+      res.status === 401 ||
+      res.status === 403 ||
+      (typeof message === 'string' && /session|token|auth/i.test(message)) ||
+      (typeof code === 'string' && /session|token|auth/i.test(code));
+
+    if (looksLikeSessionError) {
+      clearSessionAndRedirectToLogin();
+    }
+
+    throw new ApiError(message, res.status, code);
+  }
   return data as T;
 }
 
@@ -163,6 +203,24 @@ export const api = {
       directMedicineSales: number;
       lowStockAlerts: { medicineName: string; currentStock: number; minStockLevel: number; message: string }[];
     }>(`/api/dashboard/clinic${q ? `?${q}` : ''}`);
+    },
+  },
+  followUps: {
+    upcoming: (params?: { clinicId?: string; fromDate?: string; toDate?: string }) => {
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
+      return fetchApi<
+        {
+          id: string;
+          date: string;
+          time?: string;
+          patientName: string;
+          patientMobile?: string;
+          clinicName?: string;
+          doctorName?: string;
+          notes?: string;
+        }[]
+      >(`/api/follow-ups/upcoming${q ? `?${q}` : ''}`);
     },
   },
   reports: {
