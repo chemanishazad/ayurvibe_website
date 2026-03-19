@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { Lock, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, Loader2, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -46,6 +46,7 @@ export function setAdminAuthenticated(value: boolean): void {
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,9 +88,9 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-primary/5 p-4">
-      <Card className="w-full max-w-md border-0 shadow-xl shadow-primary/5">
-        <CardHeader className="text-center space-y-6 pb-2">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/20 to-primary/5 p-4">
+      <Card className="w-full max-w-md border border-border/60 bg-card/95 shadow-xl shadow-primary/5 backdrop-blur">
+        <CardHeader className="space-y-6 pb-3 text-center">
           <div className="flex justify-center">
             <Logo withText textClassName="text-center" />
           </div>
@@ -100,36 +101,56 @@ const Login = () => {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold tracking-tight">Admin Login</CardTitle>
-            <CardDescription className="mt-2">Sign in with your username and password. Clinic is assigned based on your account.</CardDescription>
+            <CardDescription className="mt-2">Sign in to continue to the admin dashboard.</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pt-2">
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <CardContent className="pt-1">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="admin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  required
+                  disabled={isLoading}
+                  className="pl-10"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  disabled={isLoading}
+                  className="pl-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full font-medium" size="lg" disabled={isLoading}>
               {isLoading ? (
@@ -141,6 +162,7 @@ const Login = () => {
                 'Sign in'
               )}
             </Button>
+            <p className="text-center text-xs text-muted-foreground">Authorized users only.</p>
           </form>
         </CardContent>
       </Card>
