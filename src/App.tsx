@@ -8,7 +8,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import BlogPost from "./pages/BlogPost";
 import SectionPage from "./pages/SectionPage";
-import LocationPage from "./pages/LocationPage";
 import Login from "./pages/Login";
 import AdminRoute from "./components/AdminRoute";
 import { AdminErrorBoundary } from "./components/AdminErrorBoundary";

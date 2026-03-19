@@ -1,5 +1,6 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "ayurvibe-website",
+  "description": "Sri Vinayaga Ayurvibe — public website (Vite + React)",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -83,7 +84,6 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "firebase-tools": "^14.17.0",
     "globals": "^15.15.0",
-    "lovable-tagger": "^1.1.9",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "terser": "^5.44.0",

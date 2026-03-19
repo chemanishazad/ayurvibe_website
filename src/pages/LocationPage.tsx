@@ -45,7 +45,7 @@ const locationData: Record<string, LocationData> = {
       }
     ],
     seoTitle: 'Best Ayurveda Hospital in Perumbakkam Chennai | Sri Vinayaga Ayurvibe',
-    seoDescription: '🏆 #1 Ayurveda Hospital in Perumbakkam Chennai! Expert Panchakarma, Abhyanga, Shirodhara treatments by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!',
+    seoDescription: 'Government-certified Ayurveda hospital in Perumbakkam, Chennai. Panchakarma, Abhyanga, Shirodhara, and consultations with Dr. V. Vaitheeshwari, B.A.M.S.',
     keywords: ['Ayurveda hospital Perumbakkam', 'Perumbakkam Ayurveda clinic', 'best Ayurveda Perumbakkam', 'Panchakarma Perumbakkam', 'Abhyanga Perumbakkam', 'Shirodhara Perumbakkam', 'Dr Vaitheeshwari Perumbakkam']
   },
   'omr': {
@@ -91,7 +91,7 @@ const locationData: Record<string, LocationData> = {
       }
     ],
     seoTitle: 'Best Ayurveda Hospital in Sholinganallur Chennai | Sri Vinayaga Ayurvibe',
-    seoDescription: '🏆 #1 Ayurveda Hospital in Sholinganallur Chennai! Expert Panchakarma, Abhyanga, women health treatments by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!',
+    seoDescription: 'Ayurveda care for Sholinganallur and nearby areas: Panchakarma, Abhyanga, women\'s health, and digestive support with Dr. V. Vaitheeshwari, B.A.M.S.',
     keywords: ['Ayurveda hospital Sholinganallur', 'Sholinganallur Ayurveda clinic', 'best Ayurveda Sholinganallur', 'Panchakarma Sholinganallur', 'women health Sholinganallur', 'digestive disorders Sholinganallur', 'Dr Vaitheeshwari Sholinganallur']
   },
   'pallikaranai': {
@@ -114,7 +114,7 @@ const locationData: Record<string, LocationData> = {
       }
     ],
     seoTitle: 'Best Ayurveda Hospital in Pallikaranai Chennai | Sri Vinayaga Ayurvibe',
-    seoDescription: '🏆 #1 Ayurveda Hospital in Pallikaranai Chennai! Expert Panchakarma, Abhyanga, skin health treatments by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!',
+    seoDescription: 'Ayurveda hospital serving Pallikaranai: Panchakarma, Abhyanga, skin and mental wellness support with Dr. V. Vaitheeshwari, B.A.M.S.',
     keywords: ['Ayurveda hospital Pallikaranai', 'Pallikaranai Ayurveda clinic', 'best Ayurveda Pallikaranai', 'Panchakarma Pallikaranai', 'skin health Pallikaranai', 'mental health Pallikaranai', 'Dr Vaitheeshwari Pallikaranai']
   },
   'navalur': {
@@ -160,7 +160,7 @@ const locationData: Record<string, LocationData> = {
       }
     ],
     seoTitle: 'Best Ayurveda Hospital in Kelambakkam Chennai | Sri Vinayaga Ayurvibe',
-    seoDescription: '🏆 #1 Ayurveda Hospital in Kelambakkam Chennai! Expert Panchakarma, Abhyanga, herbal medicine by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!',
+    seoDescription: 'Ayurveda care near Kelambakkam: Panchakarma, Abhyanga, herbal medicine, and wellness consultations with Dr. V. Vaitheeshwari, B.A.M.S.',
     keywords: ['Ayurveda hospital Kelambakkam', 'Kelambakkam Ayurveda clinic', 'best Ayurveda Kelambakkam', 'Panchakarma Kelambakkam', 'herbal medicine Kelambakkam', 'wellness consultation Kelambakkam', 'Dr Vaitheeshwari Kelambakkam']
   },
   'tambaram': {
@@ -183,7 +183,7 @@ const locationData: Record<string, LocationData> = {
       }
     ],
     seoTitle: 'Best Ayurveda Hospital in Tambaram Chennai | Sri Vinayaga Ayurvibe',
-    seoDescription: '🏆 #1 Ayurveda Hospital in Tambaram Chennai! Expert Panchakarma, Abhyanga, traditional medicine by Dr.V.Vaitheeshwari B.A.M.S.,. Government certified. Book now!',
+    seoDescription: 'Ayurveda hospital reachable from Tambaram: Panchakarma, Abhyanga, and traditional therapies with Dr. V. Vaitheeshwari, B.A.M.S.',
     keywords: ['Ayurveda hospital Tambaram', 'Tambaram Ayurveda clinic', 'best Ayurveda Tambaram', 'Panchakarma Tambaram', 'traditional medicine Tambaram', 'alternative medicine Tambaram', 'Dr Vaitheeshwari Tambaram']
   }
 };

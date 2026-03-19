@@ -108,8 +108,14 @@ const ConsultationPrintPage = () => {
   const patientMedicalHistory = (cons.patientMedicalHistory as string) || '';
   const dietLifestyleAdvice = (cons.dietLifestyleAdvice as string) || '';
   const followUpDate = (cons.followUpDate as string) || '';
-  const weight = cons.weight != null ? String(cons.weight) : '';
-  const height = cons.height != null ? String(cons.height) : '';
+  const weight =
+    cons.weight != null && String(cons.weight).trim() !== ''
+      ? String(Math.round(Number(cons.weight)))
+      : '';
+  const height =
+    cons.height != null && String(cons.height).trim() !== ''
+      ? String(Math.round(Number(cons.height)))
+      : '';
   const bpSystolic = cons.bpSystolic != null ? String(cons.bpSystolic) : '';
   const bpDiastolic = cons.bpDiastolic != null ? String(cons.bpDiastolic) : '';
   const pulse = cons.pulse != null ? String(cons.pulse) : '';

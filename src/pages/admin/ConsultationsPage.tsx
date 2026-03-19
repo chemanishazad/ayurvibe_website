@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,11 +36,45 @@ import { useToast } from '@/hooks/use-toast';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { Plus, Trash2, Printer, RotateCcw, CalendarIcon, Search, User, X, Loader2, Stethoscope, FileText, Link2, HeartPulse } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Printer,
+  RotateCcw,
+  CalendarIcon,
+  Search,
+  User,
+  X,
+  Loader2,
+  Stethoscope,
+  FileText,
+  Link2,
+  HeartPulse,
+  Scale,
+  Ruler,
+  Activity,
+  Thermometer,
+  Wind,
+  Droplets,
+  Pill,
+  ClipboardList,
+  History,
+  StickyNote,
+  UtensilsCrossed,
+  Heart,
+  MessageSquare,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { BmiDisplay } from '@/components/BmiDisplay';
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 type ConsultationRow = Record<string, unknown> & {
   id: string;
@@ -86,6 +119,15 @@ const restrictVital = (v: string, maxWhole = 3, maxDecimal = 2): string => {
   return maxDecimal ? `${whole}.${dec}` : whole;
 };
 
+/** Weight / height: whole number only, max 3 digits (0–999), for load from API. */
+const wholeVitalFromApi = (v: unknown): string => {
+  if (v == null || v === '') return '';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '';
+  const w = Math.round(Math.abs(n));
+  return String(Math.min(999, w));
+};
+
 const diagnosisDisplay = (d: unknown): string => {
   if (d == null || d === '') return '';
   try {
@@ -94,6 +136,23 @@ const diagnosisDisplay = (d: unknown): string => {
   } catch {}
   return String(d);
 };
+
+const patientInitials = (name: string) => {
+  const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+/** Shared list-row chrome for consultation records */
+const recordRowBase =
+  'group flex w-full items-stretch gap-3 rounded-xl border bg-card p-3.5 text-left shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out cursor-pointer sm:p-4';
+const recordRowHoverInitial =
+  'border-l-[5px] border-l-primary border-border/60 hover:border-primary/35 hover:bg-primary/[0.06] hover:shadow-md dark:hover:bg-primary/10';
+const recordRowHoverFollow =
+  'border-l-[5px] border-l-amber-400 border-border/60 hover:border-amber-400/80 hover:bg-amber-50/40 hover:shadow-md dark:hover:bg-amber-950/25';
+const recordRowHoverUpcoming =
+  'border-l-[5px] border-l-amber-500 border-amber-200/60 bg-amber-50/30 hover:border-amber-500/80 hover:bg-amber-50/70 hover:shadow-md dark:border-amber-800/50 dark:bg-amber-950/20 dark:hover:bg-amber-950/35';
 
 const ConsultationsPage = () => {
   const user = getAuthUser();
@@ -296,8 +355,8 @@ const ConsultationsPage = () => {
         notes: (cons.notes as string) || '',
         followUpRequired: true,
         followUpDate: (cons.followUpDate as string) || '',
-        weight: cons.weight != null ? String(cons.weight) : '',
-        height: cons.height != null ? String(cons.height) : '',
+        weight: wholeVitalFromApi(cons.weight),
+        height: wholeVitalFromApi(cons.height),
         bpSystolic: cons.bpSystolic != null ? String(cons.bpSystolic) : '',
         bpDiastolic: cons.bpDiastolic != null ? String(cons.bpDiastolic) : '',
         temperature: cons.temperature != null ? String(cons.temperature) : '',
@@ -608,8 +667,8 @@ const ConsultationsPage = () => {
         personalHistory: ph,
         diagnosis: diagnosisText,
         notes: (data.notes as string) || '',
-        weight: d.weight != null ? String(d.weight) : '',
-        height: d.height != null ? String(d.height) : '',
+        weight: wholeVitalFromApi(d.weight),
+        height: wholeVitalFromApi(d.height),
         bpSystolic: d.bpSystolic != null ? String(d.bpSystolic) : '',
         bpDiastolic: d.bpDiastolic != null ? String(d.bpDiastolic) : '',
         temperature: d.temperature != null ? String(d.temperature) : '',
@@ -725,22 +784,31 @@ const ConsultationsPage = () => {
       {(listLoading || viewLoading || loading) && (
         <FullScreenLoader label="Loading consultations..." />
       )}
-      <div className="flex items-center justify-between gap-4 mb-3 shrink-0">
-        <PageHeader title="Consultations" />
-        <div className="flex items-center gap-2">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isListRoute && (
-            <Button onClick={() => navigate('/admin/consultations/new')} disabled={!targetClinicId} size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" /> New consult
+            <Button
+              onClick={() => navigate('/admin/consultations/new')}
+              disabled={!targetClinicId}
+              size="sm"
+              className="shrink-0 shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98]"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New consult
             </Button>
           )}
           {(isViewRoute || isFormRoute) && (
-            <Button variant="outline" size="sm" onClick={() => navigate('/admin/consultations')} className="shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/admin/consultations')}
+              className="shrink-0 transition-all duration-200 hover:bg-muted/80 active:scale-[0.98]"
+            >
               Back to records
             </Button>
           )}
           {user?.role === 'admin' && clinics.length > 0 && (
             <Select value={clinicId || undefined} onValueChange={(v) => { setClinicId(v); setConsultationErrors((e) => e.filter((x) => !x.includes('Clinic'))); }}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[200px] transition-colors duration-200 hover:border-primary/35">
                 <SelectValue placeholder="Select clinic" />
               </SelectTrigger>
               <SelectContent>
@@ -754,45 +822,64 @@ const ConsultationsPage = () => {
       </div>
 
       {isListRoute && (
-        <Card className="flex flex-col min-h-0 overflow-hidden">
-          <CardHeader className="pb-2 shrink-0">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-lg">
-                  Consultation Records
-                </CardTitle>
-                <CardDescription className="mt-0.5">
-                  Click a record to view full details. Use the refresh icon to reload.
-                </CardDescription>
+        <Card className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-border/60 shadow-sm ring-1 ring-black/[0.03] transition-[box-shadow,border-color] duration-300 hover:shadow-md dark:ring-white/[0.04]">
+          <CardHeader className="shrink-0 space-y-0 border-b border-border/50 bg-muted/10 pb-3 pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/15">
+                  <Stethoscope className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">Consultation records</CardTitle>
+                  <CardDescription className="mt-1 text-xs leading-relaxed sm:text-sm">
+                    Open a row for full details. Refresh to reload the list.
+                  </CardDescription>
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button size="icon" variant="outline" onClick={loadConsultations} className="shrink-0" title="Refresh">
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={loadConsultations}
+                className="shrink-0 rounded-lg transition-all duration-200 hover:border-primary/35 hover:bg-primary/5 hover:shadow-sm active:scale-95"
+                title="Refresh list"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
+          <CardContent className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
             {listLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
                 <p className="text-sm text-muted-foreground">Loading records...</p>
               </div>
             ) : consultations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="rounded-full bg-muted p-4 mb-3">
-                  <User className="h-6 w-6 text-muted-foreground" />
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 py-14 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-4 ring-primary/5 transition-transform duration-300 hover:scale-105">
+                  <Stethoscope className="h-7 w-7" />
                 </div>
-                <p className="font-medium text-muted-foreground">No consultations yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Select a beneficiary to filter or create a new consultation</p>
+                <p className="font-semibold text-foreground">No consultations yet</p>
+                <p className="mt-1 max-w-sm px-4 text-sm text-muted-foreground">Create a new consult or pick another clinic to see records.</p>
+                <Button
+                  className="mt-5 shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
+                  size="sm"
+                  disabled={!targetClinicId}
+                  onClick={() => navigate('/admin/consultations/new')}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  New consult
+                </Button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {upcomingFollowUps.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 px-1 mb-1 flex items-center gap-1">
-                      <CalendarIcon className="h-3.5 w-3.5" /> Upcoming follow-ups ({upcomingFollowUps.length})
-                    </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 px-0.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100/90 px-3 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-300/50 dark:bg-amber-950/60 dark:text-amber-200 dark:ring-amber-700/50">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        Upcoming follow-ups ({upcomingFollowUps.length})
+                      </span>
+                    </div>
                     {upcomingFollowUps.map((f) => (
                       <div
                         key={f.id}
@@ -801,28 +888,57 @@ const ConsultationsPage = () => {
                         onClick={() => openConsultationRecord(f)}
                         onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(f)}
                         className={cn(
-                          'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/30',
-                          activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 shadow-sm' : 'hover:bg-amber-100/50 dark:hover:bg-amber-900/20'
+                          recordRowBase,
+                          recordRowHoverUpcoming,
+                          activeConsId === f.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                         )}
                       >
-                        <div className="flex-1 min-w-0 text-right">
-                          <div className="flex items-center gap-2 flex-wrap justify-end">
-                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-semibold border border-amber-300/60">
-                              <CalendarIcon className="h-3 w-3" /> Due {f.followUpDate ? format(new Date(f.followUpDate + 'T00:00:00'), 'dd-MM-yyyy') : ''}
-                            </span>
-                            <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <div
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-200/80 to-amber-100/50 text-xs font-bold text-amber-900 ring-2 ring-amber-300/40 transition-transform duration-200 group-hover:scale-105 dark:from-amber-900/50 dark:to-amber-950/50 dark:text-amber-100"
+                            aria-hidden
+                          >
+                            {patientInitials(f.patientName)}
                           </div>
-                          {f.diagnosis && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
-                          )}
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-base font-semibold leading-tight tracking-tight text-foreground transition-colors group-hover:text-primary">
+                              {f.patientName || 'Patient'}
+                            </h3>
+                            <p className="mt-1 text-xs text-muted-foreground tabular-nums sm:text-sm">
+                              {fmtDateWithTime(f.consultationDate as string, f.consultationTime)}
+                            </p>
+                            {f.diagnosis ? (
+                              <p className="mt-2 line-clamp-2 text-sm leading-snug text-muted-foreground">{diagnosisDisplay(f.diagnosis)}</p>
+                            ) : (
+                              <p className="mt-2 text-xs italic text-muted-foreground/80">No diagnosis recorded</p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
-                            <Printer className="h-3.5 w-3.5" />
-                          </Button>
+                        <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-1 text-xs font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                            <CalendarIcon className="h-3 w-3" />
+                            Due {f.followUpDate ? format(new Date(f.followUpDate + 'T00:00:00'), 'dd-MM-yyyy') : '—'}
+                          </span>
+                          <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-9 w-9 rounded-lg transition-colors duration-200 hover:bg-primary/10 hover:text-primary"
+                              onClick={() => openFollowUp(f)}
+                              title="Schedule follow-up"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-9 w-9 rounded-lg transition-colors duration-200 hover:bg-muted"
+                              onClick={() => handlePrint(f.id)}
+                              title="Print"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -830,45 +946,58 @@ const ConsultationsPage = () => {
                 )}
 
                 {orphanGroups.filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id))).length > 0 && (
-                  <div className="space-y-4">
-                    <p className="text-xs font-medium text-muted-foreground px-1 mb-1">Other follow-ups (parent not in list)</p>
+                  <div className="space-y-3">
+                    <p className="px-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Other follow-ups (parent not in list)</p>
                     {orphanGroups
                       .filter((g) => g.followUps.some((f) => !upcomingFollowUps.some((u) => u.id === f.id)))
                       .map(({ parent, followUps }) => (
-                        <div key={parent.id} className="space-y-1">
+                        <div key={parent.id} className="space-y-2">
                           <div
                             role="button"
                             tabIndex={0}
                             onClick={() => openConsultationRecord(parent)}
                             onKeyDown={(e) => { if (e.key === 'Enter') openConsultationRecord(parent); }}
                             className={cn(
-                              'flex items-center justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-3.5 cursor-pointer transition-all duration-200 bg-primary/5',
-                              activeConsId === parent.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
+                              recordRowBase,
+                              recordRowHoverInitial,
+                              'bg-primary/[0.04]',
+                              activeConsId === parent.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                             )}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-semibold text-sm">
+                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                              <div
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-2 ring-primary/15 transition-transform duration-200 group-hover:scale-105"
+                                aria-hidden
+                              >
+                                {patientInitials(followUps[0]?.patientName || parent.patientName || '?')}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-base font-semibold leading-tight tracking-tight transition-colors group-hover:text-primary">
+                                  {followUps[0]?.patientName || parent.patientName || 'Patient'}
+                                </h3>
+                                <p className="mt-1 text-xs text-muted-foreground tabular-nums sm:text-sm">
                                   {parent.consultationDate ? fmtDateWithTime(parent.consultationDate as string, parent.consultationTime) : 'Parent consultation'}
                                 </p>
-                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
-                                  <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
-                                </span>
+                                {parent.diagnosis ? (
+                                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{diagnosisDisplay(parent.diagnosis)}</p>
+                                ) : null}
                               </div>
-                              {parent.diagnosis && (
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">{diagnosisDisplay(parent.diagnosis)}</p>
-                              )}
                             </div>
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(parent)} title="Add follow-up">
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(parent.id)} title="Print">
-                                <Printer className="h-3.5 w-3.5" />
-                              </Button>
+                            <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                              <span className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                                <Stethoscope className="h-3.5 w-3.5" /> Initial visit
+                              </span>
+                              <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg transition-colors hover:bg-primary/10" onClick={() => openFollowUp(parent)} title="Schedule follow-up">
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg transition-colors hover:bg-muted" onClick={() => handlePrint(parent.id)} title="Print">
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                          <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
+                          <div className="ml-2 space-y-2 border-l-2 border-amber-200/80 pl-4 dark:border-amber-800/80">
                             {followUps
                               .filter((f) => !upcomingFollowUps.some((u) => u.id === f.id))
                               .map((f) => (
@@ -879,32 +1008,44 @@ const ConsultationsPage = () => {
                                   onClick={() => openConsultationRecord(f)}
                                   onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(f)}
                                   className={cn(
-                                    'flex items-center justify-between gap-3 rounded-lg border p-3 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400',
-                                    activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                                    recordRowBase,
+                                    recordRowHoverFollow,
+                                    activeConsId === f.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                                   )}
                                 >
-                                  <div className="flex-1 min-w-0 text-right">
-                                    <div className="flex items-center gap-2 flex-wrap justify-end">
-                                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
-                                        <FileText className="h-3 w-3" /> Follow-up
-                                      </span>
-                                      {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
-                                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium border border-amber-200/60">
-                                          Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
-                                        </span>
-                                      )}
-                                      <p className="font-medium text-sm">{form.patientId ? fmtDateWithTime(f.consultationDate as string, f.consultationTime) : f.patientName}</p>
+                                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                                    <div
+                                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100/80 text-[10px] font-bold text-amber-900 ring-1 ring-amber-300/50 transition-transform group-hover:scale-105 dark:bg-amber-950/50 dark:text-amber-200"
+                                      aria-hidden
+                                    >
+                                      {patientInitials(f.patientName)}
                                     </div>
-                                    {f.diagnosis && (
-                                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap text-right">{diagnosisDisplay(f.diagnosis)}</p>
-                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="truncate text-sm font-semibold sm:text-base">{f.patientName}</h3>
+                                      <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                                        {fmtDateWithTime(f.consultationDate as string, f.consultationTime)}
+                                      </p>
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50/90 px-2 py-0.5 text-[11px] font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                          <FileText className="h-3 w-3" /> Follow-up
+                                        </span>
+                                        {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
+                                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
+                                            Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {f.diagnosis ? (
+                                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{diagnosisDisplay(f.diagnosis)}</p>
+                                      ) : null}
+                                    </div>
                                   </div>
-                                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openFollowUp(f)} title="Add follow-up">
-                                      <RotateCcw className="h-3.5 w-3.5" />
+                                  <div className="flex shrink-0 gap-0.5 self-start pt-0.5" onClick={(e) => e.stopPropagation()}>
+                                    <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg hover:bg-primary/10" onClick={() => openFollowUp(f)} title="Schedule follow-up">
+                                      <RotateCcw className="h-4 w-4" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handlePrint(f.id)} title="Print">
-                                      <Printer className="h-3.5 w-3.5" />
+                                    <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg hover:bg-muted" onClick={() => handlePrint(f.id)} title="Print">
+                                      <Printer className="h-4 w-4" />
                                     </Button>
                                   </div>
                                 </div>
@@ -916,55 +1057,65 @@ const ConsultationsPage = () => {
                 )}
 
                 {consultationGroups.map(({ initial, followUps }) => (
-                  <div key={initial.id} className="space-y-1">
+                  <div key={initial.id} className="space-y-2">
                     <div
                       role="button"
                       tabIndex={0}
                       onClick={() => openConsultationRecord(initial)}
                       onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(initial)}
                       className={cn(
-                        'flex items-start justify-between gap-3 rounded-lg border-2 border-l-4 border-l-primary p-4 cursor-pointer transition-all duration-200 bg-primary/5',
-                        activeConsId === initial.id ? 'ring-2 ring-primary border-primary/50 shadow-sm' : 'hover:bg-primary/10 hover:border-primary/30'
+                        recordRowBase,
+                        recordRowHoverInitial,
+                        'bg-primary/[0.04]',
+                        activeConsId === initial.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                       )}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-base leading-6 truncate">
-                              {initial.patientName}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {fmtDateWithTime(initial.consultationDate as string, initial.consultationTime)}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold border border-primary/30">
-                              <Stethoscope className="h-3.5 w-3.5" /> Initial Visit
-                            </span>
-                            {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
-                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
-                                Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
-                              </span>
-                            )}
-                          </div>
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 to-primary/5 text-sm font-bold text-primary ring-2 ring-primary/15 transition-transform duration-200 group-hover:scale-105"
+                          aria-hidden
+                        >
+                          {patientInitials(initial.patientName)}
                         </div>
-                        {initial.diagnosis && (
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2 whitespace-pre-wrap">
-                            {diagnosisDisplay(initial.diagnosis)}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-base font-semibold leading-tight tracking-tight sm:text-lg transition-colors group-hover:text-primary">
+                            {initial.patientName}
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground tabular-nums sm:text-sm">
+                            {fmtDateWithTime(initial.consultationDate as string, initial.consultationTime)}
                           </p>
-                        )}
+                          {initial.diagnosis ? (
+                            <p className="mt-2 line-clamp-2 text-sm leading-snug text-muted-foreground">
+                              {diagnosisDisplay(initial.diagnosis)}
+                            </p>
+                          ) : (
+                            <p className="mt-2 text-xs italic text-muted-foreground/80">No diagnosis recorded</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex gap-1 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
-                        <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openFollowUp(initial)} title="Add follow-up">
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => handlePrint(initial.id)} title="Print">
-                          <Printer className="h-4 w-4" />
-                        </Button>
+                      <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-start">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-md border border-primary/35 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                            <Stethoscope className="h-3.5 w-3.5" /> Initial visit
+                          </span>
+                          {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                              Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary" onClick={() => openFollowUp(initial)} title="Schedule follow-up">
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg transition-colors hover:bg-muted" onClick={() => handlePrint(initial.id)} title="Print">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     {followUps.length > 0 && (
-                      <div className="ml-4 pl-3 border-l-2 border-amber-200 dark:border-amber-800 space-y-1">
+                      <div className="ml-2 space-y-2 border-l-2 border-amber-200/80 pl-4 dark:border-amber-800/80">
                         {followUps.map((f) => (
                           <div
                             key={f.id}
@@ -973,39 +1124,46 @@ const ConsultationsPage = () => {
                             onClick={() => openConsultationRecord(f)}
                             onKeyDown={(e) => e.key === 'Enter' && openConsultationRecord(f)}
                             className={cn(
-                              'flex items-start justify-between gap-3 rounded-lg border p-3.5 cursor-pointer transition-all duration-200 border-l-4 border-l-amber-400 bg-background',
-                              activeConsId === f.id ? 'ring-2 ring-primary border-primary/30 bg-primary/5 shadow-sm' : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                              recordRowBase,
+                              recordRowHoverFollow,
+                              activeConsId === f.id && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                             )}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm leading-5 truncate">{f.patientName}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    {fmtDateWithTime(f.consultationDate as string, f.consultationTime)}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold border border-amber-200/60">
-                                  <FileText className="h-3 w-3" /> Follow-up
-                                </span>
-                                {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
-                                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-medium border border-amber-200/60">
-                                    Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
-                                  </span>
-                                )}
-                                </div>
+                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                              <div
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100/80 text-[10px] font-bold text-amber-900 ring-1 ring-amber-300/50 transition-transform group-hover:scale-105 dark:bg-amber-950/50 dark:text-amber-200"
+                                aria-hidden
+                              >
+                                {patientInitials(f.patientName)}
                               </div>
-                              {f.diagnosis && (
-                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2 whitespace-pre-wrap">{diagnosisDisplay(f.diagnosis)}</p>
-                              )}
+                              <div className="min-w-0 flex-1">
+                                <h3 className="truncate text-sm font-semibold sm:text-base transition-colors group-hover:text-amber-900 dark:group-hover:text-amber-100">
+                                  {f.patientName}
+                                </h3>
+                                <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                                  {fmtDateWithTime(f.consultationDate as string, f.consultationTime)}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/80 bg-amber-50/90 px-2 py-0.5 text-[11px] font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                                    <FileText className="h-3 w-3" /> Follow-up
+                                  </span>
+                                  {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
+                                    <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
+                                      Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                    </span>
+                                  )}
+                                </div>
+                                {f.diagnosis ? (
+                                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{diagnosisDisplay(f.diagnosis)}</p>
+                                ) : null}
+                              </div>
                             </div>
-                            <div className="flex gap-1 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(f)} title="Add follow-up">
-                                <RotateCcw className="h-3.5 w-3.5" />
+                            <div className="flex shrink-0 gap-0.5 self-start pt-0.5" onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg hover:bg-primary/10" onClick={() => openFollowUp(f)} title="Schedule follow-up">
+                                <RotateCcw className="h-4 w-4" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(f.id)} title="Print">
-                                <Printer className="h-3.5 w-3.5" />
+                              <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg hover:bg-muted" onClick={() => handlePrint(f.id)} title="Print">
+                                <Printer className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
@@ -1140,11 +1298,11 @@ const ConsultationsPage = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
               <div>
                 <Label className="text-xs">Weight (kgs)</Label>
-                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: restrictVital(e.target.value, 3, 2) }))} />
+                <Input type="text" inputMode="numeric" className="h-9" placeholder="e.g. 72" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: restrictVital(e.target.value, 3, 0) }))} />
               </div>
               <div>
                 <Label className="text-xs">Height (cm)</Label>
-                <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: restrictVital(e.target.value, 3, 2) }))} />
+                <Input type="text" inputMode="numeric" className="h-9" placeholder="e.g. 165" value={form.height} onChange={(e) => setForm((f) => ({ ...f, height: restrictVital(e.target.value, 3, 0) }))} />
               </div>
               <div className="sm:col-span-2 lg:col-span-2 min-w-0">
                 <BmiDisplay weight={toNum(form.weight)} height={toNum(form.height)} compact />
@@ -1975,28 +2133,28 @@ const ConsultationsPage = () => {
                               value="clinical"
                               className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
                             >
-                              <span className="h-2 w-2 rounded-full bg-emerald-500 group-data-[state=active]:bg-white" />
+                              <Stethoscope className="h-4 w-4 shrink-0 opacity-80 group-data-[state=active]:opacity-100" />
                               Clinical
                             </TabsTrigger>
                             <TabsTrigger
                               value="vitals"
                               className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
                             >
-                              <span className="h-2 w-2 rounded-full bg-sky-500 group-data-[state=active]:bg-white" />
+                              <Activity className="h-4 w-4 shrink-0 opacity-80 group-data-[state=active]:opacity-100" />
                               Vitals
                             </TabsTrigger>
                             <TabsTrigger
                               value="history"
                               className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
                             >
-                              <span className="h-2 w-2 rounded-full bg-amber-500 group-data-[state=active]:bg-white" />
+                              <ClipboardList className="h-4 w-4 shrink-0 opacity-80 group-data-[state=active]:opacity-100" />
                               History
                             </TabsTrigger>
                             <TabsTrigger
                               value="prescription"
                               className="group gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-emerald-200 data-[state=active]:border data-[state=active]:border-emerald-500 data-[state=active]:-translate-y-[1px]"
                             >
-                              <span className="h-2 w-2 rounded-full bg-violet-500 group-data-[state=active]:bg-white" />
+                              <Pill className="h-4 w-4 shrink-0 opacity-80 group-data-[state=active]:opacity-100" />
                               Prescription
                             </TabsTrigger>
                           </TabsList>
@@ -2004,7 +2162,7 @@ const ConsultationsPage = () => {
 
                         <TabsContent value="clinical" className="mt-4 space-y-3">
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                            <Section title="Present Complaint" description="Symptoms & duration." icon={<FileText className="h-4 w-4" />}>
+                            <Section title="Present Complaint" description="Symptoms & duration." icon={<MessageSquare className="h-4 w-4" />}>
                               {String(viewConsultation.symptoms ?? '') ? (
                                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.symptoms)}</p>
                               ) : (
@@ -2018,14 +2176,14 @@ const ConsultationsPage = () => {
                                 <Empty text="No diagnosis recorded." />
                               )}
                             </Section>
-                            <Section title="Medical History" icon={<HeartPulse className="h-4 w-4" />}>
+                            <Section title="Medical History" icon={<History className="h-4 w-4" />}>
                               {String(viewConsultation.patientMedicalHistory ?? '') ? (
                                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.patientMedicalHistory)}</p>
                               ) : (
                                 <Empty text="No medical history recorded." />
                               )}
                             </Section>
-                            <Section title="Notes" icon={<FileText className="h-4 w-4" />}>
+                            <Section title="Notes" icon={<StickyNote className="h-4 w-4" />}>
                               {String(viewConsultation.notes ?? '') ? (
                                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.notes)}</p>
                               ) : (
@@ -2033,7 +2191,7 @@ const ConsultationsPage = () => {
                               )}
                             </Section>
                           </div>
-                          <Section title="Diet / Lifestyle Advice" icon={<FileText className="h-4 w-4" />}>
+                          <Section title="Diet / Lifestyle Advice" icon={<UtensilsCrossed className="h-4 w-4" />}>
                             {String(viewConsultation.dietLifestyleAdvice ?? '') ? (
                               <p className="whitespace-pre-wrap text-sm leading-relaxed">{String(viewConsultation.dietLifestyleAdvice)}</p>
                             ) : (
@@ -2043,20 +2201,40 @@ const ConsultationsPage = () => {
                         </TabsContent>
 
                         <TabsContent value="vitals" className="mt-4 space-y-3">
-                          <Section title="Vitals" description="Recorded at the time of consultation.">
+                          <Section title="Vitals" description="Recorded at the time of consultation." icon={<Activity className="h-4 w-4" />}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              <InfoItem label="Weight" value={viewConsultation.weight != null ? `${String(viewConsultation.weight)} kg` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
-                              <InfoItem label="Height" value={viewConsultation.height != null ? `${String(viewConsultation.height)} cm` : '—'} icon={<User className="h-4 w-4" />} />
-                              <InfoItem label="BP" value={`${viewConsultation.bpSystolic != null ? String(viewConsultation.bpSystolic) : '—'}/${viewConsultation.bpDiastolic != null ? String(viewConsultation.bpDiastolic) : '—'}`} icon={<HeartPulse className="h-4 w-4" />} />
-                              <InfoItem label="Temperature" value={viewConsultation.temperature != null ? String(viewConsultation.temperature) : '—'} icon={<HeartPulse className="h-4 w-4" />} />
-                              <InfoItem label="Pulse" value={viewConsultation.pulse != null ? `${String(viewConsultation.pulse)} bpm` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
-                              <InfoItem label="SpO2" value={viewConsultation.spo2 != null ? `${String(viewConsultation.spo2)}%` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
-                              <InfoItem label="CBG" value={viewConsultation.cbg != null ? `${String(viewConsultation.cbg)} mg/dL` : '—'} icon={<HeartPulse className="h-4 w-4" />} />
+                              <InfoItem
+                                label="Weight"
+                                value={
+                                  viewConsultation.weight != null && String(viewConsultation.weight).trim() !== ''
+                                    ? `${Math.round(Number(viewConsultation.weight))} kg`
+                                    : '—'
+                                }
+                                icon={<Scale className="h-4 w-4" />}
+                              />
+                              <InfoItem
+                                label="Height"
+                                value={
+                                  viewConsultation.height != null && String(viewConsultation.height).trim() !== ''
+                                    ? `${Math.round(Number(viewConsultation.height))} cm`
+                                    : '—'
+                                }
+                                icon={<Ruler className="h-4 w-4" />}
+                              />
+                              <InfoItem
+                                label="BP"
+                                value={`${viewConsultation.bpSystolic != null ? String(viewConsultation.bpSystolic) : '—'}/${viewConsultation.bpDiastolic != null ? String(viewConsultation.bpDiastolic) : '—'}`}
+                                icon={<HeartPulse className="h-4 w-4" />}
+                              />
+                              <InfoItem label="Temperature" value={viewConsultation.temperature != null ? String(viewConsultation.temperature) : '—'} icon={<Thermometer className="h-4 w-4" />} />
+                              <InfoItem label="Pulse" value={viewConsultation.pulse != null ? `${String(viewConsultation.pulse)} bpm` : '—'} icon={<Heart className="h-4 w-4" />} />
+                              <InfoItem label="SpO2" value={viewConsultation.spo2 != null ? `${String(viewConsultation.spo2)}%` : '—'} icon={<Wind className="h-4 w-4" />} />
+                              <InfoItem label="CBG" value={viewConsultation.cbg != null ? `${String(viewConsultation.cbg)} mg/dL` : '—'} icon={<Droplets className="h-4 w-4" />} />
                             </div>
                             <div className="mt-4">
                               <BmiDisplay
-                                weight={viewConsultation.weight != null ? Number(viewConsultation.weight) : undefined}
-                                height={viewConsultation.height != null ? Number(viewConsultation.height) : undefined}
+                                weight={viewConsultation.weight != null ? Math.round(Number(viewConsultation.weight)) : undefined}
+                                height={viewConsultation.height != null ? Math.round(Number(viewConsultation.height)) : undefined}
                                 className="max-w-md"
                               />
                             </div>
@@ -2064,7 +2242,7 @@ const ConsultationsPage = () => {
                         </TabsContent>
 
                         <TabsContent value="history" className="mt-4 space-y-3">
-                          <Section title="History" description="Personal history and examination findings.">
+                          <Section title="History" description="Personal history and examination findings." icon={<ClipboardList className="h-4 w-4" />}>
                             <Accordion
                               type="multiple"
                               className="w-full overflow-hidden rounded-xl border border-emerald-100/70 bg-gradient-to-b from-emerald-50/50 to-background shadow-sm"
@@ -2187,70 +2365,84 @@ const ConsultationsPage = () => {
                         </TabsContent>
 
                         <TabsContent value="prescription" className="mt-4 space-y-3">
-                          <Section title="Prescription" description="Medicines and instructions.">
+                          <Section title="Prescription" description="Medicines and instructions." icon={<Pill className="h-4 w-4" />}>
                             {Array.isArray(viewConsultation.prescription) && viewConsultation.prescription.length > 0 ? (
-                              <div className="space-y-2">
-                                {(viewConsultation.prescription as Record<string, unknown>[]).map((p, i) => (
-                                  <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border bg-gradient-to-b from-white to-emerald-50/20 p-3 shadow-sm">
-                                    <div className="flex items-start gap-3 min-w-0">
-                                      <div className="mt-1 h-7 w-1.5 rounded-full bg-emerald-500/80" />
-                                      <div className="min-w-0">
-                                        <div className="font-semibold truncate">{String(p.medicineName ?? p.medicineId ?? 'Medicine')}</div>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                                          {String(p.dosage ?? '') ? (
-                                            <Badge variant="outline" className="border-emerald-200/70 bg-white/60 text-emerald-800">
-                                              {String(p.dosage)}
-                                            </Badge>
-                                          ) : (
-                                            <span>—</span>
-                                          )}
-                                          {p.durationDays != null ? (
-                                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 border border-slate-200">
-                                              {String(p.durationDays)} days
-                                            </Badge>
-                                          ) : null}
-                                          {String(p.quantity ?? '') ? (
-                                            <Badge variant="outline" className="border-slate-200 bg-white/60 text-slate-700">
-                                              Qty: {String(p.quantity)}
-                                            </Badge>
-                                          ) : null}
-                                          {(() => {
-                                            const times: string[] = [];
-                                            if (p.timeMorning) times.push('Morning');
-                                            if (p.timeAfternoon) times.push('Afternoon');
-                                            if (p.timeNight) times.push('Night');
-                                            return times.length > 0 ? (
-                                              <Badge variant="outline" className="border-emerald-200/70 bg-white/60 text-emerald-800">
-                                                {times.join(', ')}
-                                              </Badge>
-                                            ) : null;
-                                          })()}
-                                          {p.foodRelation === 'before_food' ? (
-                                            <Badge variant="secondary" className="bg-amber-50 text-amber-800 border border-amber-200">
-                                              Before food
-                                            </Badge>
-                                          ) : p.foodRelation === 'after_food' ? (
-                                            <Badge variant="secondary" className="bg-amber-50 text-amber-800 border border-amber-200">
-                                              After food
-                                            </Badge>
-                                          ) : null}
-                                          {(() => {
-                                            const withItems: string[] = [];
-                                            if (p.withHotWater) withItems.push('Hot water');
-                                            if (p.withMilk) withItems.push('Milk');
-                                            if (p.withHoney) withItems.push('Honey');
-                                            if (p.withGhee) withItems.push('Ghee');
-                                            return withItems.length > 0 ? (
-                                              <Badge variant="secondary" className="bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                                With: {withItems.join(', ')}
-                                              </Badge>
-                                            ) : null;
-                                          })()}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
+                              <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+                                <div className="overflow-x-auto">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="border-b border-border/60 bg-gradient-to-b from-muted/55 to-muted/30 hover:bg-muted/40">
+                                        <TableHead className="min-w-[160px] whitespace-nowrap px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          Medicine
+                                        </TableHead>
+                                        <TableHead className="min-w-[110px] whitespace-nowrap px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          Dosage
+                                        </TableHead>
+                                        <TableHead className="min-w-[92px] whitespace-nowrap px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          Duration
+                                        </TableHead>
+                                        <TableHead className="min-w-[120px] whitespace-nowrap px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          Timing
+                                        </TableHead>
+                                        <TableHead className="min-w-[120px] whitespace-nowrap px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          Instructions
+                                        </TableHead>
+                                        <TableHead className="min-w-[130px] whitespace-nowrap px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          With
+                                        </TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {(viewConsultation.prescription as Record<string, unknown>[]).map((p, i) => {
+                                        const times: string[] = [];
+                                        if (p.timeMorning) times.push('Morning');
+                                        if (p.timeAfternoon) times.push('Afternoon');
+                                        if (p.timeNight) times.push('Night');
+                                        const withItems: string[] = [];
+                                        if (p.withHotWater) withItems.push('Hot water');
+                                        if (p.withMilk) withItems.push('Milk');
+                                        if (p.withHoney) withItems.push('Honey');
+                                        if (p.withGhee) withItems.push('Ghee');
+                                        const food =
+                                          p.foodRelation === 'before_food'
+                                            ? 'Before food'
+                                            : p.foodRelation === 'after_food'
+                                              ? 'After food'
+                                              : '—';
+                                        const durVal = p.durationDays;
+                                        const duration =
+                                          durVal != null && String(durVal).trim() !== ''
+                                            ? `${String(durVal)} day${Number(durVal) === 1 ? '' : 's'}`
+                                            : '—';
+                                        return (
+                                          <TableRow
+                                            key={i}
+                                            className={cn(
+                                              'border-b border-border/40 transition-colors duration-150',
+                                              i % 2 === 1 ? 'bg-muted/20' : 'bg-background',
+                                              'hover:bg-primary/[0.06] dark:hover:bg-primary/[0.08]',
+                                            )}
+                                          >
+                                            <TableCell className="border-l-[3px] border-l-primary/50 px-4 py-3.5 align-top text-sm font-semibold leading-snug text-foreground">
+                                              {String(p.medicineName ?? p.medicineId ?? '—')}
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3.5 align-top text-sm text-foreground/90">
+                                              {String(p.dosage ?? '').trim() || '—'}
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3.5 align-top text-sm tabular-nums text-muted-foreground">{duration}</TableCell>
+                                            <TableCell className="px-4 py-3.5 align-top text-sm text-muted-foreground">
+                                              {times.length > 0 ? times.join(', ') : '—'}
+                                            </TableCell>
+                                            <TableCell className="px-4 py-3.5 align-top text-sm text-muted-foreground">{food}</TableCell>
+                                            <TableCell className="px-4 py-3.5 align-top text-sm text-muted-foreground">
+                                              {withItems.length > 0 ? withItems.join(', ') : '—'}
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
                             ) : (
                               <Empty text="No prescription recorded." />

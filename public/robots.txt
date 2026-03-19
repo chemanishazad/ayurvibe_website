@@ -1,4 +1,9 @@
+# Public site — allow crawling of marketing and content routes
 User-agent: *
 Allow: /
+
+# Staff admin and print views — not for search indexes
+Disallow: /admin
+Disallow: /print/
 
 Sitemap: https://svayurvibe.com/sitemap_index.xml
