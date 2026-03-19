@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -15,18 +15,26 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import { AlertTriangle, Plus, Truck } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const InventoryPage = () => {
   const user = getAuthUser();
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
-  const [medicines, setMedicines] = useState<{ id: string; name: string }[]>([]);
+  const [medicines, setMedicines] = useState<{ id: string; name: string; uom: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [uoms, setUoms] = useState<{ id: string; code: string; name: string }[]>([]);
   const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
   const [lowStock, setLowStock] = useState<Record<string, unknown>[]>([]);
   const [clinicId, setClinicId] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
-  const [form, setForm] = useState({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '' });
+  const [form, setForm] = useState({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '', uomCode: '' });
   const [purchaseForm, setPurchaseForm] = useState({
     medicineId: '',
     supplierId: '',
@@ -34,15 +42,37 @@ const InventoryPage = () => {
     unitPurchasePrice: '',
     sellingPrice: '',
     purchaseDate: new Date().toISOString().slice(0, 10),
+    expiryDate: '',
+    uomCode: '',
   });
   const { toast } = useToast();
 
   const targetClinicId = user?.clinicId || clinicId;
+  const selectedPurchaseMedicine = useMemo(
+    () => medicines.find((m) => m.id === purchaseForm.medicineId) || null,
+    [medicines, purchaseForm.medicineId]
+  );
+  const selectedManualMedicine = useMemo(
+    () => medicines.find((m) => m.id === form.medicineId) || null,
+    [medicines, form.medicineId]
+  );
+  const selectedPurchaseUom = useMemo(
+    () => uoms.find((u) => u.code === purchaseForm.uomCode) || null,
+    [uoms, purchaseForm.uomCode]
+  );
+  const selectedManualUom = useMemo(
+    () => uoms.find((u) => u.code === form.uomCode) || null,
+    [uoms, form.uomCode]
+  );
 
   useEffect(() => {
     api.clinics.list().then(setClinics).catch(() => setClinics([]));
-    api.medicines.list().then((data) => setMedicines(data as { id: string; name: string }[])).catch(() => setMedicines([]));
+    api.medicines
+      .list()
+      .then((data) => setMedicines(data as { id: string; name: string; uom: string }[]))
+      .catch(() => setMedicines([]));
     api.suppliers.list().then((data) => setSuppliers(data as { id: string; name: string }[])).catch(() => setSuppliers([]));
+    api.uom.list().then(setUoms).catch(() => setUoms([]));
   }, []);
 
   useEffect(() => {
@@ -75,7 +105,7 @@ const InventoryPage = () => {
       });
       toast({ title: 'Stock added' });
       setShowForm(false);
-      setForm({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '' });
+      setForm({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '', uomCode: '' });
       api.inventory.list(targetClinicId).then(setInventory);
       api.inventory.lowStock(targetClinicId).then(setLowStock);
     } catch (e) {
@@ -97,6 +127,7 @@ const InventoryPage = () => {
         unitPurchasePrice: parseFloat(purchaseForm.unitPurchasePrice) || 0,
         sellingPrice: purchaseForm.sellingPrice ? parseFloat(purchaseForm.sellingPrice) : undefined,
         purchaseDate: purchaseForm.purchaseDate || undefined,
+        expiryDate: purchaseForm.expiryDate || undefined,
       });
       toast({ title: 'Purchase recorded' });
       setShowPurchase(false);
@@ -107,6 +138,8 @@ const InventoryPage = () => {
         unitPurchasePrice: '',
         sellingPrice: '',
         purchaseDate: new Date().toISOString().slice(0, 10),
+        expiryDate: '',
+        uomCode: '',
       });
       api.inventory.list(targetClinicId).then(setInventory);
       api.inventory.lowStock(targetClinicId).then(setLowStock);
@@ -193,13 +226,13 @@ const InventoryPage = () => {
         </CardContent>
       </Card>
 
-      {showPurchase && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Purchase from Supplier</CardTitle>
-            <CardDescription>Add stock with supplier. FIFO: first bought first sold.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Dialog open={showPurchase} onOpenChange={setShowPurchase}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Purchase from Supplier</DialogTitle>
+            <DialogDescription>Add stock with supplier. FIFO: first bought first sold.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
             <div>
               <Label>Medicine</Label>
               <Select value={purchaseForm.medicineId} onValueChange={(v) => setPurchaseForm((f) => ({ ...f, medicineId: v }))}>
@@ -209,11 +242,39 @@ const InventoryPage = () => {
                 <SelectContent>
                   {medicines.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name}
+                      {m.name} {m.uom ? `(${m.uom})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedPurchaseMedicine && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Default UOM: <span className="font-medium">{selectedPurchaseMedicine.uom}</span>
+                </p>
+              )}
+            </div>
+            <div>
+              <Label>UOM for this purchase</Label>
+              <Select
+                value={purchaseForm.uomCode || selectedPurchaseMedicine?.uom || ''}
+                onValueChange={(v) => setPurchaseForm((f) => ({ ...f, uomCode: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select UOM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uoms.map((u) => (
+                    <SelectItem key={u.id} value={u.code}>
+                      {u.name} ({u.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPurchaseUom && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Selected: <span className="font-medium">{selectedPurchaseUom.name}</span>
+                </p>
+              )}
             </div>
             <div>
               <Label>Supplier</Label>
@@ -232,7 +293,20 @@ const InventoryPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Quantity</Label>
+                <Label>
+                  Quantity
+                {selectedPurchaseUom?.code
+                  ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      (in {selectedPurchaseUom.code})
+                    </span>
+                  )
+                  : selectedPurchaseMedicine?.uom ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      (in {selectedPurchaseMedicine.uom})
+                    </span>
+                  ) : null}
+                </Label>
                 <Input
                   type="number"
                   value={purchaseForm.quantity}
@@ -266,21 +340,32 @@ const InventoryPage = () => {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Expiry Date</Label>
+                <Input
+                  type="date"
+                  value={purchaseForm.expiryDate}
+                  onChange={(e) => setPurchaseForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                />
+              </div>
+              <div />
+            </div>
             <div className="flex gap-2">
               <Button onClick={handlePurchase}>Record Purchase</Button>
               <Button variant="outline" onClick={() => setShowPurchase(false)}>Cancel</Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Manual Stock</CardTitle>
-            <CardDescription>Add quantity to stock (no supplier tracking). Purchase and selling only update stock.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manual Stock</DialogTitle>
+            <DialogDescription>Add quantity to stock (no supplier tracking). Purchase and selling only update stock.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
             <div>
               <Label>Medicine</Label>
               <Select value={form.medicineId} onValueChange={(v) => setForm((f) => ({ ...f, medicineId: v }))}>
@@ -290,14 +375,55 @@ const InventoryPage = () => {
                 <SelectContent>
                   {medicines.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name}
+                      {m.name} {m.uom ? `(${m.uom})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedManualMedicine && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Default UOM: <span className="font-medium">{selectedManualMedicine.uom}</span>
+                </p>
+              )}
             </div>
             <div>
-              <Label>Quantity to Add</Label>
+              <Label>UOM for this stock</Label>
+              <Select
+                value={form.uomCode || selectedManualMedicine?.uom || ''}
+                onValueChange={(v) => setForm((f) => ({ ...f, uomCode: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select UOM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uoms.map((u) => (
+                    <SelectItem key={u.id} value={u.code}>
+                      {u.name} ({u.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedManualUom && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Selected: <span className="font-medium">{selectedManualUom.name}</span>
+                </p>
+              )}
+            </div>
+            <div>
+              <Label>
+                Quantity to Add
+                {selectedManualUom?.code
+                  ? (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    (in {selectedManualUom.code})
+                  </span>
+                  )
+                  : selectedManualMedicine?.uom ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      (in {selectedManualMedicine.uom})
+                    </span>
+                  ) : null}
+              </Label>
               <Input
                 type="number"
                 min={1}
@@ -328,9 +454,9 @@ const InventoryPage = () => {
               <Button onClick={handleAddStock}>Add Stock</Button>
               <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

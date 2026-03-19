@@ -1729,7 +1729,7 @@ const ConsultationsPage = () => {
                         </div>
 
                         <div className="rounded-lg border bg-white/60 p-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Food</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Food / Route</p>
                           <RadioGroup
                             value={p.foodRelation || 'none'}
                             onValueChange={(v) => updatePrescription(i, 'foodRelation', v === 'none' ? '' : v)}
@@ -1745,7 +1745,7 @@ const ConsultationsPage = () => {
                             </label>
                             <label className="flex items-center gap-2 text-sm text-muted-foreground">
                               <RadioGroupItem value="none" />
-                              Not specified
+                              External use
                             </label>
                           </RadioGroup>
                         </div>
@@ -1758,6 +1758,8 @@ const ConsultationsPage = () => {
                               ['Milk', 'withMilk'],
                               ['Honey', 'withHoney'],
                               ['Ghee', 'withGhee'],
+                              ['Ginger juice', 'withGingerJuice'],
+                              ['Lemon juice', 'withLemonJuice'],
                             ] as const).map(([label, key]) => (
                               <label key={key} className="flex items-center gap-2 text-sm">
                                 <Checkbox checked={Boolean(p[key])} onCheckedChange={(v) => updatePrescription(i, key, Boolean(v))} />
