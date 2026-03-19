@@ -68,6 +68,9 @@ export const api = {
         body: JSON.stringify({ clinicId }),
       }),
   },
+  uom: {
+    list: () => fetchApi<{ id: string; code: string; name: string }[]>('/api/uom'),
+  },
   clinics: {
     list: () => fetchApi<{ id: string; name: string }[]>('/api/clinics'),
     create: (name: string) => fetchApi<{ id: string; name: string }>('/api/clinics', { method: 'POST', body: JSON.stringify({ name }) }),

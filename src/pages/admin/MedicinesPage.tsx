@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
@@ -42,6 +49,18 @@ const MedicinesPage = () => {
     description: '',
   });
   const { toast } = useToast();
+
+  const UOM_OPTIONS = [
+    'tablet',
+    'capsule',
+    'syrup',
+    'bottle',
+    'strip',
+    'sachet',
+    'ml',
+    'gm',
+    'kg',
+  ];
 
   useEffect(() => {
     api.medicines.list().then((data) => setMedicines(data as Medicine[])).catch(() => setMedicines([])).finally(() => setLoading(false));
@@ -188,7 +207,21 @@ const MedicinesPage = () => {
             </div>
             <div>
               <Label>UOM</Label>
-              <Input value={form.uom} onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))} placeholder="tablet, bottle, strip" />
+              <Select
+                value={form.uom}
+                onValueChange={(v) => setForm((f) => ({ ...f, uom: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select UOM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UOM_OPTIONS.map((uom) => (
+                    <SelectItem key={uom} value={uom}>
+                      {uom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Min Stock Level</Label>
@@ -215,7 +248,21 @@ const MedicinesPage = () => {
             </div>
             <div>
               <Label>UOM</Label>
-              <Input value={form.uom} onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))} />
+              <Select
+                value={form.uom}
+                onValueChange={(v) => setForm((f) => ({ ...f, uom: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select UOM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UOM_OPTIONS.map((uom) => (
+                    <SelectItem key={uom} value={uom}>
+                      {uom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Min Stock Level</Label>

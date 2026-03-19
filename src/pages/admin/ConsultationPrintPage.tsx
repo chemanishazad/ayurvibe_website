@@ -19,6 +19,8 @@ type PrescriptionRow = {
   withMilk?: boolean;
   withHoney?: boolean;
   withGhee?: boolean;
+  withGingerJuice?: boolean;
+  withLemonJuice?: boolean;
 };
 
 const ConsultationPrintPage = () => {
@@ -300,39 +302,46 @@ const ConsultationPrintPage = () => {
               <tr className="border-b border-gray-400">
                 <th className="text-left py-1 pr-2 font-semibold">Medicine</th>
                 <th className="text-left py-1 pr-2 font-semibold">Dosage</th>
-                <th className="text-left py-1 font-semibold">Duration</th>
+                <th className="text-center py-1 px-1 font-semibold">Morning</th>
+                <th className="text-center py-1 px-1 font-semibold">Afternoon</th>
+                <th className="text-center py-1 px-1 font-semibold">Night</th>
+                <th className="text-left py-1 px-1 font-semibold">Food</th>
+                <th className="text-left py-1 px-1 font-semibold">With</th>
+                <th className="text-left py-1 px-1 font-semibold">Qty</th>
+                <th className="text-left py-1 px-1 font-semibold">Duration</th>
               </tr>
             </thead>
             <tbody>
-              {prescription.length > 0 ? prescription.map((m, i) => (
-                <tr key={i} className="border-b border-gray-200">
-                  <td className="py-1 pr-2">{m.medicineName}</td>
-                  <td className="py-1 pr-2">
-                    {m.dosage || '—'}
-                    {(() => {
-                      const times: string[] = [];
-                      if (m.timeMorning) times.push('M');
-                      if (m.timeAfternoon) times.push('A');
-                      if (m.timeNight) times.push('N');
-                      const food = m.foodRelation === 'before_food' ? 'Before food' : m.foodRelation === 'after_food' ? 'After food' : '';
-                      const withItems: string[] = [];
-                      if (m.withHotWater) withItems.push('Hot water');
-                      if (m.withMilk) withItems.push('Milk');
-                      if (m.withHoney) withItems.push('Honey');
-                      if (m.withGhee) withItems.push('Ghee');
-                      const extra = [
-                        times.length ? `(${times.join('/')})` : '',
-                        food,
-                        m.quantity ? `Qty: ${m.quantity}` : '',
-                        withItems.length ? `With ${withItems.join(', ')}` : '',
-                      ].filter(Boolean).join(' • ');
-                      return extra ? <div className="text-[9px] text-gray-600 mt-0.5">{extra}</div> : null;
-                    })()}
-                  </td>
-                  <td className="py-1">{m.durationDays ? `${m.durationDays} days` : '—'}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan={3} className="py-2 text-gray-500">—</td></tr>
+              {prescription.length > 0 ? prescription.map((m, i) => {
+                const food =
+                  m.foodRelation === 'before_food'
+                    ? 'Before food'
+                    : m.foodRelation === 'after_food'
+                    ? 'After food'
+                    : 'External / Not specified';
+                const withItems: string[] = [];
+                if (m.withHotWater) withItems.push('Hot water');
+                if (m.withMilk) withItems.push('Milk');
+                if (m.withHoney) withItems.push('Honey');
+                if (m.withGhee) withItems.push('Ghee');
+                if (m.withGingerJuice) withItems.push('Ginger juice');
+                if (m.withLemonJuice) withItems.push('Lemon juice');
+
+                return (
+                  <tr key={i} className="border-b border-gray-200 align-top">
+                    <td className="py-1 pr-2">{m.medicineName}</td>
+                    <td className="py-1 pr-2">{m.dosage || '—'}</td>
+                    <td className="py-1 px-1 text-center">{m.timeMorning ? '✓' : ''}</td>
+                    <td className="py-1 px-1 text-center">{m.timeAfternoon ? '✓' : ''}</td>
+                    <td className="py-1 px-1 text-center">{m.timeNight ? '✓' : ''}</td>
+                    <td className="py-1 px-1">{food}</td>
+                    <td className="py-1 px-1">{withItems.length ? withItems.join(', ') : '—'}</td>
+                    <td className="py-1 px-1">{m.quantity || '—'}</td>
+                    <td className="py-1 px-1">{m.durationDays ? `${m.durationDays} days` : '—'}</td>
+                  </tr>
+                );
+              }) : (
+                <tr><td colSpan={9} className="py-2 text-gray-500">—</td></tr>
               )}
             </tbody>
           </table>
