@@ -8,7 +8,7 @@ import { Logo } from '@/components/Logo';
 import { Eye, EyeOff, Lock, Loader2, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'auth_token';
 const AUTH_USER_KEY = 'auth_user';
 
