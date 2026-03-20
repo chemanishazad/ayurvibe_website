@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
-import { ArrowLeft, Loader2, MapPin } from 'lucide-react';
+import { PatientFormSection } from '@/components/PatientFormSection';
+import { ArrowLeft, Loader2, User, MapPin, Stethoscope, UserPlus } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -18,7 +19,10 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { COUNTRY_CODES } from '@/lib/country-codes';
-import { fetchLocationByPincode } from '@/lib/pincode-api';
+
+type AgeUnit = 'years' | 'months';
+
+const GENDERS = ['Male', 'Female', 'Other'] as const;
 
 const patientFormErrors = (d: Record<string, unknown>): string[] => {
   const errs: string[] = [];
@@ -29,62 +33,57 @@ const patientFormErrors = (d: Record<string, unknown>): string[] => {
     if (mobile.length < 10) errs.push('Enter a valid 10-digit mobile number');
   }
   const age = d.age;
+  const unit: AgeUnit = d.ageUnit === 'months' ? 'months' : 'years';
   if (age === '' || age == null || (typeof age === 'string' && !age.trim())) errs.push('Age is required');
-  else if (Number(age) < 0 || Number(age) > 150) errs.push('Age must be 0–150');
+  else {
+    const n = Number(age);
+    if (!Number.isInteger(n) || n < 0) errs.push('Enter a valid whole number for age');
+    else if (unit === 'months' && n > 1800) errs.push('Age in months must be at most 1800');
+    else if (unit === 'years' && n > 150) errs.push('Age in years must be 0–150');
+  }
   if (!String(d.gender ?? '').trim()) errs.push('Gender is required');
   if (!String(d.address ?? '').trim()) errs.push('Address is required');
   return errs;
 };
 
+const choiceActive =
+  'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-600/20 dark:bg-emerald-950/50 dark:text-emerald-50 dark:ring-emerald-500/30';
+const choiceIdle =
+  'border-border/80 bg-background hover:border-emerald-400/50 hover:bg-muted/40 dark:hover:bg-muted/20';
+
 const NewPatientPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [pincodeLoading, setPincodeLoading] = useState(false);
-  const [pincodeLocation, setPincodeLocation] = useState<string | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({
     countryCode: '91',
     mobile: '',
     name: '',
     age: '',
+    ageUnit: 'years' as AgeUnit,
     gender: '',
     address: '',
     pincode: '',
     medicalHistory: '',
   });
   const [formErrors, setFormErrors] = useState<string[]>([]);
-  const lastFetchedPincode = useRef<string>('');
 
-  useEffect(() => {
-    const pin = String(formData.pincode ?? '').replace(/\D/g, '');
-    if (pin.length !== 6) {
-      lastFetchedPincode.current = '';
-      setPincodeLocation(null);
-      return;
-    }
-    if (lastFetchedPincode.current === pin) return;
-    lastFetchedPincode.current = pin;
-    setPincodeLoading(true);
-    setPincodeLocation(null);
-    fetchLocationByPincode(pin)
-      .then((result) => {
-        if (result) {
-          setPincodeLocation(result.location);
-          setFormData((f) => ({
-            ...f,
-            address: f.address ? `${f.address}\n${result.location}` : result.location,
-          }));
-        } else {
-          setPincodeLocation(null);
-          toast({ title: 'Pincode not found', description: 'Enter a valid 6-digit Indian pincode', variant: 'destructive' });
-        }
-      })
-      .catch(() => {
-        setPincodeLocation(null);
-        toast({ title: 'Failed to fetch location', variant: 'destructive' });
-      })
-      .finally(() => setPincodeLoading(false));
-  }, [formData.pincode, toast]);
+  const ageUnit: AgeUnit = formData.ageUnit === 'months' ? 'months' : 'years';
+
+  const setAgeUnit = (u: AgeUnit) => {
+    setFormData((f) => {
+      const raw = String(f.age ?? '').replace(/\D/g, '');
+      const maxLen = u === 'years' ? 3 : 4;
+      const nextAge = raw.slice(0, maxLen);
+      return { ...f, ageUnit: u, age: nextAge };
+    });
+  };
+
+  const handleAgeInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    const maxLen = ageUnit === 'years' ? 3 : 4;
+    setFormData((f) => ({ ...f, age: digits.slice(0, maxLen) }));
+  };
 
   const handleCreate = async () => {
     const errs = patientFormErrors(formData);
@@ -102,6 +101,7 @@ const NewPatientPage = () => {
         name: String(formData.name).trim(),
         mobile,
         age: Number(formData.age),
+        ageUnit: formData.ageUnit === 'months' ? 'months' : 'years',
         gender: String(formData.gender).trim(),
         address: String(formData.address).trim(),
         pincode: formData.pincode ? String(formData.pincode).replace(/\D/g, '') : undefined,
@@ -118,29 +118,35 @@ const NewPatientPage = () => {
     }
   };
 
+  const fieldClass = 'mt-1.5 h-10 transition-shadow focus-visible:ring-2 focus-visible:ring-emerald-500/30';
+  const genderErr = formErrors.some((e) => e.includes('Gender'));
+
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-4 mb-4 shrink-0">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/admin/patients">
+    <div className="flex flex-col flex-1 min-h-0 gap-4">
+      <div className="flex shrink-0 items-stretch gap-3 rounded-xl border border-border/60 bg-card/95 p-3 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] sm:items-center sm:p-4">
+        <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 rounded-lg border border-transparent hover:border-border hover:bg-muted/60" asChild>
+          <Link to="/admin/patients" aria-label="Back to patients">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <PageHeader
-          title="New Patient / Beneficiary"
-          description="Register a new patient. All fields except Medical History are required."
-        />
+        <div className="flex min-w-0 flex-1 items-start gap-3 border-l border-border/60 pl-3 sm:items-center">
+          <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md sm:flex">
+            <UserPlus className="h-5 w-5" />
+          </div>
+          <PageHeader
+            title="New Patient / Beneficiary"
+            description="Register a new patient. All fields except Medical History are required."
+            className="min-w-0 flex-1 !flex-col !items-start gap-0"
+          />
+        </div>
       </div>
 
-      <Card className="flex-1 min-h-0 overflow-auto">
-        <CardHeader>
-          <CardTitle>Patient Details</CardTitle>
-          <CardDescription>Enter beneficiary information. Press Enter in Address field for new line.</CardDescription>
-        </CardHeader>
-        <CardContent className="max-w-2xl space-y-6">
+      <Card className="flex-1 min-h-0 overflow-auto border-border/60 shadow-md ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+        <CardContent className="max-w-3xl space-y-6 p-4 sm:p-6">
           {formErrors.length > 0 && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-              <ul className="list-disc list-inside space-y-0.5">
+            <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm">
+              <p className="font-medium">Please fix the following:</p>
+              <ul className="mt-2 list-inside list-disc space-y-1 opacity-95">
                 {formErrors.map((e, i) => (
                   <li key={i}>{e}</li>
                 ))}
@@ -148,128 +154,210 @@ const NewPatientPage = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <Label>Patient Name / Beneficiary <span className="text-destructive">*</span></Label>
-              <Input
-                value={(formData.name as string) || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Full name"
-                className={cn('mt-1.5', formErrors.some((e) => e.includes('Name')) && 'border-destructive')}
-              />
-            </div>
-
-            <div>
-              <Label>Mobile <span className="text-destructive">*</span></Label>
-              <div className="flex gap-2 mt-1.5">
-                <Select
-                  value={(formData.countryCode as string) || '91'}
-                  onValueChange={(v) => setFormData({ ...formData, countryCode: v })}
-                >
-                  <SelectTrigger className="w-[130px] shrink-0">
-                    <SelectValue placeholder="Country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRY_CODES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {c.dial} {c.country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <PatientFormSection
+            icon={<User className="h-5 w-5" />}
+            title="Patient profile"
+            description="Legal name, contact, age, and gender used across consultations and records."
+          >
+            <div className="space-y-5">
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Patient name / Beneficiary <span className="text-destructive">*</span>
+                </Label>
                 <Input
-                  value={(formData.mobile as string) || ''}
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  placeholder="10-digit number"
-                  maxLength={10}
-                  className={cn('flex-1', formErrors.some((e) => e.includes('Mobile') || e.includes('mobile')) && 'border-destructive')}
+                  value={(formData.name as string) || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Full name as on records"
+                  className={cn(fieldClass, formErrors.some((e) => e.includes('Name')) && 'border-destructive')}
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Mobile <span className="text-destructive">*</span>
+                </Label>
+                <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                  <Select value={(formData.countryCode as string) || '91'} onValueChange={(v) => setFormData({ ...formData, countryCode: v })}>
+                    <SelectTrigger className="h-10 w-full sm:w-[140px] sm:shrink-0">
+                      <SelectValue placeholder="Code" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRY_CODES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.dial} {c.country}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={(formData.mobile as string) || ''}
+                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    placeholder="10-digit number"
+                    maxLength={10}
+                    inputMode="numeric"
+                    className={cn(
+                      'h-10 min-w-0 flex-1',
+                      formErrors.some((e) => e.includes('Mobile') || e.includes('mobile')) && 'border-destructive',
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Gender <span className="text-destructive">*</span>
+                </Label>
+                <div
+                  className={cn('mt-2 grid grid-cols-3 gap-2', genderErr && 'rounded-lg p-0.5 ring-2 ring-destructive/25')}
+                  role="radiogroup"
+                  aria-label="Gender"
+                >
+                  {GENDERS.map((g) => {
+                    const selected = formData.gender === g;
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setFormData({ ...formData, gender: g })}
+                        className={cn(
+                          'rounded-lg border-2 px-2 py-2.5 text-center text-xs font-semibold transition-all duration-150 sm:px-3 sm:py-3 sm:text-sm',
+                          selected ? choiceActive : choiceIdle,
+                        )}
+                      >
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Age <span className="text-destructive">*</span>
+                </Label>
+                <p className="mt-1 text-xs text-muted-foreground">Choose years or months, then enter a whole number.</p>
+                <div
+                  className={cn(
+                    'mt-2 grid w-full grid-cols-2 gap-2',
+                    formErrors.some((e) => e.includes('Age')) && 'rounded-lg p-0.5 ring-2 ring-destructive/25',
+                  )}
+                  role="radiogroup"
+                  aria-label="Age unit"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={ageUnit === 'years'}
+                    onClick={() => setAgeUnit('years')}
+                    className={cn(
+                      'rounded-lg border-2 px-4 py-3 text-sm font-semibold transition-all duration-150',
+                      ageUnit === 'years' ? choiceActive : choiceIdle,
+                    )}
+                  >
+                    Years
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={ageUnit === 'months'}
+                    onClick={() => setAgeUnit('months')}
+                    className={cn(
+                      'rounded-lg border-2 px-4 py-3 text-sm font-semibold transition-all duration-150',
+                      ageUnit === 'months' ? choiceActive : choiceIdle,
+                    )}
+                  >
+                    Months
+                  </button>
+                </div>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={(formData.age as string) ?? ''}
+                  onChange={(e) => handleAgeInput(e.target.value)}
+                  placeholder={ageUnit === 'years' ? 'e.g. 42' : 'e.g. 18'}
+                  className={cn(
+                    'mt-3 h-11 w-full text-base',
+                    formErrors.some((e) => e.includes('Age')) && 'border-destructive',
+                  )}
+                  aria-label={ageUnit === 'years' ? 'Age in years' : 'Age in months'}
                 />
               </div>
             </div>
+          </PatientFormSection>
 
-            <div>
-              <Label>Age <span className="text-destructive">*</span></Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={(formData.age as string) ?? ''}
-                onChange={(e) => setFormData({ ...formData, age: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                placeholder="Age"
-                className={cn('mt-1.5', formErrors.some((e) => e.includes('Age')) && 'border-destructive')}
-              />
-            </div>
-
-            <div>
-              <Label>Gender <span className="text-destructive">*</span></Label>
-              <Select
-                value={(formData.gender as string) || ''}
-                onValueChange={(v) => setFormData({ ...formData, gender: v })}
-              >
-                <SelectTrigger className={cn('mt-1.5', formErrors.some((e) => e.includes('Gender')) && 'border-destructive')}>
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Male">Male</SelectItem>
-                  <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Pincode (India)</Label>
-              <div className="mt-1.5">
+          <PatientFormSection
+            icon={<MapPin className="h-5 w-5" />}
+            title="Address"
+            description="Enter the full address first, then pincode if you have it. Nothing is fetched automatically."
+          >
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Full address <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  value={(formData.address as string) || ''}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Street, area, city, state (press Enter for a new line)"
+                  rows={4}
+                  className={cn(
+                    'mt-1.5 min-h-[120px] resize-y bg-background/80',
+                    formErrors.some((e) => e.includes('Address')) && 'border-destructive',
+                  )}
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pincode (India)</Label>
                 <Input
                   value={(formData.pincode as string) || ''}
                   onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                  placeholder="6-digit pincode (auto-fetches address)"
+                  placeholder="6-digit pincode (optional)"
                   maxLength={6}
-                  className="w-40"
+                  inputMode="numeric"
+                  className="mt-1.5 h-11 w-full max-w-full sm:max-w-xs"
                 />
-                {pincodeLoading && (
-                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Fetching...
-                  </p>
-                )}
               </div>
-              {pincodeLocation && !pincodeLoading && (
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {pincodeLocation}
-                </p>
-              )}
             </div>
+          </PatientFormSection>
 
-            <div className="sm:col-span-2">
-              <Label>Address <span className="text-destructive">*</span></Label>
-              <Textarea
-                value={(formData.address as string) || ''}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Full address (press Enter for new line)"
-                rows={4}
-                className={cn('mt-1.5 resize-y min-h-[100px]', formErrors.some((e) => e.includes('Address')) && 'border-destructive')}
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <Label>Medical History <span className="text-muted-foreground text-xs">(optional)</span></Label>
+          <PatientFormSection
+            icon={<Stethoscope className="h-5 w-5" />}
+            title="Medical history"
+            description="Optional. Allergies, chronic conditions, surgeries — helps doctors during visits."
+          >
+            <div>
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Notes <span className="text-muted-foreground font-normal normal-case">(optional)</span>
+              </Label>
               <Textarea
                 value={(formData.medicalHistory as string) || ''}
                 onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
-                placeholder="Past conditions, allergies, etc."
-                rows={3}
-                className="mt-1.5"
+                placeholder="Past conditions, allergies, ongoing medication, etc."
+                rows={4}
+                className="mt-1.5 min-h-[100px] resize-y bg-background/80"
               />
             </div>
-          </div>
+          </PatientFormSection>
 
-          <div className="flex gap-3 pt-4">
-            <Button onClick={handleCreate} disabled={loading} size="lg">
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save Patient'}
-            </Button>
-            <Button variant="outline" asChild>
+          <div className="flex flex-col-reverse gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center">
+            <Button variant="outline" className="h-11 w-full sm:w-auto" asChild>
               <Link to="/admin/patients">Cancel</Link>
+            </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={loading}
+              className="h-11 w-full bg-emerald-600 font-semibold shadow-md hover:bg-emerald-700 sm:min-w-[180px]"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                'Save patient'
+              )}
             </Button>
           </div>
         </CardContent>

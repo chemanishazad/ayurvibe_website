@@ -27,7 +27,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { COUNTRY_CODES } from '@/lib/country-codes';
-import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Search, Loader2, Printer, MessageCircle } from 'lucide-react';
 
 type ConsultationRow = Record<string, unknown> & {
@@ -39,11 +39,9 @@ type ConsultationRow = Record<string, unknown> & {
 };
 
 const PharmacyPage = () => {
-  const user = getAuthUser();
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
+  const { effectiveClinicId, isAdmin, clinics } = useAdminClinic();
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
-  const [clinicId, setClinicId] = useState('');
   const [loading, setLoading] = useState(false);
   const [consultationOpen, setConsultationOpen] = useState(false);
   const [medicineOpen, setMedicineOpen] = useState<number | null>(null);
@@ -68,22 +66,15 @@ const PharmacyPage = () => {
   });
   const { toast } = useToast();
 
-  const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
-
-  useEffect(() => {
-    api.clinics.list().then((data) => {
-      setClinics(data);
-      if (user?.role === 'admin' && data.length > 0) setClinicId((c) => c || data[0].id);
-    }).catch(() => setClinics([]));
-  }, [user?.role]);
+  const targetClinicId = effectiveClinicId ?? undefined;
 
   useEffect(() => {
     const params: Record<string, string> = {};
-    if (user?.role === 'admin' && targetClinicId) params.clinicId = targetClinicId;
+    if (isAdmin && targetClinicId) params.clinicId = targetClinicId;
     api.consultations.list(params)
       .then((data) => setConsultations(data as ConsultationRow[]))
       .catch(() => setConsultations([]));
-  }, [targetClinicId, user?.role]);
+  }, [targetClinicId, isAdmin]);
 
   useEffect(() => {
     if (targetClinicId) {
@@ -360,22 +351,8 @@ const PharmacyPage = () => {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <div className="flex items-center justify-between gap-4 mb-3 shrink-0">
-        <PageHeader
-          title="Pharmacy"
-        />
-        {user?.role === 'admin' && clinics.length > 0 && (
-          <Select value={clinicId || undefined} onValueChange={setClinicId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select clinic" />
-            </SelectTrigger>
-            <SelectContent>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      <div className="mb-3 shrink-0">
+        <PageHeader title="Pharmacy" description="Use the header clinic selector when managing multiple locations." />
       </div>
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-4 lg:flex-row">

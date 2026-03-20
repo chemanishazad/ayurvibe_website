@@ -113,12 +113,13 @@ export const SEO = ({
     if (prev) prev.remove();
 
     const graph: any[] = [];
-    // Base WebSite / Organization (lightweight; more detailed static in index.html is fine)
+    // WebSite URL must be the site root, not the current page canonical
+    const siteRootUrl = `${window.location.origin}/`;
     graph.push({
       '@context': 'https://schema.org',
       '@type': 'WebSite',
       'name': siteName,
-      'url': canonical || window.location.href
+      'url': siteRootUrl
     });
     if (type === 'article' && title) {
       graph.push({

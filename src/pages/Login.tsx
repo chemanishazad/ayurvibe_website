@@ -89,14 +89,14 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/20 to-primary/5 p-4">
-      <Card className="w-full max-w-md border border-border/60 bg-card/95 shadow-xl shadow-primary/5 backdrop-blur">
+      <Card className="w-full max-w-md border border-border/60 bg-card/95 shadow-xl shadow-primary/5 backdrop-blur transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/10">
         <CardHeader className="space-y-6 pb-3 text-center">
           <div className="flex justify-center">
             <Logo withText textClassName="text-center" />
           </div>
           <div className="flex justify-center">
-            <div className="rounded-2xl bg-primary/10 p-4 ring-4 ring-primary/5">
-              <Lock className="h-10 w-10 text-primary" />
+            <div className="group rounded-2xl bg-primary/10 p-4 ring-4 ring-primary/5 transition-transform duration-300 ease-out hover:scale-[1.03]">
+              <Lock className="h-10 w-10 text-primary transition-transform duration-300 ease-out group-hover:-rotate-3" />
             </div>
           </div>
           <div>
@@ -122,7 +122,7 @@ const Login = () => {
                   spellCheck={false}
                   required
                   disabled={isLoading}
-                  className="pl-10"
+                  className="pl-10 transition-[border-color,box-shadow] duration-200 hover:border-primary/30"
                 />
               </div>
             </div>
@@ -139,12 +139,12 @@ const Login = () => {
                   autoComplete="current-password"
                   required
                   disabled={isLoading}
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-10 transition-[border-color,box-shadow] duration-200 hover:border-primary/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  className="absolute inset-y-0 right-0 flex items-center rounded-md px-3 text-muted-foreground transition-colors duration-200 hover:bg-muted/60 hover:text-foreground"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   disabled={isLoading}
                 >
@@ -152,7 +152,12 @@ const Login = () => {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full font-medium" size="lg" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full font-medium transition-all duration-200 hover:shadow-md active:scale-[0.99]"
+              size="lg"
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />

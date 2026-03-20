@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { CalendarClock, Search } from 'lucide-react';
 
 interface UpcomingFollowUp {
@@ -19,7 +19,7 @@ interface UpcomingFollowUp {
 }
 
 const UpcomingFollowUpsPage: React.FC = () => {
-  const user = getAuthUser();
+  const { effectiveClinicId } = useAdminClinic();
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d'>('7d');
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<UpcomingFollowUp[]>([]);
@@ -46,7 +46,7 @@ const UpcomingFollowUpsPage: React.FC = () => {
         }
 
         const data = await api.followUps.upcoming({
-          clinicId: user?.clinicId || undefined,
+          clinicId: effectiveClinicId || undefined,
           fromDate,
           toDate,
         });
@@ -59,7 +59,7 @@ const UpcomingFollowUpsPage: React.FC = () => {
       }
     };
     load();
-  }, [dateRange, user?.clinicId]);
+  }, [dateRange, effectiveClinicId]);
 
   const filteredItems = items.filter((item) => {
     if (!search.trim()) return true;

@@ -14,18 +14,16 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 
 const TreatmentPlansPage = () => {
-  const user = getAuthUser();
+  const { effectiveClinicId: targetClinicId } = useAdminClinic();
   const [plans, setPlans] = useState<Record<string, unknown>[]>([]);
   const [consultations, setConsultations] = useState<Record<string, unknown>[]>([]);
   const [medicines, setMedicines] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
-  const [clinicId, setClinicId] = useState('');
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({
     consultationId: '',
     name: '',
@@ -38,15 +36,9 @@ const TreatmentPlansPage = () => {
   });
   const { toast } = useToast();
 
-  const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
-
   useEffect(() => {
-    api.clinics.list().then((data) => {
-      setClinics(data);
-      if (user?.role === 'admin' && data.length > 0) setClinicId((c) => c || data[0].id);
-    }).catch(() => setClinics([]));
     api.medicines.list().then(setMedicines).catch(() => setMedicines([]));
-  }, [user?.role]);
+  }, []);
 
   useEffect(() => {
     api.treatmentPlans.list().then(setPlans).catch(() => setPlans([]));
@@ -134,25 +126,7 @@ const TreatmentPlansPage = () => {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Treatment Plans" description="Ayurvedic treatment plans with duration and medicines" />
-
-      {user?.role === 'admin' && clinics.length > 0 && (
-        <div>
-          <Label>Clinic</Label>
-          <Select value={clinicId || undefined} onValueChange={setClinicId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select clinic" />
-            </SelectTrigger>
-            <SelectContent>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <PageHeader title="Treatment Plans" description="Ayurvedic treatment plans with duration and medicines. Use the header clinic selector for multi-clinic admins." />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

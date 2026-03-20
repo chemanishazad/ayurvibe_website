@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { AlertTriangle, Plus, Truck } from 'lucide-react';
 import {
   Dialog,
@@ -24,14 +24,13 @@ import {
 } from '@/components/ui/dialog';
 
 const InventoryPage = () => {
-  const user = getAuthUser();
+  const { effectiveClinicId: targetClinicId } = useAdminClinic();
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [medicines, setMedicines] = useState<{ id: string; name: string; uom: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [uoms, setUoms] = useState<{ id: string; code: string; name: string }[]>([]);
   const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
   const [lowStock, setLowStock] = useState<Record<string, unknown>[]>([]);
-  const [clinicId, setClinicId] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
   const [form, setForm] = useState({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '', uomCode: '' });
@@ -47,7 +46,6 @@ const InventoryPage = () => {
   });
   const { toast } = useToast();
 
-  const targetClinicId = user?.clinicId || clinicId;
   const selectedPurchaseMedicine = useMemo(
     () => medicines.find((m) => m.id === purchaseForm.medicineId) || null,
     [medicines, purchaseForm.medicineId]
@@ -194,7 +192,9 @@ const InventoryPage = () => {
         </CardHeader>
         <CardContent>
           {!targetClinicId ? (
-            <p className="text-muted-foreground">Select a clinic to view inventory</p>
+            <p className="text-muted-foreground">
+              Choose a clinic from the header dropdown, or add a clinic under Administration → Clinics.
+            </p>
           ) : inventory.length === 0 ? (
             <p className="text-muted-foreground">No inventory. Add stock for medicines.</p>
           ) : (
