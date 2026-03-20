@@ -167,7 +167,7 @@ const Login = () => {
                 'Sign in'
               )}
             </Button>
-            {/* <p className="text-center text-xs text-muted-foreground">Authorized users only.</p> */}
+            { <p className="text-center text-xs text-muted-foreground">Authorized users only.</p> }
           </form>
         </CardContent>
       </Card>
