@@ -70,10 +70,36 @@ export const api = {
   },
   uom: {
     list: () => fetchApi<{ id: string; code: string; name: string }[]>('/api/uom'),
+    listAll: () =>
+      fetchApi<{ id: string; code: string; name: string; sortOrder: number; isActive: boolean }[]>('/api/uom/all'),
+    create: (data: { code: string; name: string; sortOrder?: number; isActive?: boolean }) =>
+      fetchApi<Record<string, unknown>>('/api/uom', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ code: string; name: string; sortOrder: number; isActive: boolean }>) =>
+      fetchApi<Record<string, unknown>>(`/api/uom/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/uom/${id}`, { method: 'DELETE' }),
+  },
+  users: {
+    list: () => fetchApi<{ id: string; username: string; role: string; createdAt: string }[]>('/api/users'),
+    create: (data: { username: string; password: string; role: 'admin' | 'user'; clinicIds?: string[] }) =>
+      fetchApi<{ id: string; username: string; role: string }>('/api/users', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ username: string; role: 'admin' | 'user' }>) =>
+      fetchApi<{ id: string; username: string; role: string }>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/users/${id}`, { method: 'DELETE' }),
+    setPassword: (id: string, password: string) =>
+      fetchApi<{ success: boolean }>(`/api/users/${id}/password`, { method: 'POST', body: JSON.stringify({ password }) }),
+    listClinics: (userId: string) =>
+      fetchApi<{ id: string; name: string; mappingId: string }[]>(`/api/users/${userId}/clinics`),
+    addClinic: (userId: string, clinicId: string) =>
+      fetchApi<Record<string, unknown>>(`/api/users/${userId}/clinics`, { method: 'POST', body: JSON.stringify({ clinicId }) }),
+    removeClinic: (userId: string, clinicId: string) =>
+      fetchApi<{ success: boolean }>(`/api/users/${userId}/clinics/${clinicId}`, { method: 'DELETE' }),
   },
   clinics: {
     list: () => fetchApi<{ id: string; name: string }[]>('/api/clinics'),
     create: (name: string) => fetchApi<{ id: string; name: string }>('/api/clinics', { method: 'POST', body: JSON.stringify({ name }) }),
+    update: (id: string, data: { name: string }) =>
+      fetchApi<{ id: string; name: string }>(`/api/clinics/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/clinics/${id}`, { method: 'DELETE' }),
   },
   patients: {
     search: (mobile: string) => fetchApi<{ exists: boolean; patient: Record<string, unknown> | null }>(`/api/patients?mobile=${encodeURIComponent(mobile)}`),
@@ -88,8 +114,24 @@ export const api = {
     history: (id: string) => fetchApi<Record<string, unknown>[]>(`/api/patients/${id}/history`),
   },
   doctors: {
-    list: () => fetchApi<{ id: string; name: string }[]>('/api/doctors'),
-    create: (name: string) => fetchApi<{ id: string; name: string }>('/api/doctors', { method: 'POST', body: JSON.stringify({ name }) }),
+    list: (params?: { clinicId?: string }) => {
+      const q = params?.clinicId ? `?clinicId=${params.clinicId}` : '';
+      return fetchApi<{ id: string; name: string; clinicIds?: string[] }[]>(`/api/doctors${q}`);
+    },
+    create: (data: { name: string; clinicIds?: string[] }) =>
+      fetchApi<{ id: string; name: string; clinicIds?: string[] }>('/api/doctors', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: { name: string }) =>
+      fetchApi<{ id: string; name: string; clinicIds?: string[] }>(`/api/doctors/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/doctors/${id}`, { method: 'DELETE' }),
+    listClinics: (doctorId: string) =>
+      fetchApi<{ id: string; name: string; mappingId: string }[]>(`/api/doctors/${doctorId}/clinics`),
+    addClinic: (doctorId: string, clinicId: string) =>
+      fetchApi<Record<string, unknown>>(`/api/doctors/${doctorId}/clinics`, {
+        method: 'POST',
+        body: JSON.stringify({ clinicId }),
+      }),
+    removeClinic: (doctorId: string, clinicId: string) =>
+      fetchApi<{ success: boolean }>(`/api/doctors/${doctorId}/clinics/${clinicId}`, { method: 'DELETE' }),
   },
   medicines: {
     list: () => fetchApi<{ id: string; name: string; uom: string; purchasePrice: string; sellingPrice: string; minStockLevel: number }[]>('/api/medicines'),
@@ -133,8 +175,14 @@ export const api = {
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/direct-sales${q ? `?${q}` : ''}`);
     },
-    create: (data: { clinicId: string; saleDate: string; customerName: string; customerMobile?: string; items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice: number }>; discount?: number }) =>
-      fetchApi<Record<string, unknown>>('/api/direct-sales', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: {
+      clinicId: string;
+      saleDate: string;
+      customerName: string;
+      customerMobile?: string;
+      items: Array<{ inventoryId: string; medicineId: string; quantity: number; unitPrice: number }>;
+      discount?: number;
+    }) => fetchApi<Record<string, unknown>>('/api/direct-sales', { method: 'POST', body: JSON.stringify(data) }),
   },
   whatsapp: {
     sendBill: (data: {

@@ -4,16 +4,10 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import {
   BarChart,
   Bar,
@@ -27,8 +21,7 @@ import {
 const ReportsPage = () => {
   const user = getAuthUser();
   const isAdmin = user?.role === 'admin';
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
-  const [clinicId, setClinicId] = useState('');
+  const { effectiveClinicId } = useAdminClinic();
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [dailyCons, setDailyCons] = useState<{ date: string; count: number; revenue: number }[]>([]);
@@ -38,11 +31,7 @@ const ReportsPage = () => {
   const [lowStock, setLowStock] = useState<Record<string, unknown>[]>([]);
   const [profit, setProfit] = useState<{ dailyProfit: number; monthlyProfit: number; clinicProfit: { clinicId: string; clinicName: string; profit: number }[] } | null>(null);
 
-  const targetClinicId = user?.clinicId || clinicId;
-
-  useEffect(() => {
-    api.clinics.list().then(setClinics).catch(() => setClinics([]));
-  }, []);
+  const targetClinicId = effectiveClinicId ?? undefined;
 
   const loadReports = () => {
     const params = { clinicId: targetClinicId || undefined, from, to };

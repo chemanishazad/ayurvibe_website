@@ -13,31 +13,25 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const DirectSalesPage = () => {
-  const user = getAuthUser();
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
+  const { effectiveClinicId } = useAdminClinic();
   const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
   const [sales, setSales] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [clinicId, setClinicId] = useState('');
   const [form, setForm] = useState({
     saleDate: format(new Date(), 'yyyy-MM-dd'),
+    customerName: '',
+    customerMobile: '',
     items: [] as { inventoryId: string; medicineId: string; medicineName: string; quantity: number; unitPrice: number }[],
   });
   const { toast } = useToast();
 
-  const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
-
-  useEffect(() => {
-    api.clinics.list().then((data) => {
-      setClinics(data);
-      if (user?.role === 'admin' && data.length > 0) setClinicId((c) => c || data[0].id);
-    }).catch(() => setClinics([]));
-  }, [user?.role]);
+  const targetClinicId = effectiveClinicId ?? undefined;
 
   useEffect(() => {
     if (targetClinicId) {
@@ -76,11 +70,23 @@ const DirectSalesPage = () => {
       toast({ title: 'Missing data', description: 'Select clinic and add at least one medicine', variant: 'destructive' });
       return;
     }
+    const customerName = form.customerName.trim();
+    if (!customerName) {
+      toast({ title: 'Customer name required', description: 'Enter a name for this walk-in sale.', variant: 'destructive' });
+      return;
+    }
+    const mobileDigits = form.customerMobile.replace(/\D/g, '');
+    if (form.customerMobile.trim() && mobileDigits.length !== 10) {
+      toast({ title: 'Invalid mobile', description: 'Enter a 10-digit mobile number or leave it blank.', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     try {
       await api.directSales.create({
         clinicId: targetClinicId,
         saleDate: form.saleDate,
+        customerName,
+        customerMobile: mobileDigits.length === 10 ? mobileDigits : undefined,
         items: form.items.map((m) => ({
           inventoryId: m.inventoryId,
           medicineId: m.medicineId,
@@ -89,7 +95,7 @@ const DirectSalesPage = () => {
         })),
       });
       toast({ title: 'Sale recorded', description: `Total: ₹${totalAmount}` });
-      setForm((f) => ({ ...f, items: [] }));
+      setForm((f) => ({ ...f, items: [], customerMobile: '' }));
       api.directSales.list({ clinicId: targetClinicId, from: form.saleDate, to: form.saleDate }).then(setSales);
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -101,24 +107,6 @@ const DirectSalesPage = () => {
   return (
     <div className="space-y-8">
       <PageHeader title="Direct Medicine Sales" description="Walk-in sales (without consultation)" />
-
-      {user?.role === 'admin' && clinics.length > 0 && (
-        <div>
-          <Label>Clinic</Label>
-          <Select value={clinicId || undefined} onValueChange={setClinicId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select clinic" />
-            </SelectTrigger>
-            <SelectContent>
-              {clinics.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -134,6 +122,25 @@ const DirectSalesPage = () => {
                 value={form.saleDate}
                 onChange={(e) => setForm((f) => ({ ...f, saleDate: e.target.value }))}
               />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Customer name</Label>
+                <Input
+                  placeholder="e.g. Walk-in customer"
+                  value={form.customerName}
+                  onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Mobile (optional)</Label>
+                <Input
+                  placeholder="10-digit number"
+                  inputMode="numeric"
+                  value={form.customerMobile}
+                  onChange={(e) => setForm((f) => ({ ...f, customerMobile: e.target.value }))}
+                />
+              </div>
             </div>
             <div>
               <div className="flex items-center justify-between">
@@ -214,13 +221,16 @@ const DirectSalesPage = () => {
               <p className="text-muted-foreground">No direct sales for this date</p>
             ) : (
               <div className="space-y-2">
-                {sales.map((s, i) => (
-                  <div key={i} className="flex justify-between rounded border p-3 text-sm">
+                {sales.map((s) => (
+                  <div key={s.id as string} className="flex justify-between rounded border p-3 text-sm">
                     <div>
                       <p className="font-medium">{s.medicineName as string}</p>
-                      <p className="text-muted-foreground">{(s.quantity as number)} × ₹{(s.unitPrice as string)}</p>
+                      <p className="text-muted-foreground">
+                        {(s.quantity as number)} × ₹{s.unitPrice as string}
+                        {(s.customerName as string) ? ` · ${s.customerName as string}` : ''}
+                      </p>
                     </div>
-                    <span className="font-medium">₹{(s.total as string)}</span>
+                    <span className="font-medium">₹{s.total as string}</span>
                   </div>
                 ))}
               </div>

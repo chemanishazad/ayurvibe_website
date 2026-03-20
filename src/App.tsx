@@ -26,6 +26,11 @@ import SuppliersPage from "./pages/admin/SuppliersPage";
 import InventoryPage from "./pages/admin/InventoryPage";
 import ReportsPage from "./pages/admin/ReportsPage";
 import UpcomingFollowUpsPage from "./pages/admin/UpcomingFollowUpsPage";
+import DirectSalesPage from "./pages/admin/DirectSalesPage";
+import DoctorsPage from "./pages/admin/DoctorsPage";
+import ClinicsPage from "./pages/admin/ClinicsPage";
+import UsersAdminPage from "./pages/admin/UsersAdminPage";
+import UomAdminPage from "./pages/admin/UomAdminPage";
 import SEORedirect from "./components/SEORedirect";
 import SEO from "@/components/SEO";
 
@@ -101,6 +106,7 @@ const App = () => (
               <Route path="patients" element={<PatientsPage />} />
                   <Route path="patients/new" element={<NewPatientPage />} />
                   <Route path="patients/:id/edit" element={<EditPatientPage />} />
+              <Route path="doctors" element={<DoctorsPage />} />
               <Route path="consultations" element={<ConsultationsPage />} />
               <Route path="consultations/new" element={<ConsultationsPage />} />
               <Route path="consultations/:id" element={<ConsultationsPage />} />
@@ -109,8 +115,12 @@ const App = () => (
               <Route path="medicines" element={<MedicinesPage />} />
               <Route path="suppliers" element={<SuppliersPage />} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="direct-sales" element={<DirectSalesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="upcoming-follow-ups" element={<UpcomingFollowUpsPage />} />
+              <Route path="clinics" element={<ClinicsPage />} />
+              <Route path="users" element={<UsersAdminPage />} />
+              <Route path="uom" element={<UomAdminPage />} />
             </Route>
           </Route>
 

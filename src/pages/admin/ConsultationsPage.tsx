@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import {
   Plus,
   Trash2,
@@ -156,6 +157,8 @@ const recordRowHoverUpcoming =
 
 const ConsultationsPage = () => {
   const user = getAuthUser();
+  const { effectiveClinicId, setSelectedClinicId } = useAdminClinic();
+  const targetClinicId = effectiveClinicId ?? undefined;
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
@@ -169,7 +172,6 @@ const ConsultationsPage = () => {
   const parentConsultationIdFromState = state?.parentConsultationId;
   const isReview = state?.isReview;
 
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
   const [medicinesMaster, setMedicinesMaster] = useState<{ id: string; name: string }[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
@@ -178,7 +180,6 @@ const ConsultationsPage = () => {
   const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewConsultation, setViewConsultation] = useState<Record<string, unknown> | null>(null);
-  const [clinicId, setClinicId] = useState('');
   const defaultPersonalHistory = () => ({
     diet: [] as string[],
     exercise: [] as string[],
@@ -261,8 +262,6 @@ const ConsultationsPage = () => {
     return errs;
   };
 
-  const targetClinicId = user?.role === 'admin' ? clinicId : user?.clinicId;
-
   useEffect(() => {
     if (patientIdFromState) setForm((f) => ({ ...f, patientId: patientIdFromState }));
   }, [patientIdFromState]);
@@ -310,7 +309,7 @@ const ConsultationsPage = () => {
           withHoney?: boolean;
           withGhee?: boolean;
         }>) || [];
-      if (user?.role === 'admin' && cons.clinicId) setClinicId(cons.clinicId as string);
+      if (user?.role === 'admin' && cons.clinicId) setSelectedClinicId(cons.clinicId as string);
       let ph = defaultPersonalHistory();
       try {
         const raw = cons.personalHistory as string;
@@ -393,13 +392,19 @@ const ConsultationsPage = () => {
   }, [parentConsultationIdFromState, isReview, patientIdFromState]);
 
   useEffect(() => {
-    api.clinics.list().then((data) => {
-      setClinics(data);
-      if (user?.role === 'admin' && data.length > 0) setClinicId((c) => c || data[0].id);
-    }).catch(() => setClinics([]));
-    api.doctors.list().then(setDoctors).catch(() => setDoctors([]));
+    if (!targetClinicId) {
+      setDoctors([]);
+      return;
+    }
+    api.doctors
+      .list({ clinicId: targetClinicId })
+      .then((data) => setDoctors((data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name }))))
+      .catch(() => setDoctors([]));
+  }, [targetClinicId]);
+
+  useEffect(() => {
     api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
-  }, [user?.role]);
+  }, []);
 
   const loadConsultations = () => {
     setListLoading(true);
@@ -805,18 +810,6 @@ const ConsultationsPage = () => {
             >
               Back to records
             </Button>
-          )}
-          {user?.role === 'admin' && clinics.length > 0 && (
-            <Select value={clinicId || undefined} onValueChange={(v) => { setClinicId(v); setConsultationErrors((e) => e.filter((x) => !x.includes('Clinic'))); }}>
-              <SelectTrigger className="w-[200px] transition-colors duration-200 hover:border-primary/35">
-                <SelectValue placeholder="Select clinic" />
-              </SelectTrigger>
-              <SelectContent>
-                {clinics.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           )}
         </div>
       </div>
