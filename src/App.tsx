@@ -9,7 +9,7 @@ import NotFound from "./pages/NotFound";
 import BlogPost from "./pages/BlogPost";
 import SectionPage from "./pages/SectionPage";
 import Login from "./pages/Login";
-import AdminRoute from "./components/AdminRoute";
+import AdminRoute, { AdminOnlyRoute } from "./components/AdminRoute";
 import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
 import AdminShell from "./pages/admin/AdminShell";
 import DashboardPage from "./pages/admin/DashboardPage";
@@ -17,7 +17,8 @@ import PatientsPage from "./pages/admin/PatientsPage";
 import NewPatientPage from "./pages/admin/NewPatientPage";
 import EditPatientPage from "./pages/admin/EditPatientPage";
 import ConsultationsPage from "./pages/admin/ConsultationsPage";
-import PharmacyPage from "./pages/admin/PharmacyPage";
+import PharmacyRecordsPage from "./pages/admin/PharmacyRecordsPage";
+import PharmacyNewPage from "./pages/admin/PharmacyNewPage";
 import ConsultationPrintPage from "./pages/admin/ConsultationPrintPage";
 import PharmacyPrintPage from "./pages/admin/PharmacyPrintPage";
 import TreatmentPlansPage from "./pages/admin/TreatmentPlansPage";
@@ -106,16 +107,17 @@ const App = () => (
               <Route path="patients" element={<PatientsPage />} />
                   <Route path="patients/new" element={<NewPatientPage />} />
                   <Route path="patients/:id/edit" element={<EditPatientPage />} />
-              <Route path="doctors" element={<DoctorsPage />} />
+              <Route path="doctors" element={<AdminOnlyRoute><DoctorsPage /></AdminOnlyRoute>} />
               <Route path="consultations" element={<ConsultationsPage />} />
               <Route path="consultations/new" element={<ConsultationsPage />} />
               <Route path="consultations/:id" element={<ConsultationsPage />} />
-              <Route path="pharmacy" element={<PharmacyPage />} />
+              <Route path="pharmacy" element={<PharmacyRecordsPage />} />
+              <Route path="pharmacy/new" element={<PharmacyNewPage />} />
               <Route path="treatment-plans" element={<TreatmentPlansPage />} />
-              <Route path="medicines" element={<MedicinesPage />} />
-              <Route path="suppliers" element={<SuppliersPage />} />
+              <Route path="medicines" element={<AdminOnlyRoute><MedicinesPage /></AdminOnlyRoute>} />
+              <Route path="suppliers" element={<AdminOnlyRoute><SuppliersPage /></AdminOnlyRoute>} />
               <Route path="inventory" element={<InventoryPage />} />
-              <Route path="direct-sales" element={<DirectSalesPage />} />
+              <Route path="direct-sales" element={<AdminOnlyRoute><DirectSalesPage /></AdminOnlyRoute>} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="upcoming-follow-ups" element={<UpcomingFollowUpsPage />} />
               <Route path="clinics" element={<ClinicsPage />} />

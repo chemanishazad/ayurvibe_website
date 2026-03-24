@@ -14,7 +14,7 @@ export function PatientFormSection({ icon, title, description, children, classNa
   return (
     <div
       className={cn(
-        'rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden ring-1 ring-black/[0.04] dark:ring-white/[0.06]',
+        'w-full min-w-0 rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden ring-1 ring-black/[0.04] dark:ring-white/[0.06]',
         className,
       )}
     >

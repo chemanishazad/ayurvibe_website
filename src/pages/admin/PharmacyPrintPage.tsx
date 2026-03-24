@@ -6,7 +6,15 @@ import logo from '@/assets/logo.png';
 
 const PRINT_STORAGE_KEY = 'print_pharmacy_';
 
-type MedicineRow = { medicineName: string; quantity: number; unitPrice: string; total?: string; uom?: string };
+type MedicineRow = {
+  medicineName: string;
+  quantity: number;
+  unitPrice: string;
+  total?: string;
+  uom?: string;
+  batchNumber?: string;
+  expiryDate?: string;
+};
 
 const PharmacyPrintPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,9 +75,14 @@ const PharmacyPrintPage = () => {
   const patientMobile = digitsOnly.length === 10 && !rawMobile.includes('+')
     ? `+91 ${digitsOnly}`
     : rawMobile;
-  const consultationDate = (cons.consultationDate as string) || '';
-  const consultationTime = (cons.consultationTime as string) || '';
-  const dateTimeStr = consultationTime ? `${consultationDate} ${consultationTime}` : consultationDate;
+  /** Bill / pharmacy issue date (when saved). */
+  const billDateLabel = (cons.billDateLabel as string) || '';
+  const billDate = (cons.billDate as string) || '';
+  const billTime = (cons.billTime as string) || '';
+  const dateTimeStr =
+    billDateLabel ||
+    (billDate ? (billTime ? `${billDate} ${billTime}` : billDate) : '') ||
+    '';
   const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
   const hospitalName = 'Sri Vinayaga Ayurvibe';
   const branchName = 'Perumbakkam Branch';
@@ -112,9 +125,9 @@ const PharmacyPrintPage = () => {
           <img src={logo} alt="Logo" className="h-20 w-auto shrink-0 object-contain drop-shadow-sm" />
         </div>
 
-        {/* Beneficiary */}
-        <div className="mb-3 text-[10px]">
-          <table className="w-full max-w-xs">
+        {/* Beneficiary + bill date (right) */}
+        <div className="mb-3 flex flex-row justify-between items-start gap-3 text-[10px]">
+          <table className="w-full max-w-[58%]">
             <tbody>
               <tr>
                 <td className="py-0.5 pr-4 font-semibold align-top w-20">Beneficiary</td>
@@ -126,49 +139,62 @@ const PharmacyPrintPage = () => {
                   <td className="py-0.5 align-top">{patientMobile}</td>
                 </tr>
               )}
-              <tr>
-                <td className="py-0.5 pr-4 font-semibold align-top">Date</td>
-                <td className="py-0.5 align-top">{dateTimeStr || '—'}</td>
-              </tr>
             </tbody>
           </table>
+          <div className="text-right shrink-0 min-w-[132px] border border-gray-200 rounded px-2 py-1.5 bg-gray-50/80">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-gray-600">Bill date</p>
+            <p className="text-[10px] font-semibold tabular-nums text-gray-900 mt-0.5 leading-tight">{dateTimeStr || '—'}</p>
+          </div>
         </div>
 
         {/* Invoice: Consultation + Treatments + Medicines */}
         <div>
           <p className="text-xs font-bold mb-1.5 uppercase" style={{ color: '#15803d' }}>Invoice</p>
-          <table className="w-full text-[10px] border border-gray-300">
+          <table className="w-full text-[10px] border border-gray-300 table-fixed">
             <thead>
               <tr className="bg-gray-100">
-                <th className="text-left py-2 px-2 font-semibold border-b border-r border-gray-300">Description</th>
-                <th className="text-right py-2 px-2 font-semibold border-b border-r border-gray-300 w-16">Qty</th>
-                <th className="text-right py-2 px-2 font-semibold border-b border-r border-gray-300 w-20">Price (₹)</th>
-                <th className="text-right py-2 px-2 font-semibold border-b border-gray-300 w-24">Total (₹)</th>
+                <th className="text-left py-1.5 px-2 font-semibold border-b border-r border-gray-300 w-[28%]">Description</th>
+                <th className="text-left py-1.5 px-1 font-semibold border-b border-r border-gray-300 w-[14%] text-[9px]">Batch</th>
+                <th className="text-left py-1.5 px-1 font-semibold border-b border-r border-gray-300 w-[14%] text-[9px]">Expiry</th>
+                <th className="text-right py-1.5 px-1 font-semibold border-b border-r border-gray-300 w-[10%]">Qty</th>
+                <th className="text-right py-1.5 px-1 font-semibold border-b border-r border-gray-300 w-[16%]">Price (₹)</th>
+                <th className="text-right py-1.5 px-2 font-semibold border-b border-gray-300 w-[18%]">Total (₹)</th>
               </tr>
             </thead>
             <tbody>
               {consultationFee > 0 && (
                 <tr className="border-b border-gray-200">
-                  <td className="py-1.5 px-2 border-r border-gray-200">Consultation</td>
-                  <td className="py-1.5 px-2 text-right border-r border-gray-200">1</td>
-                  <td className="py-1.5 px-2 text-right border-r border-gray-200">{consultationFee.toFixed(2)}</td>
-                  <td className="py-1.5 px-2 text-right font-medium">{consultationFee.toFixed(2)}</td>
+                  <td className="py-1.5 px-2 border-r border-gray-200 align-top">Consultation</td>
+                  <td className="py-1.5 px-1 border-r border-gray-200 text-gray-500 align-top">—</td>
+                  <td className="py-1.5 px-1 border-r border-gray-200 text-gray-500 align-top">—</td>
+                  <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top">1</td>
+                  <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top">{consultationFee.toFixed(2)}</td>
+                  <td className="py-1.5 px-2 text-right font-medium align-top">{consultationFee.toFixed(2)}</td>
                 </tr>
               )}
               {treatmentsExcludingFee.map((t, i) => (
                 <tr key={i} className="border-b border-gray-200">
-                  <td className="py-1.5 px-2 border-r border-gray-200">{t.name}</td>
-                  <td className="py-1.5 px-2 text-right border-r border-gray-200">1</td>
-                  <td className="py-1.5 px-2 text-right border-r border-gray-200">{parseFloat(t.price || '0').toFixed(2)}</td>
-                  <td className="py-1.5 px-2 text-right font-medium">{parseFloat(t.price || '0').toFixed(2)}</td>
+                  <td className="py-1.5 px-2 border-r border-gray-200 align-top">{t.name}</td>
+                  <td className="py-1.5 px-1 border-r border-gray-200 text-gray-500 align-top">—</td>
+                  <td className="py-1.5 px-1 border-r border-gray-200 text-gray-500 align-top">—</td>
+                  <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top">1</td>
+                  <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top">{parseFloat(t.price || '0').toFixed(2)}</td>
+                  <td className="py-1.5 px-2 text-right font-medium align-top">{parseFloat(t.price || '0').toFixed(2)}</td>
                 </tr>
               ))}
               {medicines.map((m, i) => (
                 <tr key={i} className="border-b border-gray-200">
-                  <td className="py-1.5 px-2 border-r border-gray-200">{m.medicineName}</td>
-                  <td className="py-1.5 px-2 text-right border-r border-gray-200">{m.quantity} {m.uom || ''}</td>
-                  <td className="py-1.5 px-2 text-right border-r border-gray-200">{parseFloat(m.unitPrice).toFixed(2)}</td>
-                  <td className="py-1.5 px-2 text-right font-medium">{parseFloat(m.total || '0').toFixed(2)}</td>
+                  <td className="py-1.5 px-2 border-r border-gray-200 align-top font-medium">{m.medicineName}</td>
+                  <td className="py-1.5 px-1 border-r border-gray-200 text-[9px] text-gray-600 align-top break-words">{m.batchNumber || '—'}</td>
+                  <td className="py-1.5 px-1 border-r border-gray-200 text-[9px] text-gray-600 align-top tabular-nums">
+                    {m.expiryDate ? String(m.expiryDate).slice(0, 10) : '—'}
+                  </td>
+                  <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top tabular-nums">
+                    {m.quantity}
+                    {m.uom ? ` ${m.uom}` : ''}
+                  </td>
+                  <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top tabular-nums">{parseFloat(m.unitPrice).toFixed(2)}</td>
+                  <td className="py-1.5 px-2 text-right font-medium align-top tabular-nums">{parseFloat(m.total || '0').toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

@@ -54,7 +54,7 @@ import {
   Scale,
 } from 'lucide-react';
 import { getAuthUser, setAdminAuthenticated } from '@/pages/Login';
-import { ADMIN_ALL_CLINICS_VALUE, useAdminClinic } from '@/contexts/AdminClinicContext';
+import { ADMIN_ALL_CLINICS_VALUE, AdminClinicProvider, useAdminClinic } from '@/contexts/AdminClinicContext';
 
 const navGroups = [
   {
@@ -95,10 +95,34 @@ const navGroups = [
   },
 ];
 
+/** Nav items hidden for clinic staff (non-admin); admins see full menu. */
+const STAFF_HIDDEN_NAV_PATHS = new Set([
+  '/admin/doctors',
+  '/admin/medicines',
+  '/admin/suppliers',
+  '/admin/direct-sales',
+]);
+
+function getNavGroupsForUser(isAdminUser: boolean) {
+  let groups = isAdminUser ? navGroups : navGroups.filter((g) => g.label !== 'Administration');
+  if (!isAdminUser) {
+    groups = groups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((item) => !STAFF_HIDDEN_NAV_PATHS.has(item.path)),
+      }))
+      .filter((g) => g.items.length > 0);
+  }
+  return groups;
+}
+
 /** Longest nav path match so e.g. /admin/patients/new still shows "Patients". */
-function getAdminPageTitle(pathname: string): string | null {
+function getAdminPageTitle(pathname: string, isAdminUser: boolean): string | null {
   const normalized = pathname.replace(/\/$/, '') || '/';
-  const items = navGroups.flatMap((g) => g.items);
+  if (normalized === '/admin/pharmacy/new') {
+    return 'New invoice';
+  }
+  const items = getNavGroupsForUser(isAdminUser).flatMap((g) => g.items);
   const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
   for (const item of sorted) {
     if (normalized === item.path || normalized.startsWith(`${item.path}/`)) {
@@ -108,16 +132,16 @@ function getAdminPageTitle(pathname: string): string | null {
   return null;
 }
 
-const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const normalizedPath = location.pathname.replace(/\/$/, '') || '/';
-  /** Patients list uses full-height inner scroll; other pages scroll the main column only. */
-  const isPatientsFullBleed = normalizedPath === '/admin/patients';
+  /** List pages use full-height inner scroll; other pages scroll the main column only. */
+  const isPatientsFullBleed = normalizedPath === '/admin/patients' || normalizedPath === '/admin/pharmacy';
   const user = getAuthUser();
   const isAdminUser = user?.role === 'admin';
-  const pageTitle = getAdminPageTitle(location.pathname);
-  const visibleNavGroups = isAdminUser ? navGroups : navGroups.filter((g) => g.label !== 'Administration');
+  const pageTitle = getAdminPageTitle(location.pathname, isAdminUser);
+  const visibleNavGroups = getNavGroupsForUser(isAdminUser);
   const { clinics, selectedClinicId, setSelectedClinicId, isAdmin: ctxAdmin } = useAdminClinic();
   const adminClinicFilterValue = selectedClinicId || ADMIN_ALL_CLINICS_VALUE;
   const onAdminClinicFilterChange = (v: string) => {
@@ -303,8 +327,8 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div
             className={
               isPatientsFullBleed
-                ? 'mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden'
-                : 'mx-auto w-full max-w-[1600px] flex flex-col pb-6'
+                ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden'
+                : 'flex w-full min-w-0 flex-col pb-6'
             }
           >
             {children}
@@ -314,5 +338,12 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     </SidebarProvider>
   );
 };
+
+/** Provider must wrap this layout so useAdminClinic() is always valid for shell + Outlet pages. */
+const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <AdminClinicProvider>
+    <AdminLayoutInner>{children}</AdminLayoutInner>
+  </AdminClinicProvider>
+);
 
 export default AdminLayout;

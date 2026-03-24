@@ -122,8 +122,8 @@ const NewPatientPage = () => {
   const genderErr = formErrors.some((e) => e.includes('Gender'));
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-4">
-      <div className="flex shrink-0 items-stretch gap-3 rounded-xl border border-border/60 bg-card/95 p-3 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] sm:items-center sm:p-4">
+    <div className="flex w-full min-w-0 flex-col flex-1 min-h-0 gap-4">
+      <div className="flex w-full min-w-0 shrink-0 items-stretch gap-3 rounded-xl border border-border/60 bg-card/95 p-3 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] sm:items-center sm:p-4">
         <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 rounded-lg border border-transparent hover:border-border hover:bg-muted/60" asChild>
           <Link to="/admin/patients" aria-label="Back to patients">
             <ArrowLeft className="h-4 w-4" />
@@ -141,8 +141,8 @@ const NewPatientPage = () => {
         </div>
       </div>
 
-      <Card className="flex-1 min-h-0 overflow-auto border-border/60 shadow-md ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
-        <CardContent className="max-w-3xl space-y-6 p-4 sm:p-6">
+      <Card className="w-full min-w-0 flex-1 min-h-0 overflow-auto border-border/60 shadow-md ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+        <CardContent className="w-full min-w-0 space-y-6 p-4 sm:p-6">
           {formErrors.length > 0 && (
             <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-sm">
               <p className="font-medium">Please fix the following:</p>
@@ -159,8 +159,8 @@ const NewPatientPage = () => {
             title="Patient profile"
             description="Legal name, contact, age, and gender used across consultations and records."
           >
-            <div className="space-y-5">
-              <div>
+            <div className="w-full space-y-5">
+              <div className="w-full min-w-0">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Patient name / Beneficiary <span className="text-destructive">*</span>
                 </Label>
@@ -172,7 +172,7 @@ const NewPatientPage = () => {
                 />
               </div>
 
-              <div>
+              <div className="w-full min-w-0">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Mobile <span className="text-destructive">*</span>
                 </Label>
@@ -203,7 +203,7 @@ const NewPatientPage = () => {
                 </div>
               </div>
 
-              <div>
+              <div className="w-full min-w-0">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Gender <span className="text-destructive">*</span>
                 </Label>
@@ -233,7 +233,7 @@ const NewPatientPage = () => {
                 </div>
               </div>
 
-              <div>
+              <div className="w-full min-w-0">
                 <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Age <span className="text-destructive">*</span>
                 </Label>
@@ -316,7 +316,7 @@ const NewPatientPage = () => {
                   placeholder="6-digit pincode (optional)"
                   maxLength={6}
                   inputMode="numeric"
-                  className="mt-1.5 h-11 w-full max-w-full sm:max-w-xs"
+                  className="mt-1.5 h-11 w-full"
                 />
               </div>
             </div>
@@ -341,7 +341,7 @@ const NewPatientPage = () => {
             </div>
           </PatientFormSection>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center">
+          <div className="flex flex-col-reverse gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center sm:justify-end">
             <Button variant="outline" className="h-11 w-full sm:w-auto" asChild>
               <Link to="/admin/patients">Cancel</Link>
             </Button>

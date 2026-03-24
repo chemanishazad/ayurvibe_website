@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { isAdminAuthenticated } from '@/pages/Login';
+import { getAuthUser, isAdminAuthenticated } from '@/pages/Login';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -16,6 +16,17 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     return <Navigate to="/admin" state={{ from: location }} replace />;
   }
 
+  return <>{children}</>;
+};
+
+/**
+ * Renders children only for administrators. Clinic staff are redirected to the dashboard.
+ */
+export const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = getAuthUser();
+  if (user?.role !== 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
   return <>{children}</>;
 };
 
