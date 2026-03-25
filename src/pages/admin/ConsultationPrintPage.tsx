@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
 import logo from '@/assets/logo.png';
 import { getBmiCategory } from '@/lib/bmi-utils';
+import { formatHhmmToAmPm, formatIsoDateToApp } from '@/lib/datetime';
 
 const PRINT_STORAGE_KEY = 'print_consult_';
 
@@ -73,7 +74,9 @@ const ConsultationPrintPage = () => {
   const patientGender = (cons.patientGender as string) || '';
   const consultationDate = (cons.consultationDate as string) || '';
   const consultationTime = (cons.consultationTime as string) || '';
-  const dateTimeStr = consultationTime ? `${consultationDate} ${consultationTime}` : consultationDate;
+  const datePart = consultationDate ? formatIsoDateToApp(consultationDate.slice(0, 10)) : '';
+  const timePart = consultationTime ? formatHhmmToAmPm(consultationTime) : '';
+  const dateTimeStr = timePart ? `${datePart} ${timePart}` : datePart;
   const patientId = (cons.patientId as string) || '';
   const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
   const doctorName = (cons.doctorName as string) || 'Dr. V.VAITHEESHWARI BAMS';
@@ -107,7 +110,8 @@ const ConsultationPrintPage = () => {
   })();
   const patientMedicalHistory = (cons.patientMedicalHistory as string) || '';
   const dietLifestyleAdvice = (cons.dietLifestyleAdvice as string) || '';
-  const followUpDate = (cons.followUpDate as string) || '';
+  const followUpDateRaw = (cons.followUpDate as string) || '';
+  const followUpDate = followUpDateRaw ? formatIsoDateToApp(followUpDateRaw.slice(0, 10)) : '';
   const weight =
     cons.weight != null && String(cons.weight).trim() !== ''
       ? String(Math.round(Number(cons.weight)))

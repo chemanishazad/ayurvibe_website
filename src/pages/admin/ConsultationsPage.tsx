@@ -66,6 +66,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatAppDate, formatHhmmToAmPm } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { BmiDisplay } from '@/components/BmiDisplay';
 import {
@@ -108,7 +109,9 @@ type PrescriptionItem = {
 };
 
 const fmtDateWithTime = (date: string, time?: string | null) =>
-  time ? `${format(new Date(date + 'T00:00:00'), 'dd-MM-yyyy')} ${time}` : format(new Date(date + 'T00:00:00'), 'dd-MM-yyyy');
+  time
+    ? `${formatAppDate(date + 'T12:00:00')} ${formatHhmmToAmPm(time)}`
+    : formatAppDate(date + 'T12:00:00');
 
 /** Restrict numeric input: max N digits whole part, optional decimal places. */
 const restrictVital = (v: string, maxWhole = 3, maxDecimal = 2): string => {
@@ -910,7 +913,7 @@ const ConsultationsPage = () => {
                         <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
                           <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-1 text-xs font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
                             <CalendarIcon className="h-3 w-3" />
-                            Due {f.followUpDate ? format(new Date(f.followUpDate + 'T00:00:00'), 'dd-MM-yyyy') : '—'}
+                            Due {f.followUpDate ? formatAppDate(String(f.followUpDate).slice(0, 10) + 'T12:00:00') : '—'}
                           </span>
                           <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
                             <Button
@@ -1024,7 +1027,7 @@ const ConsultationsPage = () => {
                                         </span>
                                         {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
                                           <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
-                                            Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                            Due {formatAppDate(String(f.followUpDate).slice(0, 10) + 'T12:00:00')}
                                           </span>
                                         )}
                                       </div>
@@ -1093,7 +1096,7 @@ const ConsultationsPage = () => {
                           </span>
                           {initial.followUpRequired === 1 && initial.followUpDate && initial.followUpDate >= todayStr && (
                             <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
-                              Due {format(new Date((initial.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                              Due {formatAppDate(String(initial.followUpDate).slice(0, 10) + 'T12:00:00')}
                             </span>
                           )}
                         </div>
@@ -1142,7 +1145,7 @@ const ConsultationsPage = () => {
                                   </span>
                                   {f.followUpRequired === 1 && f.followUpDate && f.followUpDate >= todayStr && (
                                     <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-100/90 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-200">
-                                      Due {format(new Date((f.followUpDate as string) + 'T00:00:00'), 'dd-MM')}
+                                      Due {formatAppDate(String(f.followUpDate).slice(0, 10) + 'T12:00:00')}
                                     </span>
                                   )}
                                 </div>
@@ -1767,7 +1770,7 @@ const ConsultationsPage = () => {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !form.followUpDate && 'text-muted-foreground')}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.followUpDate ? format(new Date(form.followUpDate), 'PPP') : 'Select date'}
+                      {form.followUpDate ? formatAppDate(form.followUpDate + 'T12:00:00') : 'Select date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -2109,7 +2112,7 @@ const ConsultationsPage = () => {
                               </Badge>
                               {followUpRequired && followUpDate ? (
                                 <Badge variant="outline" className="border-emerald-200/70 bg-white/60 text-emerald-800">
-                                  Follow-up: {format(new Date(followUpDate + 'T00:00:00'), 'dd-MM-yyyy')}
+                                  Follow-up: {formatAppDate(followUpDate + 'T12:00:00')}
                                 </Badge>
                               ) : null}
                             </div>

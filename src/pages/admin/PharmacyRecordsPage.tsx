@@ -23,7 +23,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { format, parseISO, isValid } from 'date-fns';
+import { parseISO, isValid } from 'date-fns';
+import {
+  formatAppDate,
+  formatAppTime,
+  formatBillDisplayDateTime,
+  formatIsoDateToApp,
+  formatNowAppTime,
+} from '@/lib/datetime';
 import {
   Table,
   TableBody,
@@ -50,19 +57,35 @@ const PAGE_SIZES = [10, 20, 50] as const;
 
 function formatSaleDate(s: string): string {
   const d = parseISO(s.slice(0, 10));
-  return isValid(d) ? format(d, 'dd-MM-yyyy') : s.slice(0, 10);
+  return isValid(d) ? formatAppDate(d) : s.slice(0, 10);
 }
 
-/** Bill date column: sale date + saved time (newest sorts correctly with backend GREATEST). */
+function effectiveSaleDateIso(sale: PharmacySaleGroup): string {
+  const raw = (sale.saleDate || '').slice(0, 10);
+  const fromCreated = (sale.createdAt || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fromCreated)) return fromCreated;
+  return '';
+}
+
+/** Bill date column: dd-MM-yyyy + time from saved instant (aligns with filters / invoice). */
 function formatBillDateTime(sale: PharmacySaleGroup): string {
-  const datePart = formatSaleDate(sale.saleDate);
+  const iso = effectiveSaleDateIso(sale);
+  if (!iso) return '—';
+  const datePart = formatIsoDateToApp(iso);
   if (!sale.createdAt) return datePart;
   try {
     const t = parseISO(sale.createdAt);
-    return isValid(t) ? `${datePart} · ${format(t, 'HH:mm')}` : datePart;
+    return isValid(t) ? `${datePart} - ${formatAppTime(t)}` : datePart;
   } catch {
     return datePart;
   }
+}
+
+function formatGroupSheetDate(sale: PharmacySaleGroup): string {
+  const iso = effectiveSaleDateIso(sale);
+  if (!iso) return '—';
+  return formatSaleDate(iso);
 }
 
 function customerInitials(name: string): string {
@@ -272,7 +295,7 @@ const PharmacyRecordsPage = () => {
     api.consultations.get(id).then((data) => {
       const now = new Date();
       const billDate = now.toISOString().slice(0, 10);
-      const billTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const billTime = formatNowAppTime();
       try {
         const paymentMode = options?.paymentMode ?? '—';
         localStorage.setItem(
@@ -282,7 +305,7 @@ const PharmacyRecordsPage = () => {
             paymentMode,
             billDate,
             billTime,
-            billDateLabel: `${billDate} ${billTime}`,
+            billDateLabel: formatBillDisplayDateTime(billDate, billTime),
           }),
         );
       } catch {}
@@ -309,6 +332,7 @@ const PharmacyRecordsPage = () => {
       const trtTotal = String(data.treatmentTotal ?? trts.reduce((s, t) => s + parseFloat(t.price || '0'), 0));
       const grand = parseFloat(medTotal) + parseFloat(trtTotal);
       const billDate = new Date().toISOString().slice(0, 10);
+      const billTime = formatNowAppTime();
       api.whatsapp
         .sendBill({
           mobile: digits,
@@ -322,7 +346,7 @@ const PharmacyRecordsPage = () => {
             treatmentTotal: trtTotal,
             grandTotal: grand.toFixed(2),
             paymentMode: '—',
-            date: billDate,
+            date: formatBillDisplayDateTime(billDate, billTime),
             clinicName: data.clinicName as string,
           },
         })
@@ -343,7 +367,7 @@ const PharmacyRecordsPage = () => {
     const clinicName = clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic';
     const now = new Date();
     const billDate = now.toISOString().slice(0, 10);
-    const billTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const billTime = formatNowAppTime();
     const printData = {
       patientName: sale.customerName || 'Direct Sale',
       patientMobile: sale.customerMobile,
@@ -351,7 +375,7 @@ const PharmacyRecordsPage = () => {
       consultationTime: null,
       billDate,
       billTime,
-      billDateLabel: `${billDate} ${billTime}`,
+      billDateLabel: formatBillDisplayDateTime(billDate, billTime),
       clinicName,
       doctorName: 'Dr.V.VAITHEESHWARI B.A.M.S.,',
       paymentMode: 'Cash',
@@ -714,7 +738,7 @@ const PharmacyRecordsPage = () => {
               <SheetHeader className="border-b px-6 pb-4 pt-6 text-left">
                 <SheetTitle>Pharmacy sale</SheetTitle>
                 <SheetDescription>
-                  {formatSaleDate(viewSale.saleDate)}
+                  {formatGroupSheetDate(viewSale)}
                   {' · '}
                   {viewSale.saleKind === 'direct'
                     ? 'Direct sale'

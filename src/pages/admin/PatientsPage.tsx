@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { formatPatientAgeDisplay } from '@/lib/patient-age';
 import { Search, UserPlus, Eye, Pencil, X, CalendarDays, Users, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatAppDateTime } from '@/lib/datetime';
 import {
   Select,
   SelectContent,
@@ -301,7 +301,7 @@ const PatientsPage = () => {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap py-2 text-sm tabular-nums text-muted-foreground">
-                            {p.createdAt ? format(new Date(p.createdAt as string), 'dd-MM-yyyy HH:mm') : '—'}
+                            {p.createdAt ? formatAppDateTime(p.createdAt as string) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-right">
                             <div className="flex flex-wrap items-center justify-end gap-2">

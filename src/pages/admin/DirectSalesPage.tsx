@@ -24,6 +24,7 @@ import { api } from '@/lib/api';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { formatIsoDateToApp } from '@/lib/datetime';
 import {
   RECORDS_PAGE_SIZE,
   buildPharmacyGroups,
@@ -402,7 +403,7 @@ const DirectSalesPage = () => {
                         const more = sale.items.length > 2 ? ` +${sale.items.length - 2}` : '';
                         return (
                           <TableRow key={sale.key}>
-                            <TableCell className="whitespace-nowrap">{sale.saleDate}</TableCell>
+                            <TableCell className="whitespace-nowrap">{formatIsoDateToApp(sale.saleDate)}</TableCell>
                             <TableCell>
                               <span className="inline-flex rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
                                 {sale.saleKind === 'direct' ? 'Direct' : 'Consultation'}

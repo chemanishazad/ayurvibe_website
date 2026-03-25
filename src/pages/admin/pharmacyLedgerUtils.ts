@@ -77,6 +77,11 @@ export function buildPharmacyGroups(rows: PharmacyLedgerLine[]): PharmacySaleGro
       if (n && !(g.customerName || '').trim()) g.customerName = n;
       if (m && !(g.customerMobile || '').trim()) g.customerMobile = m;
     }
+    /** Some API rows may lack sale_date; use line timestamp so bill date column is never blank. */
+    if (!/^\d{4}-\d{2}-\d{2}$/.test((g.saleDate || '').slice(0, 10)) && g.createdAt) {
+      const d = String(g.createdAt).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) g.saleDate = d;
+    }
   }
   /** Newest first: bill date, then timestamp (stable vs string localeCompare). */
   return groups.sort((a, b) => {

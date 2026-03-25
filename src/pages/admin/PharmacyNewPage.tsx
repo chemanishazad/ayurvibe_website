@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
+import { formatAppDate, formatBillDisplayDateTime, formatNowAppTime } from '@/lib/datetime';
 import { COUNTRY_CODES } from '@/lib/country-codes';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus } from 'lucide-react';
@@ -215,8 +216,7 @@ const PharmacyNewPage = () => {
 
   const formatExpiry = (d: string | null) => {
     if (!d) return '—';
-    const s = String(d).slice(0, 10);
-    return s;
+    return formatAppDate(String(d).slice(0, 10) + 'T12:00:00');
   };
 
   const selectLinePick = (idx: number, pick: BatchPick | FifoPick) => {
@@ -336,7 +336,7 @@ const PharmacyNewPage = () => {
         api.consultations.get(consId).then((data) => {
           const now = new Date();
           const billDate = now.toISOString().slice(0, 10);
-          const billTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+          const billTime = formatNowAppTime();
           try {
             localStorage.setItem(
               `print_pharmacy_${consId}`,
@@ -345,7 +345,7 @@ const PharmacyNewPage = () => {
                 paymentMode,
                 billDate,
                 billTime,
-                billDateLabel: `${billDate} ${billTime}`,
+                billDateLabel: formatBillDisplayDateTime(billDate, billTime),
               }),
             );
           } catch {}
@@ -376,7 +376,7 @@ const PharmacyNewPage = () => {
                 treatmentTotal: trtTotal,
                 grandTotal: grand.toFixed(2),
                 paymentMode,
-                date: `${billDate} ${billTime}`,
+                date: formatBillDisplayDateTime(billDate, billTime),
                 clinicName: data.clinicName as string,
               },
             }).then((r) => {
@@ -432,11 +432,16 @@ const PharmacyNewPage = () => {
         const billGrandTotal = String(medicineTotal);
         setForm((f) => ({ ...f, items: [], medicineDiscount: null, customerName: '', customerMobile: '', customerCountryCode: '91' }));
         const printId = `direct_${Date.now()}`;
+        const billDate = saleDate;
+        const billTime = formatNowAppTime();
         const printData = {
           patientName: customerName,
           patientMobile: customerMobile ? `${COUNTRY_CODES.find((c) => c.code === customerCountryCode)?.dial || '+91'} ${customerMobile}` : undefined,
           consultationDate: saleDate,
           consultationTime: null,
+          billDate,
+          billTime,
+          billDateLabel: formatBillDisplayDateTime(billDate, billTime),
           clinicName,
           doctorName: 'Dr.V.VAITHEESHWARI BAMS.',
           paymentMode: getPaymentDisplay(),
@@ -460,7 +465,7 @@ const PharmacyNewPage = () => {
               treatmentTotal: billTreatmentTotal,
               grandTotal: billGrandTotal,
               paymentMode: getPaymentDisplay(),
-              date: saleDate,
+              date: formatBillDisplayDateTime(saleDate, formatNowAppTime()),
               clinicName,
             },
           }).then((r) => {
@@ -502,7 +507,7 @@ const PharmacyNewPage = () => {
     api.consultations.get(id).then((data) => {
       const now = new Date();
       const billDate = now.toISOString().slice(0, 10);
-      const billTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const billTime = formatNowAppTime();
       try {
         const paymentMode = options?.paymentMode ?? '—';
         localStorage.setItem(
@@ -512,7 +517,7 @@ const PharmacyNewPage = () => {
             paymentMode,
             billDate,
             billTime,
-            billDateLabel: `${billDate} ${billTime}`,
+            billDateLabel: formatBillDisplayDateTime(billDate, billTime),
           }),
         );
       } catch {}
@@ -602,7 +607,9 @@ const PharmacyNewPage = () => {
                       </CommandGroup>
                       <CommandGroup heading="Patient (latest visit at this clinic)">
                         {patientMaster.map((p) => {
-                          const visit = p.lastConsultationDate ? String(p.lastConsultationDate).slice(0, 10) : null;
+                          const visitLabel = p.lastConsultationDate
+                            ? formatAppDate(String(p.lastConsultationDate).slice(0, 10) + 'T12:00:00')
+                            : null;
                           return (
                             <CommandItem
                               key={p.id}
@@ -617,7 +624,7 @@ const PharmacyNewPage = () => {
                                   });
                                   return;
                                 }
-                                const datePart = visit ? ` · ${visit}` : '';
+                                const datePart = visitLabel ? ` · ${visitLabel}` : '';
                                 setForm((f) => ({
                                   ...f,
                                   saleMode: 'consultation' as const,
@@ -633,8 +640,8 @@ const PharmacyNewPage = () => {
                                 <span className="text-xs text-muted-foreground truncate">
                                   {p.mobile}
                                   {p.lastConsultationId
-                                    ? visit
-                                      ? ` · Latest visit ${visit}`
+                                    ? visitLabel
+                                      ? ` · Latest visit ${visitLabel}`
                                       : ' · Latest visit'
                                     : ' · No visit at this clinic'}
                                 </span>
@@ -846,7 +853,7 @@ const PharmacyNewPage = () => {
                                                 <span className="font-medium">{p.kind === 'batch' ? p.medicineName : `${p.medicineName} (FIFO)`}</span>
                                                 <span className="text-xs text-muted-foreground">
                                                   {p.kind === 'batch'
-                                                    ? `${p.batchNumber ?? '—'} · Exp ${p.expiryDate ? String(p.expiryDate).slice(0, 10) : '—'} · ${remainingForPick(p, i)} left · ₹${parseFloat(p.effectiveSellingPrice).toFixed(2)}`
+                                                    ? `${p.batchNumber ?? '—'} · Exp ${p.expiryDate ? formatAppDate(String(p.expiryDate).slice(0, 10) + 'T12:00:00') : '—'} · ${remainingForPick(p, i)} left · ₹${parseFloat(p.effectiveSellingPrice).toFixed(2)}`
                                                     : `${remainingForPick(p, i)} left · ₹${parseFloat(p.sellingPrice).toFixed(2)}`}
                                                 </span>
                                               </div>

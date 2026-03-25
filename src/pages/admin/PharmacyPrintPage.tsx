@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
 import { Leaf } from 'lucide-react';
 import logo from '@/assets/logo.png';
+import { formatExpiryOrDateLabel, formatPharmacyPrintBillDateTime } from '@/lib/datetime';
 
 const PRINT_STORAGE_KEY = 'print_pharmacy_';
 
@@ -75,14 +76,8 @@ const PharmacyPrintPage = () => {
   const patientMobile = digitsOnly.length === 10 && !rawMobile.includes('+')
     ? `+91 ${digitsOnly}`
     : rawMobile;
-  /** Bill / pharmacy issue date (when saved). */
-  const billDateLabel = (cons.billDateLabel as string) || '';
-  const billDate = (cons.billDate as string) || '';
-  const billTime = (cons.billTime as string) || '';
-  const dateTimeStr =
-    billDateLabel ||
-    (billDate ? (billTime ? `${billDate} ${billTime}` : billDate) : '') ||
-    '';
+  /** Bill / pharmacy issue date (bill fields, else consultation date for direct-sale / legacy payloads). */
+  const dateTimeStr = formatPharmacyPrintBillDateTime(cons);
   const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
   const hospitalName = 'Sri Vinayaga Ayurvibe';
   const branchName = 'Perumbakkam Branch';
@@ -187,7 +182,7 @@ const PharmacyPrintPage = () => {
                   <td className="py-1.5 px-2 border-r border-gray-200 align-top font-medium">{m.medicineName}</td>
                   <td className="py-1.5 px-1 border-r border-gray-200 text-[9px] text-gray-600 align-top break-words">{m.batchNumber || '—'}</td>
                   <td className="py-1.5 px-1 border-r border-gray-200 text-[9px] text-gray-600 align-top tabular-nums">
-                    {m.expiryDate ? String(m.expiryDate).slice(0, 10) : '—'}
+                    {formatExpiryOrDateLabel(m.expiryDate)}
                   </td>
                   <td className="py-1.5 px-1 text-right border-r border-gray-200 align-top tabular-nums">
                     {m.quantity}
@@ -209,7 +204,7 @@ const PharmacyPrintPage = () => {
               {medicineTotal > 0 && <p className="text-xs">Medicines: ₹{medicineTotal.toFixed(2)}</p>}
               {medicineDiscountAmount < 0 && <p className="text-xs text-green-600">Discount: ₹{medicineDiscountAmount.toFixed(2)}</p>}
               <p className="text-sm font-bold pt-1">Grand Total: ₹{grandTotal.toFixed(2)}</p>
-              <p className="text-xs pt-1.5 text-gray-600">Payment: {paymentMode}</p>
+              <p className="text-xs pt-1.5 text-gray-600">Payment Info: {paymentMode}</p>
             </div>
           </div>
         </div>
