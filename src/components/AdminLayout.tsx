@@ -34,71 +34,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  LogOut,
-  LayoutDashboard,
-  Users,
-  Stethoscope,
-  Pill,
-  Package,
-  FileText,
-  ClipboardList,
-  Menu,
-  ChevronDown,
-  Truck,
-  CalendarClock,
-  UsersRound,
-  ShoppingCart,
-  Building2,
-  UserCog,
-  Scale,
-} from 'lucide-react';
+import { LogOut, Menu, ChevronDown, Stethoscope } from 'lucide-react';
 import { getAuthUser, setAdminAuthenticated } from '@/pages/Login';
-import { ADMIN_ALL_CLINICS_VALUE, useAdminClinic } from '@/contexts/AdminClinicContext';
-
-const navGroups = [
-  {
-    label: 'Overview',
-    items: [{ path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
-  },
-  {
-    label: 'Clinical',
-    items: [
-      { path: '/admin/patients', label: 'Patients', icon: Users },
-      { path: '/admin/doctors', label: 'Doctors', icon: UsersRound },
-      { path: '/admin/consultations', label: 'Consultations', icon: Stethoscope },
-      { path: '/admin/pharmacy', label: 'Pharmacy', icon: Pill },
-      { path: '/admin/treatment-plans', label: 'Treatment Plans', icon: ClipboardList },
-      { path: '/admin/upcoming-follow-ups', label: 'Upcoming Follow Ups', icon: CalendarClock },
-    ],
-  },
-  {
-    label: 'Commerce',
-    items: [
-      { path: '/admin/medicines', label: 'Medicines', icon: Pill },
-      { path: '/admin/suppliers', label: 'Suppliers', icon: Truck },
-      { path: '/admin/inventory', label: 'Inventory', icon: Package },
-      { path: '/admin/direct-sales', label: 'Direct sales', icon: ShoppingCart },
-    ],
-  },
-  {
-    label: 'Reports',
-    items: [{ path: '/admin/reports', label: 'Reports', icon: FileText }],
-  },
-  {
-    label: 'Administration',
-    items: [
-      { path: '/admin/clinics', label: 'Clinics', icon: Building2 },
-      { path: '/admin/users', label: 'Users & access', icon: UserCog },
-      { path: '/admin/uom', label: 'Units (UOM)', icon: Scale },
-    ],
-  },
-];
+import { ADMIN_ALL_CLINICS_VALUE, AdminClinicProvider, useAdminClinic } from '@/contexts/AdminClinicContext';
+import { getNavGroupsForSession } from '@/lib/nav-access';
+import { useToast } from '@/hooks/use-toast';
 
 /** Longest nav path match so e.g. /admin/patients/new still shows "Patients". */
-function getAdminPageTitle(pathname: string): string | null {
+function getAdminPageTitle(pathname: string, user: ReturnType<typeof getAuthUser>): string | null {
   const normalized = pathname.replace(/\/$/, '') || '/';
-  const items = navGroups.flatMap((g) => g.items);
+  if (normalized === '/admin/pharmacy/new') {
+    return 'New invoice';
+  }
+  const items = getNavGroupsForSession(
+    user ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null } : null,
+  ).flatMap((g) => g.items);
   const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
   for (const item of sorted) {
     if (normalized === item.path || normalized.startsWith(`${item.path}/`)) {
@@ -108,24 +58,35 @@ function getAdminPageTitle(pathname: string): string | null {
   return null;
 }
 
-const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const normalizedPath = location.pathname.replace(/\/$/, '') || '/';
-  /** Patients list uses full-height inner scroll; other pages scroll the main column only. */
-  const isPatientsFullBleed = normalizedPath === '/admin/patients';
+  /** List pages use full-height inner scroll; other pages scroll the main column only. */
+  const isPatientsFullBleed = normalizedPath === '/admin/patients' || normalizedPath === '/admin/pharmacy';
   const user = getAuthUser();
   const isAdminUser = user?.role === 'admin';
-  const pageTitle = getAdminPageTitle(location.pathname);
-  const visibleNavGroups = isAdminUser ? navGroups : navGroups.filter((g) => g.label !== 'Administration');
-  const { clinics, selectedClinicId, setSelectedClinicId, isAdmin: ctxAdmin } = useAdminClinic();
+  const pageTitle = getAdminPageTitle(location.pathname, user);
+  const visibleNavGroups = getNavGroupsForSession(
+    user ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null } : null,
+  );
+  const {
+    clinics,
+    selectedClinicId,
+    setSelectedClinicId,
+    isAdmin: ctxAdmin,
+    effectiveClinicId,
+    switchStaffClinic,
+    staffClinicSwitching,
+  } = useAdminClinic();
+  const { toast } = useToast();
   const adminClinicFilterValue = selectedClinicId || ADMIN_ALL_CLINICS_VALUE;
   const onAdminClinicFilterChange = (v: string) => {
     setSelectedClinicId(v === ADMIN_ALL_CLINICS_VALUE ? '' : v);
   };
-  const staffClinicLabel =
-    !ctxAdmin && user?.clinicId
-      ? clinics.find((c) => c.id === user.clinicId)?.name ?? 'Your clinic'
+  const staffClinicName =
+    !ctxAdmin && effectiveClinicId
+      ? clinics.find((c) => c.id === effectiveClinicId)?.name ?? null
       : null;
 
   const handleLogout = () => {
@@ -197,7 +158,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <div className="flex-1 min-w-0">
               <p className="truncate text-[12px] font-medium">{user?.username}</p>
               <p className="text-[11px] text-sidebar-foreground/70">
-                {isAdminUser ? 'Administrator' : 'Clinic staff'}
+                {isAdminUser ? 'Administrator' : user?.allowedNavPaths?.length ? 'Staff (custom access)' : 'Clinic staff'}
               </p>
             </div>
           </div>
@@ -237,9 +198,40 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Select>
               </div>
             )}
-            {staffClinicLabel && (
-              <span className="hidden max-w-[200px] truncate text-sm text-muted-foreground sm:inline">
-                {staffClinicLabel}
+            {!ctxAdmin && clinics.length > 1 && effectiveClinicId && (
+              <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Clinic</span>
+                <Select
+                  value={effectiveClinicId}
+                  disabled={staffClinicSwitching}
+                  onValueChange={async (v) => {
+                    try {
+                      await switchStaffClinic(v);
+                    } catch {
+                      toast({
+                        title: 'Could not switch clinic',
+                        description: 'Try again or sign out and back in.',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-[min(52vw,240px)]">
+                    <SelectValue placeholder="Clinic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clinics.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {!ctxAdmin && clinics.length === 1 && staffClinicName && (
+              <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
+                {staffClinicName}
               </span>
             )}
             {/* Mobile clinic selector for admin */}
@@ -251,6 +243,35 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ADMIN_ALL_CLINICS_VALUE}>All clinics</SelectItem>
+                    {clinics.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {!ctxAdmin && clinics.length > 1 && effectiveClinicId && (
+              <div className="flex shrink-0 sm:hidden">
+                <Select
+                  value={effectiveClinicId}
+                  disabled={staffClinicSwitching}
+                  onValueChange={async (v) => {
+                    try {
+                      await switchStaffClinic(v);
+                    } catch {
+                      toast({
+                        title: 'Could not switch clinic',
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-[140px]">
+                    <SelectValue placeholder="Clinic" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {clinics.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
@@ -280,7 +301,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <div className="flex flex-col">
                     <span>{user?.username}</span>
                     <span className="text-xs font-normal text-muted-foreground">
-                      {isAdminUser ? 'Administrator' : 'Clinic Staff'}
+                      {isAdminUser ? 'Administrator' : user?.allowedNavPaths?.length ? 'Staff (custom access)' : 'Clinic Staff'}
                     </span>
                   </div>
                 </DropdownMenuLabel>
@@ -303,8 +324,8 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div
             className={
               isPatientsFullBleed
-                ? 'mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden'
-                : 'mx-auto w-full max-w-[1600px] flex flex-col pb-6'
+                ? 'flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden'
+                : 'flex w-full min-w-0 flex-col pb-6'
             }
           >
             {children}
@@ -314,5 +335,12 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     </SidebarProvider>
   );
 };
+
+/** Provider must wrap this layout so useAdminClinic() is always valid for shell + Outlet pages. */
+const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <AdminClinicProvider>
+    <AdminLayoutInner>{children}</AdminLayoutInner>
+  </AdminClinicProvider>
+);
 
 export default AdminLayout;

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageCircle, X, Send, User, Bot, Phone, Mail, Calendar, Clock, MapPin, Star, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatAppTime } from '@/lib/datetime';
 
 interface Message {
   id: string;
@@ -562,7 +563,7 @@ Thank you for choosing Sri Vinayaga Ayurvibe! 🙏`,
                 >
                   <p className="text-sm">{message.text}</p>
                   <p className="text-xs opacity-70 mt-1">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatAppTime(message.timestamp)}
                   </p>
                 </div>
               </div>

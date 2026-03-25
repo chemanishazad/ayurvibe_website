@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import FullScreenLoader from '@/components/FullScreenLoader';
+import { ADMIN_NAV_CATALOG } from '@/lib/nav-access';
 import { Plus, Pencil, Trash2, KeyRound, Link2 } from 'lucide-react';
 import {
   Dialog,
@@ -26,7 +27,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-type UserRow = { id: string; username: string; role: string; createdAt: string };
+type UserRow = {
+  id: string;
+  username: string;
+  role: string;
+  createdAt: string;
+  allowedNavPaths?: string[] | null;
+  staffRole?: string | null;
+  linkedDoctorId?: string | null;
+};
 
 const UsersAdminPage = () => {
   const me = getAuthUser();
@@ -43,10 +52,17 @@ const UsersAdminPage = () => {
     password: '',
     role: 'user' as 'admin' | 'user',
     clinicIds: [] as string[],
+    staffKind: 'full' as 'full' | 'nurse',
+    linkedDoctorId: null as string | null,
   });
+  const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<'admin' | 'user'>('user');
+  const [editNavRestricted, setEditNavRestricted] = useState(false);
+  const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
+  const [editStaffKind, setEditStaffKind] = useState<'full' | 'nurse'>('full');
+  const [editLinkedDoctorId, setEditLinkedDoctorId] = useState<string | null>(null);
   const [pwdUser, setPwdUser] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [mapUser, setMapUser] = useState<UserRow | null>(null);
@@ -58,9 +74,11 @@ const UsersAdminPage = () => {
     api.users.list().then((data) => setUsers(data as UserRow[])).catch(() => setUsers([]));
 
   useEffect(() => {
-    Promise.all([refreshUsers(), api.clinics.list().then(setClinics).catch(() => setClinics([]))]).finally(() =>
-      setLoading(false),
-    );
+    Promise.all([
+      refreshUsers(),
+      api.clinics.list().then(setClinics).catch(() => setClinics([])),
+      api.doctors.list().then((data) => setDoctors((data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name })))).catch(() => setDoctors([])),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const clinicsNotMapped = useMemo(() => {
@@ -95,10 +113,23 @@ const UsersAdminPage = () => {
         password: createForm.password,
         role: createForm.role,
         clinicIds: createForm.role === 'user' ? createForm.clinicIds : undefined,
+        ...(createForm.role === 'user'
+          ? {
+              staffRole: createForm.staffKind === 'nurse' ? 'nurse' : null,
+              linkedDoctorId: createForm.staffKind === 'nurse' ? null : createForm.linkedDoctorId,
+            }
+          : {}),
       });
       toast({ title: 'User created' });
       setShowCreate(false);
-      setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
+      setCreateForm({
+        username: '',
+        password: '',
+        role: 'user',
+        clinicIds: [],
+        staffKind: 'full',
+        linkedDoctorId: null,
+      });
       await refreshUsers();
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -111,7 +142,19 @@ const UsersAdminPage = () => {
     if (!editing || !editUsername.trim()) return;
     setLoading(true);
     try {
-      await api.users.update(editing.id, { username: editUsername.trim(), role: editRole });
+      const allowedNavPaths: string[] | null | undefined =
+        editRole === 'user'
+          ? editNavRestricted && editNavPaths.length > 0
+            ? [...new Set(editNavPaths)]
+            : null
+          : undefined;
+      await api.users.update(editing.id, {
+        username: editUsername.trim(),
+        role: editRole,
+        ...(editRole === 'user' ? { allowedNavPaths } : {}),
+        ...(editRole === 'user' ? { staffRole: editStaffKind === 'nurse' ? 'nurse' : null } : {}),
+        ...(editRole === 'user' ? { linkedDoctorId: editStaffKind === 'nurse' ? null : editLinkedDoctorId } : {}),
+      });
       toast({ title: 'User updated' });
       setEditing(null);
       await refreshUsers();
@@ -120,6 +163,10 @@ const UsersAdminPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleEditNavPath = (path: string, checked: boolean) => {
+    setEditNavPaths((prev) => (checked ? [...prev, path] : prev.filter((p) => p !== path)));
   };
 
   const handleDelete = async (u: UserRow) => {
@@ -172,7 +219,14 @@ const UsersAdminPage = () => {
         <Button
           onClick={() => {
             setShowCreate(true);
-            setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
+            setCreateForm({
+              username: '',
+              password: '',
+              role: 'user',
+              clinicIds: [],
+              staffKind: 'full',
+              linkedDoctorId: null,
+            });
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -194,6 +248,7 @@ const UsersAdminPage = () => {
                 <tr className="border-b">
                   <th className="py-2 text-left">Username</th>
                   <th className="py-2 text-left">Role</th>
+                  <th className="py-2 text-left">OP doctor</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -201,7 +256,19 @@ const UsersAdminPage = () => {
                 {users.map((u) => (
                   <tr key={u.id} className="border-b">
                     <td className="py-2 font-medium">{u.username}</td>
-                    <td className="py-2 capitalize">{u.role}</td>
+                    <td className="py-2 capitalize">
+                      {u.role}
+                      {u.role === 'user' && u.staffRole === 'nurse' ? (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
+                          vitals only
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-2 text-muted-foreground">
+                      {u.role === 'user' && u.staffRole !== 'nurse' && u.linkedDoctorId
+                        ? doctors.find((d) => d.id === u.linkedDoctorId)?.name ?? '—'
+                        : '—'}
+                    </td>
                     <td className="py-2 text-right">
                       <div className="flex flex-wrap justify-end gap-1">
                         {u.role === 'user' && (
@@ -217,6 +284,11 @@ const UsersAdminPage = () => {
                             setEditing(u);
                             setEditUsername(u.username);
                             setEditRole(u.role === 'admin' ? 'admin' : 'user');
+                            const paths = u.allowedNavPaths;
+                            setEditNavRestricted(Boolean(paths && paths.length > 0));
+                            setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
+                            setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
+                            setEditLinkedDoctorId(u.linkedDoctorId ?? null);
                           }}
                         >
                           <Pencil className="h-4 w-4" />
@@ -283,6 +355,60 @@ const UsersAdminPage = () => {
               </Select>
             </div>
             {createForm.role === 'user' && (
+              <>
+                <div>
+                  <Label>Consultation form</Label>
+                  <Select
+                    value={createForm.staffKind}
+                    onValueChange={(v) =>
+                      setCreateForm((f) => ({
+                        ...f,
+                        staffKind: v as 'full' | 'nurse',
+                        linkedDoctorId: v === 'nurse' ? null : f.linkedDoctorId,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full">Full (OP / doctor)</SelectItem>
+                      <SelectItem value="nurse">Nurse — vitals only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Nurses record vitals only; that visit has no doctor until a clinician completes OP.
+                  </p>
+                </div>
+                {createForm.staffKind === 'full' && (
+                  <div>
+                    <Label>Default doctor (OP)</Label>
+                    <Select
+                      value={createForm.linkedDoctorId ?? '__none__'}
+                      onValueChange={(v) =>
+                        setCreateForm((f) => ({ ...f, linkedDoctorId: v === '__none__' ? null : v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Optional" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None — choose doctor each visit</SelectItem>
+                        {doctors.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      If set, the consultation form fixes this doctor (not changeable on the form).
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+            {createForm.role === 'user' && (
               <div className="space-y-2 rounded-lg border p-3">
                 <Label>Clinic access</Label>
                 {clinics.length === 0 ? (
@@ -319,7 +445,16 @@ const UsersAdminPage = () => {
             </div>
             <div>
               <Label>Role</Label>
-              <Select value={editRole} onValueChange={(v) => setEditRole(v as 'admin' | 'user')}>
+              <Select
+                value={editRole}
+                onValueChange={(v) => {
+                  setEditRole(v as 'admin' | 'user');
+                  if (v === 'admin') {
+                    setEditNavRestricted(false);
+                    setEditNavPaths([]);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -329,6 +464,88 @@ const UsersAdminPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            {editRole === 'user' && (
+              <div>
+                <Label>Consultation form</Label>
+                <Select
+                  value={editStaffKind}
+                  onValueChange={(v) => {
+                    const kind = v as 'full' | 'nurse';
+                    setEditStaffKind(kind);
+                    if (kind === 'nurse') setEditLinkedDoctorId(null);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Full (OP / doctor)</SelectItem>
+                    <SelectItem value="nurse">Nurse — vitals only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nurses only see beneficiary + vitals; visit time is set when saving.
+                </p>
+              </div>
+            )}
+            {editRole === 'user' && editStaffKind === 'full' && (
+              <div>
+                <Label>Default doctor (OP)</Label>
+                <Select
+                  value={editLinkedDoctorId ?? '__none__'}
+                  onValueChange={(v) => setEditLinkedDoctorId(v === '__none__' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None — choose doctor each visit</SelectItem>
+                    {doctors.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  If set, the consultation form fixes this doctor (not changeable on the form).
+                </p>
+              </div>
+            )}
+            {editRole === 'user' && (
+              <div className="space-y-3 rounded-lg border p-3">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Checkbox
+                    checked={editNavRestricted}
+                    onCheckedChange={(ch) => {
+                      const on = ch === true;
+                      setEditNavRestricted(on);
+                      if (!on) setEditNavPaths([]);
+                    }}
+                  />
+                  Custom sidebar (pick sections)
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Leave off for the default staff menu (clinical + inventory; no masters). Turn on to grant only checked items—e.g. nurses: Patients, Consultations, Pharmacy.
+                </p>
+                {editNavRestricted && (
+                  <div className="max-h-[220px] space-y-2 overflow-y-auto rounded-md border bg-muted/30 p-2">
+                    {ADMIN_NAV_CATALOG.map((item) => (
+                      <label key={item.path} className="flex cursor-pointer items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={editNavPaths.includes(item.path)}
+                          onCheckedChange={(ch) => toggleEditNavPath(item.path, ch === true)}
+                        />
+                        <span>
+                          {item.label}{' '}
+                          <span className="text-muted-foreground">({item.group})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <Button onClick={handleUpdate} disabled={loading} className="w-full">
               Save
             </Button>

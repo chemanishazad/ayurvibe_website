@@ -14,6 +14,7 @@ import meditationImg from '@/assets/meditation-blog.jpg';
 import nutritionImg from '@/assets/nutrition-blog.jpg';
 import abhyangaBlogImg from '@/assets/abhyanga-blog.jpg';
 import { Logo, logoPath } from '@/components/Logo';
+import { formatAppDate } from '@/lib/datetime';
 
 const BlogPost = () => {
   const { id } = useParams();
@@ -269,11 +270,7 @@ const BlogPost = () => {
             </div>
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-2" />
-              {new Date(currentPost.date).toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+              {formatAppDate(currentPost.date)}
             </div>
             <div className="flex items-center">
               <Clock className="h-4 w-4 mr-2" />

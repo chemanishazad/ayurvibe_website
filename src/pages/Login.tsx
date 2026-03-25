@@ -20,17 +20,36 @@ export function getAuthToken(): string | null {
   return sessionStorage.getItem(AUTH_TOKEN_KEY);
 }
 
-export function getAuthUser(): { id: string; username: string; role: string; clinicId: string | null } | null {
+export type AuthUser = {
+  id: string;
+  username: string;
+  role: string;
+  clinicId: string | null;
+  /** Staff: explicit sidebar routes from admin; omitted or null = default staff menu. */
+  allowedNavPaths?: string[] | null;
+  /** Staff: `nurse` = vitals-only consultation entry. */
+  staffRole?: string | null;
+  /** Staff: default doctor for OP (fixed; assigned in Users admin). */
+  linkedDoctorId?: string | null;
+};
+
+export function getAuthUser(): AuthUser | null {
   const raw = sessionStorage.getItem(AUTH_USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as { id: string; username: string; role: string; clinicId: string | null };
+    return JSON.parse(raw) as AuthUser;
   } catch {
     return null;
   }
 }
 
-export function setAuthUser(user: { id: string; username: string; role: string; clinicId: string | null }): void {
+export function setAuthUser(user: AuthUser): void {
+  sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+}
+
+/** Replace token + user together (e.g. after switch-clinic). */
+export function persistAuthSession(token: string, user: AuthUser): void {
+  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
   sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 }
 

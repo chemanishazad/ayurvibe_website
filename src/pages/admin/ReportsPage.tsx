@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
+import { formatChartDateLabel } from '@/lib/datetime';
 import { getAuthUser } from '@/pages/Login';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import {
@@ -87,9 +88,9 @@ const ReportsPage = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailyCons.slice(0, 30)}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
+                      <XAxis dataKey="date" tickFormatter={(v) => formatChartDateLabel(String(v))} />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip labelFormatter={(label) => formatChartDateLabel(String(label))} />
                       <Bar dataKey="count" fill="hsl(var(--primary))" name="Consultations" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="revenue" fill="hsl(var(--chart-2))" name="Revenue (₹)" radius={[4, 4, 0, 0]} />
                     </BarChart>

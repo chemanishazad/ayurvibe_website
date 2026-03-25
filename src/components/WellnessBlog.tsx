@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Calendar, Clock, User, Search, Leaf, Heart, Sparkles } from 'lucide-react';
+import { formatAppDate } from '@/lib/datetime';
 
 // Import blog images
 import doshaGuideImg from '@/assets/dosha-guide-blog.jpg';
@@ -168,7 +169,7 @@ const WellnessBlog = () => {
                 </div>
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-1" />
-                  {new Date(blogPosts[0].date).toLocaleDateString()}
+                  {formatAppDate(blogPosts[0].date)}
                 </div>
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-1" />
@@ -215,7 +216,7 @@ const WellnessBlog = () => {
                   </div>
                   <div className="flex items-center">
                     <Calendar className="h-3 w-3 mr-1" />
-                    {new Date(post.date).toLocaleDateString()}
+                    {formatAppDate(post.date)}
                   </div>
                 </div>
                 <div className="flex items-center">

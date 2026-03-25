@@ -17,6 +17,7 @@ import { api } from '@/lib/api';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatIsoDateToApp } from '@/lib/datetime';
 
 const TreatmentPlansPage = () => {
   const { effectiveClinicId: targetClinicId } = useAdminClinic();
@@ -144,7 +145,7 @@ const TreatmentPlansPage = () => {
                 <SelectContent>
                   {consultations.map((c) => (
                     <SelectItem key={c.id as string} value={c.id as string}>
-                      {(c.patientName as string)} – {(c.consultationDate as string)}
+                      {(c.patientName as string)} – {formatIsoDateToApp(String(c.consultationDate ?? '').slice(0, 10))}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -245,8 +246,12 @@ const TreatmentPlansPage = () => {
                       <span>{p.name as string}</span>
                       <span className="text-muted-foreground">{(p.durationDays as number)} days</span>
                     </div>
-                    <p className="text-muted-foreground">{(p.patientName as string)} · {(p.consultationDate as string)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{(p.startDate as string)} – {(p.endDate as string)}</p>
+                    <p className="text-muted-foreground">
+                      {(p.patientName as string)} · {formatIsoDateToApp(String(p.consultationDate ?? '').slice(0, 10))}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatIsoDateToApp(String(p.startDate ?? '').slice(0, 10))} – {formatIsoDateToApp(String(p.endDate ?? '').slice(0, 10))}
+                    </p>
                   </div>
                 ))}
               </div>
