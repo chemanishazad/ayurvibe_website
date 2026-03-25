@@ -67,6 +67,7 @@ export const api = {
           clinicId: string;
           allowedNavPaths?: string[] | null;
           staffRole?: string | null;
+          linkedDoctorId?: string | null;
         };
       }>('/api/auth/switch-clinic', {
         method: 'POST',
@@ -93,6 +94,7 @@ export const api = {
           createdAt: string;
           allowedNavPaths?: string[] | null;
           staffRole?: string | null;
+          linkedDoctorId?: string | null;
         }[]
       >('/api/users'),
     create: (data: {
@@ -101,10 +103,16 @@ export const api = {
       role: 'admin' | 'user';
       clinicIds?: string[];
       allowedNavPaths?: string[] | null;
-    }) => fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+      staffRole?: 'nurse' | null;
+      linkedDoctorId?: string | null;
+    }) =>
+      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null; linkedDoctorId?: string | null }>(
+        '/api/users',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+      ),
     update: (
       id: string,
       data: Partial<{
@@ -112,9 +120,17 @@ export const api = {
         role: 'admin' | 'user';
         allowedNavPaths: string[] | null;
         staffRole: 'nurse' | null;
+        linkedDoctorId: string | null;
       }>,
     ) =>
-      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null; staffRole?: string | null }>(
+      fetchApi<{
+        id: string;
+        username: string;
+        role: string;
+        allowedNavPaths?: string[] | null;
+        staffRole?: string | null;
+        linkedDoctorId?: string | null;
+      }>(
         `/api/users/${id}`,
         {
           method: 'PATCH',

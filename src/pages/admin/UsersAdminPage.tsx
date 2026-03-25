@@ -34,6 +34,7 @@ type UserRow = {
   createdAt: string;
   allowedNavPaths?: string[] | null;
   staffRole?: string | null;
+  linkedDoctorId?: string | null;
 };
 
 const UsersAdminPage = () => {
@@ -51,13 +52,17 @@ const UsersAdminPage = () => {
     password: '',
     role: 'user' as 'admin' | 'user',
     clinicIds: [] as string[],
+    staffKind: 'full' as 'full' | 'nurse',
+    linkedDoctorId: null as string | null,
   });
+  const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<'admin' | 'user'>('user');
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
   const [editStaffKind, setEditStaffKind] = useState<'full' | 'nurse'>('full');
+  const [editLinkedDoctorId, setEditLinkedDoctorId] = useState<string | null>(null);
   const [pwdUser, setPwdUser] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [mapUser, setMapUser] = useState<UserRow | null>(null);
@@ -69,9 +74,11 @@ const UsersAdminPage = () => {
     api.users.list().then((data) => setUsers(data as UserRow[])).catch(() => setUsers([]));
 
   useEffect(() => {
-    Promise.all([refreshUsers(), api.clinics.list().then(setClinics).catch(() => setClinics([]))]).finally(() =>
-      setLoading(false),
-    );
+    Promise.all([
+      refreshUsers(),
+      api.clinics.list().then(setClinics).catch(() => setClinics([])),
+      api.doctors.list().then((data) => setDoctors((data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name })))).catch(() => setDoctors([])),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const clinicsNotMapped = useMemo(() => {
@@ -106,10 +113,23 @@ const UsersAdminPage = () => {
         password: createForm.password,
         role: createForm.role,
         clinicIds: createForm.role === 'user' ? createForm.clinicIds : undefined,
+        ...(createForm.role === 'user'
+          ? {
+              staffRole: createForm.staffKind === 'nurse' ? 'nurse' : null,
+              linkedDoctorId: createForm.staffKind === 'nurse' ? null : createForm.linkedDoctorId,
+            }
+          : {}),
       });
       toast({ title: 'User created' });
       setShowCreate(false);
-      setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
+      setCreateForm({
+        username: '',
+        password: '',
+        role: 'user',
+        clinicIds: [],
+        staffKind: 'full',
+        linkedDoctorId: null,
+      });
       await refreshUsers();
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -133,6 +153,7 @@ const UsersAdminPage = () => {
         role: editRole,
         ...(editRole === 'user' ? { allowedNavPaths } : {}),
         ...(editRole === 'user' ? { staffRole: editStaffKind === 'nurse' ? 'nurse' : null } : {}),
+        ...(editRole === 'user' ? { linkedDoctorId: editStaffKind === 'nurse' ? null : editLinkedDoctorId } : {}),
       });
       toast({ title: 'User updated' });
       setEditing(null);
@@ -198,7 +219,14 @@ const UsersAdminPage = () => {
         <Button
           onClick={() => {
             setShowCreate(true);
-            setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
+            setCreateForm({
+              username: '',
+              password: '',
+              role: 'user',
+              clinicIds: [],
+              staffKind: 'full',
+              linkedDoctorId: null,
+            });
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -220,6 +248,7 @@ const UsersAdminPage = () => {
                 <tr className="border-b">
                   <th className="py-2 text-left">Username</th>
                   <th className="py-2 text-left">Role</th>
+                  <th className="py-2 text-left">OP doctor</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -234,6 +263,11 @@ const UsersAdminPage = () => {
                           vitals only
                         </span>
                       ) : null}
+                    </td>
+                    <td className="py-2 text-muted-foreground">
+                      {u.role === 'user' && u.staffRole !== 'nurse' && u.linkedDoctorId
+                        ? doctors.find((d) => d.id === u.linkedDoctorId)?.name ?? '—'
+                        : '—'}
                     </td>
                     <td className="py-2 text-right">
                       <div className="flex flex-wrap justify-end gap-1">
@@ -254,6 +288,7 @@ const UsersAdminPage = () => {
                             setEditNavRestricted(Boolean(paths && paths.length > 0));
                             setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
                             setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
+                            setEditLinkedDoctorId(u.linkedDoctorId ?? null);
                           }}
                         >
                           <Pencil className="h-4 w-4" />
@@ -320,6 +355,60 @@ const UsersAdminPage = () => {
               </Select>
             </div>
             {createForm.role === 'user' && (
+              <>
+                <div>
+                  <Label>Consultation form</Label>
+                  <Select
+                    value={createForm.staffKind}
+                    onValueChange={(v) =>
+                      setCreateForm((f) => ({
+                        ...f,
+                        staffKind: v as 'full' | 'nurse',
+                        linkedDoctorId: v === 'nurse' ? null : f.linkedDoctorId,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full">Full (OP / doctor)</SelectItem>
+                      <SelectItem value="nurse">Nurse — vitals only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Nurses record vitals only; that visit has no doctor until a clinician completes OP.
+                  </p>
+                </div>
+                {createForm.staffKind === 'full' && (
+                  <div>
+                    <Label>Default doctor (OP)</Label>
+                    <Select
+                      value={createForm.linkedDoctorId ?? '__none__'}
+                      onValueChange={(v) =>
+                        setCreateForm((f) => ({ ...f, linkedDoctorId: v === '__none__' ? null : v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Optional" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None — choose doctor each visit</SelectItem>
+                        {doctors.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      If set, the consultation form fixes this doctor (not changeable on the form).
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+            {createForm.role === 'user' && (
               <div className="space-y-2 rounded-lg border p-3">
                 <Label>Clinic access</Label>
                 {clinics.length === 0 ? (
@@ -378,17 +467,48 @@ const UsersAdminPage = () => {
             {editRole === 'user' && (
               <div>
                 <Label>Consultation form</Label>
-                <Select value={editStaffKind} onValueChange={(v) => setEditStaffKind(v as 'full' | 'nurse')}>
+                <Select
+                  value={editStaffKind}
+                  onValueChange={(v) => {
+                    const kind = v as 'full' | 'nurse';
+                    setEditStaffKind(kind);
+                    if (kind === 'nurse') setEditLinkedDoctorId(null);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="full">Full (doctor / staff)</SelectItem>
+                    <SelectItem value="full">Full (OP / doctor)</SelectItem>
                     <SelectItem value="nurse">Nurse — vitals only</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Nurses only see beneficiary + vitals; visit time is set when saving; doctor is auto-assigned.
+                  Nurses only see beneficiary + vitals; visit time is set when saving.
+                </p>
+              </div>
+            )}
+            {editRole === 'user' && editStaffKind === 'full' && (
+              <div>
+                <Label>Default doctor (OP)</Label>
+                <Select
+                  value={editLinkedDoctorId ?? '__none__'}
+                  onValueChange={(v) => setEditLinkedDoctorId(v === '__none__' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None — choose doctor each visit</SelectItem>
+                    {doctors.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  If set, the consultation form fixes this doctor (not changeable on the form).
                 </p>
               </div>
             )}

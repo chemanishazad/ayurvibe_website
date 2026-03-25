@@ -29,6 +29,8 @@ export type AuthUser = {
   allowedNavPaths?: string[] | null;
   /** Staff: `nurse` = vitals-only consultation entry. */
   staffRole?: string | null;
+  /** Staff: default doctor for OP (fixed; assigned in Users admin). */
+  linkedDoctorId?: string | null;
 };
 
 export function getAuthUser(): AuthUser | null {

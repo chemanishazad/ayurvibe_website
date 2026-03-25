@@ -120,6 +120,7 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
             clinicId: r.user.clinicId,
             allowedNavPaths: r.user.allowedNavPaths ?? u.allowedNavPaths ?? null,
             staffRole: (r.user as AuthUser).staffRole ?? u.staffRole ?? null,
+            linkedDoctorId: (r.user as AuthUser).linkedDoctorId ?? u.linkedDoctorId ?? null,
           });
         } else {
           persistAuthSession(r.token, r.user as AuthUser);
@@ -143,6 +144,7 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
         clinicId: r.user.clinicId,
         allowedNavPaths: r.user.allowedNavPaths ?? u.allowedNavPaths ?? null,
         staffRole: (r.user as AuthUser).staffRole ?? u.staffRole ?? null,
+        linkedDoctorId: (r.user as AuthUser).linkedDoctorId ?? u.linkedDoctorId ?? null,
       });
       window.location.reload();
     } catch (e) {

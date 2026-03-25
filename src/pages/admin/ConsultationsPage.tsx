@@ -164,6 +164,8 @@ const patientInitials = (name: string) => {
 const ConsultationsPage = () => {
   const user = getAuthUser();
   const isNurseStaff = user?.role === 'user' && user?.staffRole === 'nurse';
+  const linkedDoctorId = (user?.linkedDoctorId ?? '').trim();
+  const fixedDoctorMode = Boolean(linkedDoctorId && !isNurseStaff);
   const { effectiveClinicId, setSelectedClinicId } = useAdminClinic();
   const targetClinicId = effectiveClinicId ?? undefined;
   const location = useLocation();
@@ -265,10 +267,7 @@ const ConsultationsPage = () => {
     if (!form.patientId?.trim()) errs.push('Beneficiary is required');
     if (!targetClinicId) errs.push('Clinic is required');
     if (!form.consultationDate?.trim()) errs.push('Consultation date is required');
-    if (isNurseStaff) {
-      if (!form.doctorId?.trim() && doctors.length === 0) errs.push('No doctor available for this clinic');
-      return errs;
-    }
+    if (isNurseStaff) return errs;
     if (!form.doctorId?.trim()) errs.push('Doctor is required');
     return errs;
   };
@@ -354,7 +353,7 @@ const ConsultationsPage = () => {
         patientId: cons.patientId as string,
         patientGender: (cons.patientGender as string) || '',
         patientMedicalHistory: (cons.patientMedicalHistory as string) || (f.patientMedicalHistory || ''),
-        doctorId: cons.doctorId as string,
+        doctorId: fixedDoctorMode ? linkedDoctorId : (cons.doctorId as string),
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
         symptoms: (cons.symptoms as string) || '',
@@ -400,7 +399,7 @@ const ConsultationsPage = () => {
         variant: isAccessDenied ? 'default' : 'destructive',
       });
     });
-  }, [parentConsultationIdFromState, isReview, patientIdFromState]);
+  }, [parentConsultationIdFromState, isReview, patientIdFromState, fixedDoctorMode, linkedDoctorId]);
 
   useEffect(() => {
     if (!targetClinicId) {
@@ -414,13 +413,13 @@ const ConsultationsPage = () => {
   }, [targetClinicId]);
 
   useEffect(() => {
-    if (!isNurseStaff || doctors.length === 0) return;
-    setForm((f) => (f.doctorId ? f : { ...f, doctorId: doctors[0].id }));
-  }, [isNurseStaff, doctors]);
-
-  useEffect(() => {
     api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
   }, []);
+
+  useEffect(() => {
+    if (!fixedDoctorMode || !linkedDoctorId) return;
+    setForm((f) => ({ ...f, doctorId: linkedDoctorId }));
+  }, [fixedDoctorMode, linkedDoctorId]);
 
   const loadConsultations = () => {
     setListLoading(true);
@@ -501,7 +500,7 @@ const ConsultationsPage = () => {
       const consultationTime = isNurseStaff ? format(now, 'HH:mm') : form.consultationTime;
       const created = await api.consultations.create({
         patientId: form.patientId,
-        doctorId: form.doctorId,
+        ...(!isNurseStaff ? { doctorId: fixedDoctorMode ? linkedDoctorId : form.doctorId } : {}),
         clinicId: targetClinicId,
         consultationDate,
         consultationTime: consultationTime || undefined,
@@ -554,7 +553,7 @@ const ConsultationsPage = () => {
         patientName: savedPatientName,
         patientMedicalHistory: form.patientMedicalHistory,
         patientGender: form.patientGender,
-        doctorId: '',
+        doctorId: fixedDoctorMode ? linkedDoctorId : '',
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
         followUpDate: '',
@@ -582,8 +581,10 @@ const ConsultationsPage = () => {
         api.consultations.get(created.id).then((data) => {
           try { localStorage.setItem(`print_consult_${created.id}`, JSON.stringify(data)); } catch {}
           window.open(`${window.location.origin}/print/consultation/${created.id}`, '_blank', 'noopener,noreferrer');
+          navigate('/admin/consultations', { replace: true });
         }).catch(() => {
           window.open(`${window.location.origin}/print/consultation/${created.id}`, '_blank', 'noopener,noreferrer');
+          navigate('/admin/consultations', { replace: true });
         });
       }
     } catch (e) {
@@ -608,7 +609,7 @@ const ConsultationsPage = () => {
       patientName: '',
       patientMedicalHistory: '',
       patientGender: '',
-      doctorId: '',
+      doctorId: fixedDoctorMode ? linkedDoctorId : '',
       consultationDate: format(new Date(), 'yyyy-MM-dd'),
       consultationTime: format(new Date(), 'HH:mm'),
       followUpDate: '',
@@ -687,7 +688,7 @@ const ConsultationsPage = () => {
         patientGender: (d.patientGender as string) || '',
         menstrualHistory: mh,
         ayurvedaExamination: ae,
-        doctorId: data.doctorId as string,
+        doctorId: fixedDoctorMode ? linkedDoctorId : (data.doctorId as string),
         parentConsultationId: consultationId,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
@@ -855,8 +856,10 @@ const ConsultationsPage = () => {
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {isNurseStaff
-                  ? 'Choose beneficiary and enter vitals. Date and time use now; doctor is assigned automatically for this clinic. Doctors add complaint, examination, diagnosis and prescription later.'
-                  : form.parentConsultationId
+                  ? 'Choose beneficiary and enter vitals. Visit date and time are set when you save. A doctor is not assigned here—they add complaint, examination, diagnosis and prescription when they see the patient.'
+                  : fixedDoctorMode
+                    ? 'OP visit: doctor is fixed from your login (see below). Complete the form, then Save & print — you return to the consultation list and a print tab opens.'
+                    : form.parentConsultationId
                     ? 'Data copied from previous visit. Edit symptoms, vitals, diagnosis and save as follow-up.'
                     : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
               </CardDescription>
@@ -934,7 +937,36 @@ const ConsultationsPage = () => {
               )}
               </div>
             </div>
-            {!isNurseStaff && (
+            {!isNurseStaff && fixedDoctorMode && (
+              <>
+                <p className="text-sm rounded-md border border-emerald-200/60 bg-emerald-50/50 px-3 py-2 text-foreground">
+                  <span className="font-medium">Doctor (OP):</span>{' '}
+                  {doctors.find((d) => d.id === linkedDoctorId)?.name ?? '—'}
+                  <span className="text-muted-foreground"> — from your account (not changeable)</span>
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Date <span className="text-destructive">*</span></Label>
+                    <Input
+                      type="date"
+                      className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
+                      value={form.consultationDate}
+                      onChange={(e) => { setForm((f) => ({ ...f, consultationDate: e.target.value })); setConsultationErrors((e) => e.filter((x) => !x.includes('date'))); }}
+                    />
+                  </div>
+                  <div>
+                    <Label>Time</Label>
+                    <Input
+                      type="time"
+                      className="h-10"
+                      value={form.consultationTime}
+                      onChange={(e) => setForm((f) => ({ ...f, consultationTime: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            {!isNurseStaff && !fixedDoctorMode && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label>Doctor <span className="text-destructive">*</span></Label>
@@ -966,15 +998,6 @@ const ConsultationsPage = () => {
                 />
               </div>
             </div>
-            )}
-            {isNurseStaff && (
-              <p className="text-xs text-muted-foreground rounded-md border border-dashed bg-muted/30 px-3 py-2">
-                Visit date and time are set to now. Doctor for this visit:{' '}
-                <span className="font-medium text-foreground">
-                  {doctors.find((d) => d.id === form.doctorId)?.name ?? (doctors[0]?.name ?? '—')}
-                </span>
-                .
-              </p>
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
               <div>
@@ -1688,10 +1711,11 @@ const ConsultationsPage = () => {
                   const followUpDate = viewConsultation.followUpDate ? String(viewConsultation.followUpDate) : '';
                   const parentConsultationId = viewConsultation.parentConsultationId ? String(viewConsultation.parentConsultationId) : '';
                   const patientName = String(viewConsultation.patientName ?? '') || '—';
-                  const doctorName = (() => {
-                    const id = String(viewConsultation.doctorId ?? '');
-                    return doctors.find((d) => d.id === id)?.name || id || '—';
-                  })();
+                  const doctorName =
+                    String(viewConsultation.doctorName ?? '').trim() ||
+                    (viewConsultation.doctorId
+                      ? doctors.find((d) => d.id === String(viewConsultation.doctorId))?.name ?? '—'
+                      : '—');
                   const dateTime = viewConsultation.consultationDate
                     ? fmtDateWithTime(String(viewConsultation.consultationDate), (viewConsultation.consultationTime as string | null | undefined))
                     : '—';
