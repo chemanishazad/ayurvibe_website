@@ -77,9 +77,19 @@ const ConsultationPrintPage = () => {
   const datePart = consultationDate ? formatIsoDateToApp(consultationDate.slice(0, 10)) : '';
   const timePart = consultationTime ? formatHhmmToAmPm(consultationTime) : '';
   const dateTimeStr = timePart ? `${datePart} ${timePart}` : datePart;
-  const patientId = (cons.patientId as string) || '';
-  const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
-  const doctorName = (cons.doctorName as string) || 'Dr. V.VAITHEESHWARI BAMS';
+  const DEFAULT_ORG = 'Sri Vinayaga Ayurvibe';
+  const rawClinicName = String(cons.clinicName as string || '').trim();
+  const dashParts = rawClinicName.split(/\s*[—–]\s*/);
+  const mainClinicHeading = dashParts[0]?.trim() || rawClinicName || DEFAULT_ORG;
+  const branchFromTitle = dashParts.length > 1 ? dashParts.slice(1).join(' · ').trim() : '';
+  const locationLine =
+    String((cons.clinicAddress as string) || (cons.clinicSubtitle as string) || '').trim() ||
+    branchFromTitle;
+  const doctorLine = String(cons.doctorName as string || '').trim();
+  const phoneRaw = String((cons.clinicPhone as string) || (cons.clinicContact as string) || '').trim();
+  const emailRaw = String((cons.clinicEmail as string) || '').trim();
+  const contactLine =
+    [phoneRaw, emailRaw].filter(Boolean).join(' · ') || '8122339197 · svayurvibe@gmail.com';
   const symptoms = (cons.symptoms as string) || '';
   const diagnosis = (() => {
     const d = cons.diagnosis;
@@ -89,24 +99,6 @@ const ConsultationPrintPage = () => {
       if (Array.isArray(parsed)) return parsed.map((x: { name?: string }) => x?.name).filter(Boolean).join('\n');
       return String(d);
     } catch { return String(d); }
-  })();
-  const personalHistory = (() => {
-    try {
-      const raw = cons.personalHistory as string;
-      return raw ? JSON.parse(raw) as Record<string, string[]> : null;
-    } catch { return null; }
-  })();
-  const menstrualHistory = (() => {
-    try {
-      const raw = cons.menstrualHistory as string;
-      return raw ? JSON.parse(raw) as Record<string, string | number | boolean> : null;
-    } catch { return null; }
-  })();
-  const ayurvedaExamination = (() => {
-    try {
-      const raw = cons.ayurvedaExamination as string;
-      return raw ? JSON.parse(raw) as Record<string, string> : null;
-    } catch { return null; }
   })();
   const patientMedicalHistory = (cons.patientMedicalHistory as string) || '';
   const dietLifestyleAdvice = (cons.dietLifestyleAdvice as string) || '';
@@ -138,7 +130,7 @@ const ConsultationPrintPage = () => {
       <div
         ref={printRef}
         id="print-consultation"
-        className="bg-white text-black relative mx-auto"
+        className="bg-white text-black relative mx-auto flex flex-col"
         style={{
           width: '148mm',
           minHeight: '210mm',
@@ -158,28 +150,55 @@ const ConsultationPrintPage = () => {
         </svg>
       </div>
 
-      <div className="relative pl-[12%] pr-[12%] py-3 print:py-2" style={{ paddingLeft: '12%', paddingRight: '12%' }}>
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div>
-            <h1 className="text-base font-bold tracking-wide uppercase" style={{ color: '#15803d' }}>
-              {clinicName}
+      <div
+        className="relative pl-[12%] pr-[12%] py-3 print:py-2 flex flex-col min-h-[210mm] flex-1"
+        style={{ paddingLeft: '12%', paddingRight: '12%' }}
+      >
+        {/* Header: left = name + location + doctor + contact; right = logo */}
+        <div className="grid grid-cols-[1fr_auto] items-start gap-3 mb-3 border-b border-emerald-100/80 pb-2.5">
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-bold tracking-wide uppercase leading-tight" style={{ color: '#15803d' }}>
+              {mainClinicHeading}
             </h1>
-            <p className="text-[10px] font-medium mt-0.5" style={{ color: '#166534' }}>{doctorName}</p>
-            <p className="text-[9px] text-gray-600">8122339197 | svayurvibe@gmail.com</p>
+            {locationLine ? (
+              <p className="text-[10px] font-semibold text-gray-700 mt-1 leading-snug whitespace-pre-wrap">
+                {locationLine}
+              </p>
+            ) : null}
+            {doctorLine ? (
+              <p className="text-[10px] font-medium mt-1.5" style={{ color: '#166534' }}>
+                {doctorLine}
+              </p>
+            ) : null}
+            <p className="text-[9px] text-gray-600 mt-0.5">{contactLine}</p>
           </div>
-          <img src={logo} alt="Logo" className="h-9 w-auto shrink-0" />
+          <img
+            src={logo}
+            alt=""
+            className="h-16 w-auto max-w-[100px] shrink-0 object-contain print:h-[72px]"
+          />
         </div>
 
         {/* Beneficiary Details */}
-        <div className="border border-gray-300 rounded p-1.5 mb-2">
-          <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Beneficiary Details</p>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-3 gap-y-0.5 text-[10px]">
-            <span><strong>Name:</strong> {patientName || '—'}</span>
-            <span><strong>Age:</strong> {patientAge || '—'}</span>
-            <span><strong>Sex:</strong> {patientGender || '—'}</span>
-            <span><strong>Date:</strong> {dateTimeStr || '—'}</span>
-            <span><strong>ID:</strong> {patientId ? patientId.slice(0, 8) + '…' : '—'}</span>
+        <div className="border border-gray-300 rounded p-2 mb-2">
+          <p className="text-[9px] font-semibold text-gray-600 mb-2 uppercase tracking-wide">Beneficiary Details</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10px] leading-snug">
+            <div className="min-w-0">
+              <p className="text-[8px] font-semibold uppercase text-gray-500 mb-0.5">Name</p>
+              <p className="font-medium break-words">{patientName || '—'}</p>
+            </div>
+            <div>
+              <p className="text-[8px] font-semibold uppercase text-gray-500 mb-0.5">Age</p>
+              <p className="font-medium">{patientAge || '—'}</p>
+            </div>
+            <div>
+              <p className="text-[8px] font-semibold uppercase text-gray-500 mb-0.5">Sex</p>
+              <p className="font-medium">{patientGender || '—'}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[8px] font-semibold uppercase text-gray-500 mb-0.5">Date</p>
+              <p className="font-medium">{dateTimeStr || '—'}</p>
+            </div>
           </div>
         </div>
 
@@ -200,120 +219,31 @@ const ConsultationPrintPage = () => {
 
         {/* Present Complaint with duration */}
         {symptoms && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Present Complaint with duration</p>
-            <p className="text-[10px] whitespace-pre-wrap border-b border-dotted border-gray-400">{symptoms}</p>
-          </div>
-        )}
-
-        {/* Personal History */}
-        {personalHistory && Object.values(personalHistory).some((arr) => arr?.length > 0) && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Personal History</p>
-            <div className="text-[10px] space-y-0.5">
-              {personalHistory.diet?.length > 0 && <p><strong>Diet:</strong> {personalHistory.diet.join(', ')}</p>}
-              {personalHistory.exercise?.length > 0 && <p><strong>Exercise:</strong> {personalHistory.exercise.join(', ')}</p>}
-              {personalHistory.habits?.length > 0 && <p><strong>Habits/Addictions:</strong> {personalHistory.habits.join(', ')}</p>}
-              {personalHistory.bowelMovement?.length > 0 && <p><strong>Bowel Movement:</strong> {personalHistory.bowelMovement.join(', ')}</p>}
-              {personalHistory.appetite?.length > 0 && <p><strong>Appetite:</strong> {personalHistory.appetite.join(', ')}</p>}
-              {personalHistory.micturition?.length > 0 && <p><strong>Micturition:</strong> {personalHistory.micturition.join(', ')}</p>}
-              {personalHistory.sleepPattern?.length > 0 && <p><strong>Sleep Pattern:</strong> {personalHistory.sleepPattern.join(', ')}</p>}
-            </div>
-          </div>
-        )}
-
-        {/* Menstrual History (For Female Patients) */}
-        {patientGender?.toLowerCase() === 'female' && menstrualHistory && Object.values(menstrualHistory).some((v) => v != null && v !== '' && v !== false) && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Menstrual History (For Female Patients)</p>
-            <div className="text-[10px] space-y-0.5">
-              {menstrualHistory.menstrualCycle && <p><strong>Menstrual Cycle:</strong> {menstrualHistory.menstrualCycle}</p>}
-              {menstrualHistory.lmp && <p><strong>LMP:</strong> {menstrualHistory.lmp}</p>}
-              {menstrualHistory.padsPerDay != null && menstrualHistory.padsPerDay !== '' && <p><strong>Pads per day:</strong> {String(menstrualHistory.padsPerDay)}</p>}
-              {menstrualHistory.cycleLengthDays != null && menstrualHistory.cycleLengthDays !== '' && <p><strong>Cycle Length:</strong> {String(menstrualHistory.cycleLengthDays)} days</p>}
-              {menstrualHistory.cycleCountOnVisit != null && menstrualHistory.cycleCountOnVisit !== '' && <p><strong>Cycle Count on visit:</strong> {String(menstrualHistory.cycleCountOnVisit)}</p>}
-              {menstrualHistory.clots && <p><strong>Clots:</strong> {menstrualHistory.clots}</p>}
-              {menstrualHistory.menstrualFlow && <p><strong>Menstrual Flow:</strong> {menstrualHistory.menstrualFlow}</p>}
-              {menstrualHistory.dysmenorrhea && <p><strong>Dysmenorrhea:</strong> Yes</p>}
-              {menstrualHistory.leucorrhea && <p><strong>Leucorrhea:</strong> Yes</p>}
-              {menstrualHistory.menopause && (
-                <p>
-                  <strong>Menopause:</strong> Yes
-                  {menstrualHistory.menopauseAge != null && menstrualHistory.menopauseAge !== ''
-                    ? ` (Age: ${String(menstrualHistory.menopauseAge)})`
-                    : ''}
-                </p>
-              )}
-              {(menstrualHistory.gravida != null && menstrualHistory.gravida !== '') || (menstrualHistory.para != null && menstrualHistory.para !== '') || (menstrualHistory.abortions != null && menstrualHistory.abortions !== '') ? (
-                <p><strong>Pregnancy History:</strong> G: {menstrualHistory.gravida != null && menstrualHistory.gravida !== '' ? String(menstrualHistory.gravida) : '—'} P: {menstrualHistory.para != null && menstrualHistory.para !== '' ? String(menstrualHistory.para) : '—'} A: {menstrualHistory.abortions != null && menstrualHistory.abortions !== '' ? String(menstrualHistory.abortions) : '—'}</p>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-        {/* Ayurveda Examination */}
-        {ayurvedaExamination && Object.values(ayurvedaExamination).some((v) => v != null && v !== '') && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Ayurveda Examination</p>
-            <table className="w-full text-[10px] border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="text-left py-1.5 px-2 font-semibold border-b border-r border-gray-300">Parameter</th>
-                  <th className="text-left py-1.5 px-2 font-semibold border-b border-gray-300">Observation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ayurvedaExamination.naadi && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Naadi</td><td className="py-1 px-2">{ayurvedaExamination.naadi}</td></tr>}
-                {ayurvedaExamination.malam && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Malam</td><td className="py-1 px-2">{ayurvedaExamination.malam}</td></tr>}
-                {(ayurvedaExamination.mootram || ayurvedaExamination.mootramColour) && (
-                  <tr className="border-b border-gray-200">
-                    <td className="py-1 px-2 border-r border-gray-200 font-medium">Mootram (Urine)</td>
-                    <td className="py-1 px-2">
-                      {[ayurvedaExamination.mootram, ayurvedaExamination.mootramColour].filter(Boolean).join(' · ')}
-                    </td>
-                  </tr>
-                )}
-                {ayurvedaExamination.jihwa && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Jihwa</td><td className="py-1 px-2">{ayurvedaExamination.jihwa}</td></tr>}
-                {ayurvedaExamination.shabda && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Shabda</td><td className="py-1 px-2">{ayurvedaExamination.shabda}</td></tr>}
-                {ayurvedaExamination.sparsha && (Array.isArray(ayurvedaExamination.sparsha) ? ayurvedaExamination.sparsha.length > 0 : ayurvedaExamination.sparsha) && (
-                  <tr className="border-b border-gray-200">
-                    <td className="py-1 px-2 border-r border-gray-200 font-medium">Sparsha</td>
-                    <td className="py-1 px-2">{Array.isArray(ayurvedaExamination.sparsha) ? ayurvedaExamination.sparsha.join(', ') : ayurvedaExamination.sparsha}</td>
-                  </tr>
-                )}
-                {(ayurvedaExamination.drik || ayurvedaExamination.drikColour) && (
-                  <tr className="border-b border-gray-200">
-                    <td className="py-1 px-2 border-r border-gray-200 font-medium">Drik (Eye) / Colour</td>
-                    <td className="py-1 px-2">
-                      {[ayurvedaExamination.drik, ayurvedaExamination.drikColour].filter(Boolean).join(' · ')}
-                    </td>
-                  </tr>
-                )}
-                {ayurvedaExamination.aakriti && <tr className="border-b border-gray-200"><td className="py-1 px-2 border-r border-gray-200 font-medium">Aakriti</td><td className="py-1 px-2">{ayurvedaExamination.aakriti}</td></tr>}
-              </tbody>
-            </table>
+          <div className="border border-gray-300 rounded p-1.5 mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Present Complaint with duration</p>
+            <p className="text-[10px] whitespace-pre-wrap leading-relaxed">{symptoms}</p>
           </div>
         )}
 
         {/* Medical History */}
         {patientMedicalHistory && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Medical History</p>
-            <p className="text-[10px] whitespace-pre-wrap border-b border-dotted border-gray-400">{patientMedicalHistory}</p>
+          <div className="border border-gray-300 rounded p-1.5 mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Medical History</p>
+            <p className="text-[10px] whitespace-pre-wrap leading-relaxed">{patientMedicalHistory}</p>
           </div>
         )}
 
         {/* Diagnosis */}
         {diagnosis && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Diagnosis</p>
-            <p className="text-[10px] whitespace-pre-wrap border-b border-dotted border-gray-400">{diagnosis}</p>
+          <div className="border border-gray-300 rounded p-1.5 mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Diagnosis</p>
+            <p className="text-[10px] whitespace-pre-wrap leading-relaxed">{diagnosis}</p>
           </div>
         )}
 
         {/* Prescription */}
-        <div className="mb-2">
-          <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Prescription</p>
+        <div className="border border-gray-300 rounded p-1.5 mb-2">
+          <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Prescription</p>
           <table className="w-full text-[10px] border-collapse">
             <thead>
               <tr className="border-b border-gray-400">
@@ -366,9 +296,9 @@ const ConsultationPrintPage = () => {
 
         {/* Diet / Lifestyle Advice */}
         {dietLifestyleAdvice && (
-          <div className="mb-2">
-            <p className="text-[9px] font-semibold text-gray-600 mb-0.5 uppercase">Diet / Lifestyle Advice</p>
-            <p className="text-[10px] whitespace-pre-wrap border-b border-dotted border-gray-400">{dietLifestyleAdvice}</p>
+          <div className="border border-gray-300 rounded p-1.5 mb-2">
+            <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Diet / Lifestyle Advice</p>
+            <p className="text-[10px] whitespace-pre-wrap leading-relaxed">{dietLifestyleAdvice}</p>
           </div>
         )}
 
@@ -380,10 +310,10 @@ const ConsultationPrintPage = () => {
           </div>
         )}
 
-        {/* Signature */}
-        <div className="mt-4 flex justify-end">
+        {/* Signature — pinned to bottom of page (A5) when content is short */}
+        <div className="mt-auto pt-6 flex justify-end print:pt-8">
           <div className="text-right">
-            <div className="border-t-2 border-gray-800 w-20 mt-6" />
+            <div className="border-t-2 border-gray-800 w-20" />
             <p className="text-[9px] text-gray-600 mt-0.5">Doctor&apos;s Signature</p>
           </div>
         </div>

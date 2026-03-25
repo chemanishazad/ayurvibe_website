@@ -28,6 +28,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { formatAppDate, formatBillDisplayDateTime, formatNowAppTime } from '@/lib/datetime';
+import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
 import { COUNTRY_CODES } from '@/lib/country-codes';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus } from 'lucide-react';
@@ -337,16 +338,18 @@ const PharmacyNewPage = () => {
           const now = new Date();
           const billDate = now.toISOString().slice(0, 10);
           const billTime = formatNowAppTime();
+          const billDateLabel = formatBillDisplayDateTime(billDate, billTime);
           try {
             localStorage.setItem(
               `print_pharmacy_${consId}`,
-              JSON.stringify({
-                ...data,
-                paymentMode,
-                billDate,
-                billTime,
-                billDateLabel: formatBillDisplayDateTime(billDate, billTime),
-              }),
+              JSON.stringify(
+                buildPharmacyPrintPayload(data as Record<string, unknown>, {
+                  paymentMode,
+                  billDate,
+                  billTime,
+                  billDateLabel,
+                }),
+              ),
             );
           } catch {}
           window.open(`${window.location.origin}/print/pharmacy/${consId}`, '_blank', 'noopener,noreferrer');
@@ -512,13 +515,14 @@ const PharmacyNewPage = () => {
         const paymentMode = options?.paymentMode ?? '—';
         localStorage.setItem(
           `print_pharmacy_${id}`,
-          JSON.stringify({
-            ...data,
-            paymentMode,
-            billDate,
-            billTime,
-            billDateLabel: formatBillDisplayDateTime(billDate, billTime),
-          }),
+          JSON.stringify(
+            buildPharmacyPrintPayload(data as Record<string, unknown>, {
+              paymentMode,
+              billDate,
+              billTime,
+              billDateLabel: formatBillDisplayDateTime(billDate, billTime),
+            }),
+          ),
         );
       } catch {}
       window.open(`${window.location.origin}/print/pharmacy/${id}`, '_blank', 'noopener,noreferrer');

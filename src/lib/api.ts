@@ -58,7 +58,17 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   auth: {
     switchClinic: (clinicId: string) =>
-      fetchApi<{ token: string; user: { id: string; username: string; role: string; clinicId: string } }>('/api/auth/switch-clinic', {
+      fetchApi<{
+        token: string;
+        user: {
+          id: string;
+          username: string;
+          role: string;
+          clinicId: string;
+          allowedNavPaths?: string[] | null;
+          staffRole?: string | null;
+        };
+      }>('/api/auth/switch-clinic', {
         method: 'POST',
         body: JSON.stringify({ clinicId }),
       }),
@@ -74,11 +84,43 @@ export const api = {
     delete: (id: string) => fetchApi<{ success: boolean }>(`/api/uom/${id}`, { method: 'DELETE' }),
   },
   users: {
-    list: () => fetchApi<{ id: string; username: string; role: string; createdAt: string }[]>('/api/users'),
-    create: (data: { username: string; password: string; role: 'admin' | 'user'; clinicIds?: string[] }) =>
-      fetchApi<{ id: string; username: string; role: string }>('/api/users', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<{ username: string; role: 'admin' | 'user' }>) =>
-      fetchApi<{ id: string; username: string; role: string }>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    list: () =>
+      fetchApi<
+        {
+          id: string;
+          username: string;
+          role: string;
+          createdAt: string;
+          allowedNavPaths?: string[] | null;
+          staffRole?: string | null;
+        }[]
+      >('/api/users'),
+    create: (data: {
+      username: string;
+      password: string;
+      role: 'admin' | 'user';
+      clinicIds?: string[];
+      allowedNavPaths?: string[] | null;
+    }) => fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    update: (
+      id: string,
+      data: Partial<{
+        username: string;
+        role: 'admin' | 'user';
+        allowedNavPaths: string[] | null;
+        staffRole: 'nurse' | null;
+      }>,
+    ) =>
+      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null; staffRole?: string | null }>(
+        `/api/users/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        },
+      ),
     delete: (id: string) => fetchApi<{ success: boolean }>(`/api/users/${id}`, { method: 'DELETE' }),
     setPassword: (id: string, password: string) =>
       fetchApi<{ success: boolean }>(`/api/users/${id}/password`, { method: 'POST', body: JSON.stringify({ password }) }),

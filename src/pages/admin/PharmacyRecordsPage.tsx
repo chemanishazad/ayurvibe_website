@@ -31,6 +31,7 @@ import {
   formatIsoDateToApp,
   formatNowAppTime,
 } from '@/lib/datetime';
+import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
 import {
   Table,
   TableBody,
@@ -298,15 +299,17 @@ const PharmacyRecordsPage = () => {
       const billTime = formatNowAppTime();
       try {
         const paymentMode = options?.paymentMode ?? '—';
+        const billDateLabel = formatBillDisplayDateTime(billDate, billTime);
         localStorage.setItem(
           `print_pharmacy_${id}`,
-          JSON.stringify({
-            ...data,
-            paymentMode,
-            billDate,
-            billTime,
-            billDateLabel: formatBillDisplayDateTime(billDate, billTime),
-          }),
+          JSON.stringify(
+            buildPharmacyPrintPayload(data as Record<string, unknown>, {
+              paymentMode,
+              billDate,
+              billTime,
+              billDateLabel,
+            }),
+          ),
         );
       } catch {}
       window.open(`${window.location.origin}/print/pharmacy/${id}`, '_blank', 'noopener,noreferrer');

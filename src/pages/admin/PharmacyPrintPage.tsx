@@ -66,7 +66,9 @@ const PharmacyPrintPage = () => {
     total: m.total ?? String(Number(m.quantity) * parseFloat(m.unitPrice || '0')),
   }));
   const treatments = (cons.treatments as { name: string; price: string }[]) || [];
-  const consultationFee = parseFloat(treatments.find((t) => t.name === 'Consultation')?.price || '0');
+  const feeFromTreatment = parseFloat(treatments.find((t) => t.name === 'Consultation')?.price || '0');
+  const feeFromField = parseFloat(String(cons.consultationFee ?? '0'));
+  const consultationFee = Number.isFinite(feeFromTreatment) && feeFromTreatment > 0 ? feeFromTreatment : feeFromField;
   const medicineDiscount = treatments.find((t) => t.name === 'Medicine Discount');
   const medicineDiscountAmount = medicineDiscount ? parseFloat(medicineDiscount.price || '0') : 0;
   const treatmentsExcludingFee = treatments.filter((t) => t.name !== 'Consultation');
@@ -78,10 +80,17 @@ const PharmacyPrintPage = () => {
     : rawMobile;
   /** Bill / pharmacy issue date (bill fields, else consultation date for direct-sale / legacy payloads). */
   const dateTimeStr = formatPharmacyPrintBillDateTime(cons);
-  const clinicName = (cons.clinicName as string) || 'SRI VINAYAGA AYURVIBE';
-  const hospitalName = 'Sri Vinayaga Ayurvibe';
-  const branchName = 'Perumbakkam Branch';
-  const doctorName = (cons.doctorName as string) || 'Dr.V.VAITHEESHWARI BAMS';
+  const DEFAULT_ORG = 'Sri Vinayaga Ayurvibe';
+  const clinicTitle = String(cons.clinicName as string || '').trim() || DEFAULT_ORG;
+  const subtitle =
+    String((cons.clinicSubtitle as string) || (cons.clinicBranch as string) || '').trim() || '';
+  const doctorLine = String(cons.doctorName as string || '').trim();
+  const contactLine =
+    String((cons.clinicPhone as string) || (cons.clinicContact as string) || '').trim() ||
+    '+91 8122339197 | svayurvibe@gmail.com';
+  const footerAddress =
+    String(cons.clinicAddress as string || '').trim() ||
+    'No : 12/597, Mainroad, Nethaji nagar, Perumbakkam, Chennai - 600131.';
   const medicineTotal = parseFloat((cons.medicineTotal as string) || '0') || medicines.reduce((s, m) => s + parseFloat(m.total || '0'), 0);
   const treatmentTotal = parseFloat((cons.treatmentTotal as string) || '0') || treatments.reduce((s, t) => s + parseFloat(t.price || '0'), 0);
   const grandTotal = medicineTotal + treatmentTotal;
@@ -111,11 +120,19 @@ const PharmacyPrintPage = () => {
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
             <h1 className="text-lg font-bold tracking-wide" style={{ color: '#15803d' }}>
-              {hospitalName}
+              {clinicTitle}
             </h1>
-            <p className="text-[11px] font-semibold mt-0.5 uppercase" style={{ color: '#166534' }}>{branchName}</p>
-            <p className="text-[10px] font-medium mt-1" style={{ color: '#166534' }}>{doctorName}</p>
-            <p className="text-[9px] text-gray-600 mt-0.5">+91 8122339197 | svayurvibe@gmail.com</p>
+            {subtitle ? (
+              <p className="text-[11px] font-semibold mt-0.5 uppercase" style={{ color: '#166534' }}>
+                {subtitle}
+              </p>
+            ) : null}
+            {doctorLine ? (
+              <p className="text-[10px] font-medium mt-1" style={{ color: '#166534' }}>
+                {doctorLine}
+              </p>
+            ) : null}
+            <p className="text-[9px] text-gray-600 mt-0.5">{contactLine}</p>
           </div>
           <img src={logo} alt="Logo" className="h-20 w-auto shrink-0 object-contain drop-shadow-sm" />
         </div>
@@ -217,7 +234,7 @@ const PharmacyPrintPage = () => {
 
         {/* Footer */}
         <div className="mt-4 text-[9px] text-gray-500 text-center">
-          <p>No : 12/597, Mainroad, Nethaji nagar, Perumbakkam, Chennai - 600131.</p>
+          <p>{footerAddress}</p>
         </div>
       </div>
       </div>

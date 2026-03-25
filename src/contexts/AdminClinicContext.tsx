@@ -7,7 +7,8 @@ import React, {
   useState,
 } from 'react';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
+import { decodeJwtPayload } from '@/lib/jwt-decode';
+import { getAuthToken, getAuthUser, persistAuthSession, type AuthUser } from '@/pages/Login';
 
 const STORAGE_KEY = 'ayurvibe_admin_clinic_id';
 
@@ -20,9 +21,12 @@ export type AdminClinicContextValue = {
   /** Admin filter: empty = all clinics; otherwise one clinic id (persisted when set). */
   selectedClinicId: string;
   setSelectedClinicId: (id: string) => void;
-  /** Admin: null = all clinics (no filter); else active clinic id. Staff: JWT clinic. */
+  /** Admin: null = all clinics (no filter); else active clinic id. Staff: JWT clinicId (source of truth). */
   effectiveClinicId: string | null;
   isAdmin: boolean;
+  /** Staff with multiple clinics: switch workspace (new JWT, full reload). */
+  switchStaffClinic: (clinicId: string) => Promise<void>;
+  staffClinicSwitching: boolean;
   /** Call after creating/renaming/deleting clinics so the header list updates. */
   refreshClinics: () => void;
 };
@@ -35,6 +39,7 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
   const [clinicsLoading, setClinicsLoading] = useState(true);
   const [clinicRefreshKey, setClinicRefreshKey] = useState(0);
+  const [staffClinicSwitching, setStaffClinicSwitching] = useState(false);
   const [selectedClinicId, setSelectedClinicIdState] = useState(() => {
     try {
       return sessionStorage.getItem(STORAGE_KEY) || '';
@@ -74,10 +79,77 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
     setSelectedClinicId('');
   }, [isAdmin, clinicsLoading, clinics, selectedClinicId, setSelectedClinicId]);
 
+  /** Staff: always use clinicId from JWT so UI matches API scope (session user can be repaired in effects). */
   const effectiveClinicId = useMemo(() => {
     if (isAdmin) return selectedClinicId || null;
-    return user?.clinicId ?? null;
-  }, [isAdmin, selectedClinicId, user?.clinicId]);
+    const token = getAuthToken();
+    const payload = decodeJwtPayload<{ clinicId?: string | null }>(token);
+    return payload?.clinicId ?? user?.clinicId ?? null;
+  }, [isAdmin, selectedClinicId, user?.clinicId, clinicRefreshKey]);
+
+  /** Keep stored user.clinicId aligned with JWT after refresh or tab restore. */
+  useEffect(() => {
+    if (isAdmin || !user || user.role !== 'user') return;
+    const token = getAuthToken();
+    if (!token) return;
+    const payload = decodeJwtPayload<{ clinicId?: string | null }>(token);
+    const cid = payload?.clinicId;
+    if (cid && user.clinicId !== cid) {
+      const next: AuthUser = { ...user, clinicId: cid };
+      persistAuthSession(token, next);
+    }
+  }, [isAdmin, user]);
+
+  /** If JWT names a clinic no longer mapped to this user, switch to first mapped clinic. */
+  useEffect(() => {
+    if (isAdmin || !user || user.role !== 'user' || clinicsLoading || clinics.length === 0) return;
+    const token = getAuthToken();
+    const payload = decodeJwtPayload<{ clinicId?: string | null }>(token);
+    const cid = payload?.clinicId;
+    if (!cid) return;
+    if (clinics.some((c) => c.id === cid)) return;
+    const fallback = clinics[0].id;
+    setStaffClinicSwitching(true);
+    api.auth
+      .switchClinic(fallback)
+      .then((r) => {
+        const u = getAuthUser();
+        if (u) {
+          persistAuthSession(r.token, {
+            ...u,
+            clinicId: r.user.clinicId,
+            allowedNavPaths: r.user.allowedNavPaths ?? u.allowedNavPaths ?? null,
+            staffRole: (r.user as AuthUser).staffRole ?? u.staffRole ?? null,
+          });
+        } else {
+          persistAuthSession(r.token, r.user as AuthUser);
+        }
+        window.location.reload();
+      })
+      .catch(() => setStaffClinicSwitching(false));
+  }, [isAdmin, user, clinicsLoading, clinics, clinicRefreshKey]);
+
+  const switchStaffClinic = useCallback(async (clinicId: string) => {
+    const u = getAuthUser();
+    if (!u || u.role !== 'user') return;
+    const cur = decodeJwtPayload<{ clinicId?: string | null }>(getAuthToken())?.clinicId;
+    if (clinicId === cur) return;
+    if (!clinics.some((c) => c.id === clinicId)) return;
+    setStaffClinicSwitching(true);
+    try {
+      const r = await api.auth.switchClinic(clinicId);
+      persistAuthSession(r.token, {
+        ...u,
+        clinicId: r.user.clinicId,
+        allowedNavPaths: r.user.allowedNavPaths ?? u.allowedNavPaths ?? null,
+        staffRole: (r.user as AuthUser).staffRole ?? u.staffRole ?? null,
+      });
+      window.location.reload();
+    } catch (e) {
+      setStaffClinicSwitching(false);
+      throw e;
+    }
+  }, [clinics]);
 
   const value = useMemo(
     () => ({
@@ -87,9 +159,21 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
       setSelectedClinicId,
       effectiveClinicId,
       isAdmin: !!isAdmin,
+      switchStaffClinic,
+      staffClinicSwitching,
       refreshClinics,
     }),
-    [clinics, clinicsLoading, selectedClinicId, setSelectedClinicId, effectiveClinicId, isAdmin, refreshClinics],
+    [
+      clinics,
+      clinicsLoading,
+      selectedClinicId,
+      setSelectedClinicId,
+      effectiveClinicId,
+      isAdmin,
+      switchStaffClinic,
+      staffClinicSwitching,
+      refreshClinics,
+    ],
   );
 
   return <AdminClinicContext.Provider value={value}>{children}</AdminClinicContext.Provider>;
