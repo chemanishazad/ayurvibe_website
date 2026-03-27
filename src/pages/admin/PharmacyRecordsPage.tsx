@@ -32,6 +32,7 @@ import {
   formatNowAppTime,
 } from '@/lib/datetime';
 import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
+import { openPharmacyPrint, savePharmacyPrintPayload } from '@/lib/print-handoff';
 import {
   Table,
   TableBody,
@@ -154,6 +155,7 @@ const PharmacyRecordsPage = () => {
         to: recordsDateTo,
       });
       setPharmacyRecords(data as Record<string, unknown>[]);
+      console.log('data',data)
       setRecordsSource('unified');
     } catch {
       try {
@@ -245,6 +247,7 @@ const PharmacyRecordsPage = () => {
   const recordsTotalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
 
   const pagedPharmacyGroups = useMemo(() => {
+    console.log(filteredPharmacyGroups);
     const start = (recordsPage - 1) * perPage;
     return filteredPharmacyGroups.slice(start, start + perPage);
   }, [filteredPharmacyGroups, recordsPage, perPage]);
@@ -300,19 +303,17 @@ const PharmacyRecordsPage = () => {
       try {
         const paymentMode = options?.paymentMode ?? '—';
         const billDateLabel = formatBillDisplayDateTime(billDate, billTime);
-        localStorage.setItem(
-          `print_pharmacy_${id}`,
-          JSON.stringify(
-            buildPharmacyPrintPayload(data as Record<string, unknown>, {
-              paymentMode,
-              billDate,
-              billTime,
-              billDateLabel,
-            }),
-          ),
+        savePharmacyPrintPayload(
+          id,
+          buildPharmacyPrintPayload(data as Record<string, unknown>, {
+            paymentMode,
+            billDate,
+            billTime,
+            billDateLabel,
+          })
         );
       } catch {}
-      window.open(`${window.location.origin}/print/pharmacy/${id}`, '_blank', 'noopener,noreferrer');
+      openPharmacyPrint(id);
     }).catch(() => toast({ title: 'Failed to load', variant: 'destructive' }));
   };
 
@@ -393,10 +394,8 @@ const PharmacyRecordsPage = () => {
       medicineTotal: String(medicineSubtotal),
       treatmentTotal: discountAmount < 0 ? String(discountAmount) : '0',
     };
-    try {
-      localStorage.setItem(`print_pharmacy_${printId}`, JSON.stringify(printData));
-    } catch {}
-    window.open(`${window.location.origin}/print/pharmacy/${printId}`, '_blank', 'noopener,noreferrer');
+    savePharmacyPrintPayload(printId, printData);
+    openPharmacyPrint(printId);
   };
 
   const whatsappDirectSaleRecord = (sale: PharmacySaleGroup) => {

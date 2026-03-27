@@ -27,7 +27,14 @@ export const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   const location = useLocation();
   const user = getAuthUser();
   const path = location.pathname.replace(/\/$/, '') || '/';
-  if (userMayAccessRoute(user ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null } : null, path)) {
+  if (
+    userMayAccessRoute(
+      user
+        ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
+        : null,
+      path,
+    )
+  ) {
     return <>{children}</>;
   }
   return <Navigate to="/admin/dashboard" replace />;

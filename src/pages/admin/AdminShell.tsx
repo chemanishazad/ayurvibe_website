@@ -10,12 +10,15 @@ const AdminShell = () => {
   const user = getAuthUser();
   const normalized = pathname.replace(/\/$/, '') || '/';
   if (user && user.role !== 'admin') {
-    if (
-      !userMayAccessRoute(
-        { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null },
-        normalized,
-      )
-    ) {
+    const session = {
+      role: user.role,
+      allowedNavPaths: user.allowedNavPaths ?? null,
+      staffRole: user.staffRole ?? null,
+    };
+    if (!userMayAccessRoute(session, normalized)) {
+      if (user.role === 'user' && user.staffRole === 'nurse' && normalized.startsWith('/admin/consultations')) {
+        return <Navigate to="/admin/op" replace />;
+      }
       const fallback = (user.allowedNavPaths && user.allowedNavPaths[0]) || '/admin/dashboard';
       return <Navigate to={fallback} replace />;
     }

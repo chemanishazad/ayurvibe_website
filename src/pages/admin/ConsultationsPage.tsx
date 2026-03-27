@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -70,6 +70,10 @@ import { formatAppDate, formatHhmmToAmPm } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { BmiDisplay } from '@/components/BmiDisplay';
 import { ConsultationListTable } from '@/pages/admin/ConsultationListTable';
+import { useConsultationPatientSearch } from '@/pages/admin/hooks/useConsultationPatientSearch';
+import { openConsultationPrint, saveConsultationPrintPayload } from '@/lib/print-handoff';
+import ConsultationsTopBar from '@/pages/admin/consultations/ConsultationsTopBar';
+import ClinicSelectionNotice from '@/pages/admin/consultations/ClinicSelectionNotice';
 import {
   Table,
   TableBody,
@@ -164,30 +168,41 @@ const patientInitials = (name: string) => {
 const ConsultationsPage = () => {
   const user = getAuthUser();
   const isNurseStaff = user?.role === 'user' && user?.staffRole === 'nurse';
-  const linkedDoctorId = (user?.linkedDoctorId ?? '').trim();
-  const fixedDoctorMode = Boolean(linkedDoctorId && !isNurseStaff);
   const { effectiveClinicId, setSelectedClinicId } = useAdminClinic();
   const targetClinicId = effectiveClinicId ?? undefined;
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const consultationIdFromRoute = params.id;
-  const isNewRoute = location.pathname.endsWith('/consultations/new');
-  const isViewRoute = Boolean(consultationIdFromRoute);
-  const isFormRoute = isNewRoute;
-  const isListRoute = !isViewRoute && !isFormRoute;
+  const path = location.pathname.replace(/\/$/, '') || '/';
+  const isOpSection = path.startsWith('/admin/op');
+  const isConsultationsNew = path.endsWith('/consultations/new');
+  const isOpNew = path.endsWith('/op/new');
+  const isNewRoute = isConsultationsNew || isOpNew;
+  const isConsultationViewRoute =
+    /^\/admin\/consultations\/[^/]+$/.test(path) && !path.endsWith('/consultations/new');
+  const isOpDoctorCompleteRoute =
+    Boolean(isOpSection && consultationIdFromRoute && /^\/admin\/op\/[^/]+$/.test(path) && !path.endsWith('/op/new'));
+  const isFormRoute = isNewRoute || isOpDoctorCompleteRoute;
+  const isListRoute = !isConsultationViewRoute && !isFormRoute;
+  const isViewRoute = isConsultationViewRoute;
+  const isOpListView = isOpSection && isListRoute;
   const state = location.state as { patientId?: string; parentConsultationId?: string; isReview?: boolean } | null;
   const patientIdFromState = state?.patientId;
   const parentConsultationIdFromState = state?.parentConsultationId;
   const isReview = state?.isReview;
 
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
+  const linkedDoctorId = (user?.linkedDoctorId ?? '').trim();
+  const opCompleteUsesLinkedDoctor =
+    isOpDoctorCompleteRoute && !!linkedDoctorId && doctors.some((d) => d.id === linkedDoctorId);
   const [medicinesMaster, setMedicinesMaster] = useState<{ id: string; name: string }[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [activeConsId, setActiveConsId] = useState<string | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [opFormLoading, setOpFormLoading] = useState(false);
   const [viewConsultation, setViewConsultation] = useState<Record<string, unknown> | null>(null);
   const defaultPersonalHistory = () => ({
     diet: [] as string[],
@@ -257,10 +272,13 @@ const ConsultationsPage = () => {
   const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
   const [followUpDateOpen, setFollowUpDateOpen] = useState(false);
   const [patientSearchOpen, setPatientSearchOpen] = useState(false);
-  const [patientSearchResults, setPatientSearchResults] = useState<{ id: string; name: string; mobile: string }[]>([]);
-  const [patientSearching, setPatientSearching] = useState(false);
   const [consultationErrors, setConsultationErrors] = useState<string[]>([]);
+  const [patientHistory, setPatientHistory] = useState<ConsultationRow[]>([]);
+  const [patientHistoryLoading, setPatientHistoryLoading] = useState(false);
   const { toast } = useToast();
+  const clinicSelectionRequired = !!(user?.role === 'admin' && !targetClinicId);
+  const { patientSearchResults, patientSearching, searchPatients, loadRecentPatients } =
+    useConsultationPatientSearch(targetClinicId);
 
   const consultationFormErrors = (): string[] => {
     const errs: string[] = [];
@@ -271,6 +289,18 @@ const ConsultationsPage = () => {
     if (!form.doctorId?.trim()) errs.push('Doctor is required');
     return errs;
   };
+
+  /** Nurse must not land on /admin/op/:id (completion is doctor-only). */
+  useEffect(() => {
+    if (!isNurseStaff || !isOpDoctorCompleteRoute) return;
+    navigate('/admin/op', { replace: true });
+  }, [isNurseStaff, isOpDoctorCompleteRoute, navigate]);
+
+  /** Non-nurse on /admin/op/new → redirect to /admin/consultations/new. */
+  useEffect(() => {
+    if (!isOpNew || isNurseStaff) return;
+    navigate('/admin/consultations/new', { replace: true });
+  }, [isOpNew, isNurseStaff, navigate]);
 
   useEffect(() => {
     if (patientIdFromState) setForm((f) => ({ ...f, patientId: patientIdFromState }));
@@ -288,7 +318,20 @@ const ConsultationsPage = () => {
   }, [form.patientId]);
 
   useEffect(() => {
-    if (!consultationIdFromRoute) {
+    if (!isNurseStaff || !isOpNew || !form.patientId?.trim()) {
+      setPatientHistory([]);
+      return;
+    }
+    setPatientHistoryLoading(true);
+    api.consultations
+      .list({ patientId: form.patientId.trim() })
+      .then((data) => setPatientHistory(data as ConsultationRow[]))
+      .catch(() => setPatientHistory([]))
+      .finally(() => setPatientHistoryLoading(false));
+  }, [form.patientId, isNurseStaff, isOpNew]);
+
+  useEffect(() => {
+    if (!isConsultationViewRoute || !consultationIdFromRoute) {
       setViewConsultation(null);
       return;
     }
@@ -297,7 +340,121 @@ const ConsultationsPage = () => {
       .then((data) => setViewConsultation(data as unknown as Record<string, unknown>))
       .catch(() => setViewConsultation(null))
       .finally(() => setViewLoading(false));
-  }, [consultationIdFromRoute]);
+  }, [consultationIdFromRoute, isConsultationViewRoute]);
+
+  /** Doctor opens /admin/op/:id — hydrate full consult form; default doctor from profile. */
+  useEffect(() => {
+    if (!isOpDoctorCompleteRoute || !consultationIdFromRoute) return;
+    setOpFormLoading(true);
+    api.opVisits
+      .get(consultationIdFromRoute)
+      .then((raw) => {
+        const cons = raw as Record<string, unknown>;
+        if (cons.kind !== 'op_visit') {
+          toast({ title: 'Invalid OP visit', variant: 'destructive' });
+          return;
+        }
+        if (user?.role === 'admin' && cons.clinicId) setSelectedClinicId(cons.clinicId as string);
+        const linkedDoc = user?.linkedDoctorId ?? '';
+        let ph = defaultPersonalHistory();
+        try {
+          const rawPh = cons.personalHistory as string;
+          if (rawPh) ph = { ...defaultPersonalHistory(), ...JSON.parse(rawPh) };
+        } catch {}
+        let mh = defaultMenstrualHistory();
+        try {
+          const rawMh = cons.menstrualHistory as string;
+          if (rawMh) mh = { ...defaultMenstrualHistory(), ...JSON.parse(rawMh) };
+        } catch {}
+        let ae = defaultAyurvedaExamination();
+        try {
+          const rawAe = cons.ayurvedaExamination as string;
+          if (rawAe) {
+            const parsed = JSON.parse(rawAe) as Record<string, unknown>;
+            ae = { ...defaultAyurvedaExamination(), ...parsed };
+            if (parsed.sparsha != null && !Array.isArray(parsed.sparsha)) ae.sparsha = [String(parsed.sparsha)];
+          }
+        } catch {}
+        let diagnosisText = '';
+        try {
+          const d = cons.diagnosis as string;
+          if (d?.startsWith('[')) {
+            const arr = JSON.parse(d) as { name?: string }[];
+            diagnosisText = arr.map((x) => x?.name).filter(Boolean).join('\n');
+          } else if (d) diagnosisText = d;
+        } catch {
+          diagnosisText = (cons.diagnosis as string) || '';
+        }
+        const presc =
+          (cons.prescription as Array<{
+            medicineId?: string;
+            medicineName?: string;
+            dosage?: string;
+            durationDays?: number;
+            timeMorning?: boolean;
+            timeAfternoon?: boolean;
+            timeNight?: boolean;
+            foodRelation?: 'before_food' | 'after_food';
+            quantity?: string;
+            withHotWater?: boolean;
+            withMilk?: boolean;
+            withHoney?: boolean;
+            withGhee?: boolean;
+          }>) || [];
+        setForm((f) => ({
+          ...f,
+          patientId: cons.patientId as string,
+          patientGender: (cons.patientGender as string) || '',
+          patientMedicalHistory: (cons.patientMedicalHistory as string) || '',
+          doctorId: linkedDoc || (cons.doctorId as string) || '',
+          consultationDate: String(cons.consultationDate || '').slice(0, 10) || f.consultationDate,
+          consultationTime: (cons.consultationTime as string) || f.consultationTime,
+          symptoms: (cons.symptoms as string) || '',
+          personalHistory: ph,
+          menstrualHistory: mh,
+          ayurvedaExamination: ae,
+          diagnosis: diagnosisText,
+          notes: (cons.notes as string) || '',
+          followUpRequired: Boolean(cons.followUpRequired),
+          followUpDate: (cons.followUpDate as string) || '',
+          parentConsultationId: (cons.parentConsultationId as string) || '',
+          weight: wholeVitalFromApi(cons.weight),
+          height: wholeVitalFromApi(cons.height),
+          bpSystolic: cons.bpSystolic != null ? String(cons.bpSystolic) : '',
+          bpDiastolic: cons.bpDiastolic != null ? String(cons.bpDiastolic) : '',
+          temperature: cons.temperature != null ? String(cons.temperature) : '',
+          pulse: cons.pulse != null ? String(cons.pulse) : '',
+          spo2: cons.spo2 != null ? String(cons.spo2) : '',
+          cbg: cons.cbg != null ? String(cons.cbg) : '',
+          dietLifestyleAdvice: (cons.dietLifestyleAdvice as string) || '',
+          prescription: presc.filter((p) => p.medicineId).map((p) => ({
+            medicineId: p.medicineId!,
+            medicineName: p.medicineName || 'Medicine',
+            dosage: p.dosage || '',
+            durationDays: p.durationDays ?? '',
+            timeMorning: Boolean(p.timeMorning),
+            timeAfternoon: Boolean(p.timeAfternoon),
+            timeNight: Boolean(p.timeNight),
+            foodRelation: (p.foodRelation as 'before_food' | 'after_food' | undefined) || '',
+            quantity: p.quantity || '',
+            withHotWater: Boolean(p.withHotWater),
+            withMilk: Boolean(p.withMilk),
+            withHoney: Boolean(p.withHoney),
+            withGhee: Boolean(p.withGhee),
+          })),
+        }));
+        api.patients.get(String(cons.patientId)).then((p) => {
+          setForm((ff) => ({
+            ...ff,
+            patientName: (p.name as string) || '',
+            patientMedicalHistory: (ff.patientMedicalHistory || (p.medicalHistory as string)) || '',
+            patientGender: (ff.patientGender || (p.gender as string)) || '',
+          }));
+        }).catch(() => {});
+      })
+      .catch(() => toast({ title: 'Failed to load OP visit', variant: 'destructive' }))
+      .finally(() => setOpFormLoading(false));
+  }, [consultationIdFromRoute, isOpDoctorCompleteRoute, navigate, setSelectedClinicId, toast, user?.linkedDoctorId, user?.role]);
 
 
   useEffect(() => {
@@ -353,7 +510,7 @@ const ConsultationsPage = () => {
         patientId: cons.patientId as string,
         patientGender: (cons.patientGender as string) || '',
         patientMedicalHistory: (cons.patientMedicalHistory as string) || (f.patientMedicalHistory || ''),
-        doctorId: fixedDoctorMode ? linkedDoctorId : (cons.doctorId as string),
+        doctorId: cons.doctorId as string,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
         symptoms: (cons.symptoms as string) || '',
@@ -399,7 +556,7 @@ const ConsultationsPage = () => {
         variant: isAccessDenied ? 'default' : 'destructive',
       });
     });
-  }, [parentConsultationIdFromState, isReview, patientIdFromState, fixedDoctorMode, linkedDoctorId]);
+  }, [parentConsultationIdFromState, isReview, patientIdFromState]);
 
   useEffect(() => {
     if (!targetClinicId) {
@@ -416,17 +573,18 @@ const ConsultationsPage = () => {
     api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
   }, []);
 
-  useEffect(() => {
-    if (!fixedDoctorMode || !linkedDoctorId) return;
-    setForm((f) => ({ ...f, doctorId: linkedDoctorId }));
-  }, [fixedDoctorMode, linkedDoctorId]);
-
   const loadConsultations = () => {
+    if (clinicSelectionRequired && isListRoute) {
+      setConsultations([]);
+      setListLoading(false);
+      return;
+    }
     setListLoading(true);
     const params: Record<string, string> = {};
     if (user?.role === 'admin' && targetClinicId) params.clinicId = targetClinicId;
     if (form.patientId?.trim()) params.patientId = form.patientId.trim();
-    api.consultations.list(params)
+    const req = isOpListView ? api.opVisits.list(params) : api.consultations.list(params);
+    req
       .then((data) => setConsultations(data as ConsultationRow[]))
       .catch(() => setConsultations([]))
       .finally(() => setListLoading(false));
@@ -434,7 +592,7 @@ const ConsultationsPage = () => {
 
   useEffect(() => {
     loadConsultations();
-  }, [targetClinicId, user?.role, form.patientId]);
+  }, [targetClinicId, user?.role, form.patientId, isOpListView, isListRoute, isOpSection]);
 
   const addPrescription = () => {
     const first = medicinesMaster[0];
@@ -498,9 +656,9 @@ const ConsultationsPage = () => {
       const now = new Date();
       const consultationDate = isNurseStaff ? format(now, 'yyyy-MM-dd') : form.consultationDate;
       const consultationTime = isNurseStaff ? format(now, 'HH:mm') : form.consultationTime;
-      const created = await api.consultations.create({
+
+      const basePayload: Record<string, unknown> = {
         patientId: form.patientId,
-        ...(!isNurseStaff ? { doctorId: fixedDoctorMode ? linkedDoctorId : form.doctorId } : {}),
         clinicId: targetClinicId,
         consultationDate,
         consultationTime: consultationTime || undefined,
@@ -538,13 +696,106 @@ const ConsultationsPage = () => {
           withHoney: p.withHoney,
           withGhee: p.withGhee,
         })),
-      }) as { id?: string };
+      };
+
+      if (isOpDoctorCompleteRoute && consultationIdFromRoute) {
+        const doctorId = String(form.doctorId || user?.linkedDoctorId || '').trim();
+        if (!doctorId) {
+          toast({
+            title: 'Doctor required',
+            description: 'Select the examining doctor or ask admin to link a doctor to your account.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        const updated = (await api.opVisits.complete(consultationIdFromRoute, {
+          ...basePayload,
+          doctorId,
+        })) as { id?: string };
+        setConsultationErrors([]);
+        toast({
+          title: 'Consultation saved',
+          description: 'Visit is now under Consultations. Add fee and medicines at Pharmacy if needed.',
+        });
+        loadConsultations();
+        const cid = updated?.id || consultationIdFromRoute;
+        navigate(`/admin/consultations/${cid}`);
+        api.consultations.get(cid).then((data) => {
+          saveConsultationPrintPayload(cid, data);
+          openConsultationPrint(cid);
+        }).catch(() => {
+          openConsultationPrint(cid);
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (isNurseStaff && isOpNew) {
+        await api.opVisits.create({
+          patientId: form.patientId,
+          clinicId: targetClinicId!,
+          visitDate: consultationDate,
+          visitTime: consultationTime || undefined,
+          weight: toNum(form.weight),
+          height: toNum(form.height),
+          bpSystolic: toNum(form.bpSystolic),
+          bpDiastolic: toNum(form.bpDiastolic),
+          temperature: toNum(form.temperature),
+          pulse: toNum(form.pulse),
+          spo2: toNum(form.spo2),
+          cbg: toNum(form.cbg),
+          parentConsultationId: form.parentConsultationId || undefined,
+        });
+        setConsultationErrors([]);
+        toast({
+          title: 'Vitals saved',
+          description: 'OP record created. A doctor will complete the consultation from OP.',
+        });
+        const savedPatientId = form.patientId;
+        const savedPatientName = form.patientName;
+        setForm({
+          patientId: savedPatientId,
+          patientName: savedPatientName,
+          patientMedicalHistory: form.patientMedicalHistory,
+          patientGender: form.patientGender,
+          doctorId: '',
+          consultationDate: format(new Date(), 'yyyy-MM-dd'),
+          consultationTime: format(new Date(), 'HH:mm'),
+          followUpDate: '',
+          symptoms: '',
+          personalHistory: defaultPersonalHistory(),
+          menstrualHistory: defaultMenstrualHistory(),
+          ayurvedaExamination: defaultAyurvedaExamination(),
+          diagnosis: '',
+          notes: '',
+          followUpRequired: false,
+          parentConsultationId: '',
+          weight: '',
+          height: '',
+          bpSystolic: '',
+          bpDiastolic: '',
+          temperature: '',
+          pulse: '',
+          spo2: '',
+          cbg: '',
+          dietLifestyleAdvice: '',
+          prescription: [],
+        });
+        loadConsultations();
+        navigate('/admin/op');
+        setLoading(false);
+        return;
+      }
+
+      const created = (await api.consultations.create({
+        ...basePayload,
+        doctorId: form.doctorId,
+      })) as { id?: string };
       setConsultationErrors([]);
       toast({
-        title: isNurseStaff ? 'Vitals saved' : 'Consultation saved',
-        description: isNurseStaff
-          ? 'Clinical details and prescription can be added by a doctor when they see the patient.'
-          : 'Prescription recorded. Add fee & medicines at Pharmacy.',
+        title: 'Consultation saved',
+        description: 'Prescription recorded. Add fee & medicines at Pharmacy.',
       });
       const savedPatientId = form.patientId;
       const savedPatientName = form.patientName;
@@ -553,7 +804,7 @@ const ConsultationsPage = () => {
         patientName: savedPatientName,
         patientMedicalHistory: form.patientMedicalHistory,
         patientGender: form.patientGender,
-        doctorId: fixedDoctorMode ? linkedDoctorId : '',
+        doctorId: '',
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
         followUpDate: '',
@@ -577,14 +828,12 @@ const ConsultationsPage = () => {
         prescription: [],
       });
       loadConsultations();
-      if (created?.id && !isNurseStaff) {
+      if (created?.id) {
         api.consultations.get(created.id).then((data) => {
-          try { localStorage.setItem(`print_consult_${created.id}`, JSON.stringify(data)); } catch {}
-          window.open(`${window.location.origin}/print/consultation/${created.id}`, '_blank', 'noopener,noreferrer');
-          navigate('/admin/consultations', { replace: true });
+          saveConsultationPrintPayload(created.id, data);
+          openConsultationPrint(created.id);
         }).catch(() => {
-          window.open(`${window.location.origin}/print/consultation/${created.id}`, '_blank', 'noopener,noreferrer');
-          navigate('/admin/consultations', { replace: true });
+          openConsultationPrint(created.id);
         });
       }
     } catch (e) {
@@ -596,8 +845,8 @@ const ConsultationsPage = () => {
 
   const handlePrint = (id: string) => {
     api.consultations.get(id).then((data) => {
-      try { localStorage.setItem(`print_consult_${id}`, JSON.stringify(data)); } catch {}
-      window.open(`${window.location.origin}/print/consultation/${id}`, '_blank', 'noopener,noreferrer');
+      saveConsultationPrintPayload(id, data);
+      openConsultationPrint(id);
     }).catch(() => toast({ title: 'Failed to load', variant: 'destructive' }));
   };
 
@@ -609,7 +858,7 @@ const ConsultationsPage = () => {
       patientName: '',
       patientMedicalHistory: '',
       patientGender: '',
-      doctorId: fixedDoctorMode ? linkedDoctorId : '',
+      doctorId: '',
       consultationDate: format(new Date(), 'yyyy-MM-dd'),
       consultationTime: format(new Date(), 'HH:mm'),
       followUpDate: '',
@@ -632,6 +881,7 @@ const ConsultationsPage = () => {
       dietLifestyleAdvice: '',
       prescription: [],
     });
+    navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new');
   };
 
   const loadConsultationForFollowUp = (consultationId: string) => {
@@ -688,7 +938,7 @@ const ConsultationsPage = () => {
         patientGender: (d.patientGender as string) || '',
         menstrualHistory: mh,
         ayurvedaExamination: ae,
-        doctorId: fixedDoctorMode ? linkedDoctorId : (data.doctorId as string),
+        doctorId: data.doctorId as string,
         parentConsultationId: consultationId,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
@@ -726,7 +976,18 @@ const ConsultationsPage = () => {
   };
 
   const openConsultationRecord = (cons: ConsultationRow) => {
-    navigate(`/admin/consultations/${cons.id}`);
+    if (isOpListView) {
+      if (isNurseStaff) {
+        toast({
+          title: 'Open this visit as a doctor',
+          description: 'Nurses record vitals only. A doctor opens the row here to add examination, diagnosis, and complete the consultation.',
+        });
+        return;
+      }
+      navigate(`/admin/op/${cons.id}`);
+    } else {
+      navigate(`/admin/consultations/${cons.id}`);
+    }
   };
 
   const openFollowUp = (cons: ConsultationRow) => {
@@ -737,64 +998,30 @@ const ConsultationsPage = () => {
 
   /** Upcoming follow-ups: consultations with followUpRequired and followUpDate >= today. */
   const upcomingFollowUps = React.useMemo(() => {
+    if (isOpListView) return [];
     return consultations
       .filter((c) => c.followUpRequired === 1 && c.followUpDate && c.followUpDate >= todayStr)
       .sort((a, b) => ((a.followUpDate as string) || '').localeCompare((b.followUpDate as string) || ''));
-  }, [consultations]);
-
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const searchPatients = (term: string) => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    if (!term || term.length < 2) {
-      setPatientSearchResults([]);
-      return;
-    }
-    searchDebounceRef.current = setTimeout(() => {
-      setPatientSearching(true);
-      api.patients.list({ name: term })
-        .then((data) => setPatientSearchResults((data as { id: string; name: string; mobile: string }[]).slice(0, 15)))
-        .catch(() => setPatientSearchResults([]))
-        .finally(() => setPatientSearching(false));
-    }, 300);
-  };
-
-  const loadRecentPatients = () => {
-    setPatientSearching(true);
-    api.patients.list({})
-      .then((data) => setPatientSearchResults((data as { id: string; name: string; mobile: string }[]).slice(0, 10)))
-      .catch(() => setPatientSearchResults([]))
-      .finally(() => setPatientSearching(false));
-  };
+  }, [consultations, isOpListView, todayStr]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {(viewLoading || loading) && (
+      {(viewLoading || loading || (opFormLoading && isOpDoctorCompleteRoute)) && (
         <FullScreenLoader label="Loading consultations..." />
       )}
-      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-end gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {isListRoute && (
-            <Button
-              onClick={() => navigate('/admin/consultations/new')}
-              disabled={!targetClinicId}
-              size="sm"
-              className="shrink-0 shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98]"
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> New consult
-            </Button>
-          )}
-          {(isViewRoute || isFormRoute) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/admin/consultations')}
-              className="shrink-0 transition-all duration-200 hover:bg-muted/80 active:scale-[0.98]"
-            >
-              Back to records
-            </Button>
-          )}
-        </div>
-      </div>
+      <ConsultationsTopBar
+        isListRoute={isListRoute}
+        isNurseStaff={isNurseStaff}
+        isViewRoute={isViewRoute}
+        isFormRoute={isFormRoute}
+        isClinicSelected={!!targetClinicId}
+        onOpenNew={() => navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new')}
+        onBackToRecords={() => navigate(isOpSection ? '/admin/op' : '/admin/consultations')}
+      />
+
+      {clinicSelectionRequired && (isListRoute || isFormRoute) && (
+        <ClinicSelectionNotice message="Select a clinic in the header to manage consultations and OP flow." />
+      )}
 
       {isListRoute && (
         <Card className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-border/60 shadow-sm ring-1 ring-black/[0.03] transition-[box-shadow,border-color] duration-300 hover:shadow-md dark:ring-white/[0.04]">
@@ -805,9 +1032,13 @@ const ConsultationsPage = () => {
                   <Stethoscope className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">Consultation records</CardTitle>
+                  <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">
+                    {isOpListView ? 'OP queue (vitals pending doctor)' : 'Consultation records'}
+                  </CardTitle>
                   <CardDescription className="mt-1 text-xs leading-relaxed sm:text-sm">
-                    Open a row for full details. Refresh to reload the list.
+                    {isOpListView
+                      ? 'Nurse-entered vitals stay here until a doctor completes the visit. Open a row to examine.'
+                      : 'Doctor-assigned visits. Open a row for full details. Refresh to reload.'}
                   </CardDescription>
                 </div>
               </div>
@@ -836,8 +1067,11 @@ const ConsultationsPage = () => {
               openConsultationRecord={openConsultationRecord}
               openFollowUp={openFollowUp}
               handlePrint={handlePrint}
-              onNewConsult={() => navigate('/admin/consultations/new')}
+              onNewConsult={() => navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new')}
               targetClinicId={targetClinicId}
+              listKind={isOpListView ? 'op' : 'consultations'}
+              newConsultLabel={isNurseStaff ? 'New OP' : 'New consult'}
+              disableRowOpen={Boolean(isOpListView && isNurseStaff)}
             />
           </CardContent>
         </Card>
@@ -848,24 +1082,29 @@ const ConsultationsPage = () => {
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3 shrink-0">
             <div>
               <CardTitle className="text-lg">
-                {isNurseStaff
-                  ? 'Record vitals'
-                  : form.parentConsultationId
-                    ? 'Add Follow-up'
-                    : 'New consult'}
+                {isOpDoctorCompleteRoute
+                  ? 'Complete OP visit'
+                  : isNurseStaff
+                    ? isOpNew
+                      ? 'New OP — record vitals'
+                      : 'Record vitals'
+                    : form.parentConsultationId
+                      ? 'Add Follow-up'
+                      : 'New consult'}
               </CardTitle>
               <CardDescription className="mt-0.5">
-                {isNurseStaff
-                  ? 'Choose beneficiary and enter vitals. Visit date and time are set when you save. A doctor is not assigned here—they add complaint, examination, diagnosis and prescription when they see the patient.'
-                  : fixedDoctorMode
-                    ? 'OP visit: doctor is fixed from your login (see below). Complete the form, then Save & print — you return to the consultation list and a print tab opens.'
+                {isOpDoctorCompleteRoute
+                  ? 'Vitals and beneficiary are from the nurse. Add examination, diagnosis, prescription, then save — the visit moves to Consultations and print opens.'
+                  : isNurseStaff
+                    ? 'Choose beneficiary and enter vitals. Visit date and time are set when you save. A doctor is not assigned here—they add complaint, examination, diagnosis and prescription when they see the patient.'
                     : form.parentConsultationId
-                    ? 'Data copied from previous visit. Edit symptoms, vitals, diagnosis and save as follow-up.'
-                    : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
+                      ? 'Data copied from previous visit. Edit symptoms, vitals, diagnosis and save as follow-up.'
+                      : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
               </CardDescription>
             </div>
             <Button onClick={openNewConsultation} disabled={!targetClinicId} size="sm" className="shrink-0">
-              <Plus className="h-4 w-4 mr-1.5" /> New consult
+              <Plus className="h-4 w-4 mr-1.5" />{' '}
+              {isNurseStaff ? 'New OP' : 'New consult'}
             </Button>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 pt-0">
@@ -937,36 +1176,110 @@ const ConsultationsPage = () => {
               )}
               </div>
             </div>
-            {!isNurseStaff && fixedDoctorMode && (
-              <>
-                <p className="text-sm rounded-md border border-emerald-200/60 bg-emerald-50/50 px-3 py-2 text-foreground">
-                  <span className="font-medium">Doctor (OP):</span>{' '}
-                  {doctors.find((d) => d.id === linkedDoctorId)?.name ?? '—'}
-                  <span className="text-muted-foreground"> — from your account (not changeable)</span>
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Date <span className="text-destructive">*</span></Label>
-                    <Input
-                      type="date"
-                      className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
-                      value={form.consultationDate}
-                      onChange={(e) => { setForm((f) => ({ ...f, consultationDate: e.target.value })); setConsultationErrors((e) => e.filter((x) => !x.includes('date'))); }}
-                    />
-                  </div>
-                  <div>
-                    <Label>Time</Label>
-                    <Input
-                      type="time"
-                      className="h-10"
-                      value={form.consultationTime}
-                      onChange={(e) => setForm((f) => ({ ...f, consultationTime: e.target.value }))}
-                    />
-                  </div>
+            {isNurseStaff && isOpNew && form.patientId && (
+              <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <History className="h-4 w-4" /> Patient visit history
+                  </p>
+                  {form.parentConsultationId && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary ring-1 ring-primary/20 hover:bg-primary/25 transition-colors"
+                      onClick={() => setForm((f) => ({ ...f, parentConsultationId: '' }))}
+                    >
+                      Follow-up selected <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
-              </>
+                {patientHistoryLoading ? (
+                  <div className="flex items-center gap-2 py-3 justify-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading history...
+                  </div>
+                ) : patientHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">No previous consultations for this patient. This will be an <span className="font-semibold text-foreground">initial</span> visit.</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-border/40 bg-background">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent text-[11px]">
+                          <TableHead className="py-1.5 px-2">Date</TableHead>
+                          <TableHead className="py-1.5 px-2">Doctor</TableHead>
+                          <TableHead className="py-1.5 px-2">Diagnosis</TableHead>
+                          <TableHead className="py-1.5 px-2 text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {patientHistory
+                          .sort((a, b) => (b.consultationDate || '').localeCompare(a.consultationDate || ''))
+                          .map((h) => {
+                            const isSelected = form.parentConsultationId === h.id;
+                            return (
+                              <TableRow key={h.id} className={cn('text-xs', isSelected && 'bg-primary/5')}>
+                                <TableCell className="py-1.5 px-2 whitespace-nowrap tabular-nums">
+                                  {fmtDateWithTime(h.consultationDate, h.consultationTime)}
+                                </TableCell>
+                                <TableCell className="py-1.5 px-2">{(h as Record<string, unknown>).doctorName as string || '—'}</TableCell>
+                                <TableCell className="py-1.5 px-2 max-w-[160px] truncate">{diagnosisDisplay((h as Record<string, unknown>).diagnosis)}</TableCell>
+                                <TableCell className="py-1.5 px-2 text-right">
+                                  {isSelected ? (
+                                    <span className="text-[10px] font-semibold text-primary">Selected</span>
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-6 px-2 text-[10px]"
+                                      onClick={() => setForm((f) => ({ ...f, parentConsultationId: h.id }))}
+                                    >
+                                      Follow-up
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                {!form.parentConsultationId && patientHistory.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground">Click <span className="font-semibold">Follow-up</span> on a row to link this OP visit, or leave unselected for an <span className="font-semibold">initial</span> visit.</p>
+                )}
+              </div>
             )}
-            {!isNurseStaff && !fixedDoctorMode && (
+            {!isNurseStaff && (
+            opCompleteUsesLinkedDoctor ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="sm:col-span-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                  <Label className="text-muted-foreground">Examining doctor</Label>
+                  <p className="mt-1 text-base font-semibold text-foreground">
+                    {doctors.find((d) => d.id === linkedDoctorId)?.name ?? '—'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Your account is linked to this doctor — the consultation will be saved under this name.
+                  </p>
+                </div>
+                <div>
+                  <Label>Date <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="date"
+                    className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
+                    value={form.consultationDate}
+                    onChange={(e) => { setForm((f) => ({ ...f, consultationDate: e.target.value })); setConsultationErrors((e) => e.filter((x) => !x.includes('date'))); }}
+                  />
+                </div>
+                <div>
+                  <Label>Time</Label>
+                  <Input
+                    type="time"
+                    className="h-10"
+                    value={form.consultationTime}
+                    onChange={(e) => setForm((f) => ({ ...f, consultationTime: e.target.value }))}
+                  />
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label>Doctor <span className="text-destructive">*</span></Label>
@@ -998,6 +1311,7 @@ const ConsultationsPage = () => {
                 />
               </div>
             </div>
+            )
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
               <div>
@@ -1640,8 +1954,23 @@ const ConsultationsPage = () => {
             </div>
             </>
             )}
-            <Button onClick={handleSubmit} disabled={loading || !targetClinicId} className="w-full h-11 font-medium" size="lg">
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : isNurseStaff ? 'Save vitals' : 'Save & Print'}
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || opFormLoading || !targetClinicId}
+              className="w-full h-11 font-medium"
+              size="lg"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...
+                </>
+              ) : isNurseStaff ? (
+                'Save vitals'
+              ) : isOpDoctorCompleteRoute ? (
+                'Save, print & move to Consultations'
+              ) : (
+                'Save & Print'
+              )}
             </Button>
           </div>
           </CardContent>

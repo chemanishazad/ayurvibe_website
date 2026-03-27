@@ -47,7 +47,9 @@ function getAdminPageTitle(pathname: string, user: ReturnType<typeof getAuthUser
     return 'New invoice';
   }
   const items = getNavGroupsForSession(
-    user ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null } : null,
+    user
+      ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
+      : null,
   ).flatMap((g) => g.items);
   const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
   for (const item of sorted) {
@@ -68,7 +70,9 @@ const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children })
   const isAdminUser = user?.role === 'admin';
   const pageTitle = getAdminPageTitle(location.pathname, user);
   const visibleNavGroups = getNavGroupsForSession(
-    user ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null } : null,
+    user
+      ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
+      : null,
   );
   const {
     clinics,

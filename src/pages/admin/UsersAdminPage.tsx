@@ -18,7 +18,7 @@ import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { ADMIN_NAV_CATALOG } from '@/lib/nav-access';
-import { Plus, Pencil, Trash2, KeyRound, Link2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, KeyRound, Link2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,6 @@ type UserRow = {
   createdAt: string;
   allowedNavPaths?: string[] | null;
   staffRole?: string | null;
-  linkedDoctorId?: string | null;
 };
 
 const UsersAdminPage = () => {
@@ -52,48 +51,88 @@ const UsersAdminPage = () => {
     password: '',
     role: 'user' as 'admin' | 'user',
     clinicIds: [] as string[],
-    staffKind: 'full' as 'full' | 'nurse',
-    linkedDoctorId: null as string | null,
   });
-  const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [editUsername, setEditUsername] = useState('');
   const [editRole, setEditRole] = useState<'admin' | 'user'>('user');
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
   const [editStaffKind, setEditStaffKind] = useState<'full' | 'nurse'>('full');
-  const [editLinkedDoctorId, setEditLinkedDoctorId] = useState<string | null>(null);
   const [pwdUser, setPwdUser] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [mapUser, setMapUser] = useState<UserRow | null>(null);
   const [userClinics, setUserClinics] = useState<{ id: string; name: string; mappingId: string }[]>([]);
-  const [addClinicId, setAddClinicId] = useState('');
+  const [mapClinicIdsDraft, setMapClinicIdsDraft] = useState<string[]>([]);
+  const [mappingSaving, setMappingSaving] = useState(false);
   const { toast } = useToast();
 
   const refreshUsers = () =>
     api.users.list().then((data) => setUsers(data as UserRow[])).catch(() => setUsers([]));
 
   useEffect(() => {
-    Promise.all([
-      refreshUsers(),
-      api.clinics.list().then(setClinics).catch(() => setClinics([])),
-      api.doctors.list().then((data) => setDoctors((data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name })))).catch(() => setDoctors([])),
-    ]).finally(() => setLoading(false));
+    Promise.all([refreshUsers(), api.clinics.list().then(setClinics).catch(() => setClinics([]))]).finally(() =>
+      setLoading(false),
+    );
   }, []);
-
-  const clinicsNotMapped = useMemo(() => {
-    const have = new Set(userClinics.map((c) => c.id));
-    return clinics.filter((c) => !have.has(c.id));
-  }, [clinics, userClinics]);
 
   const openMappings = async (u: UserRow) => {
     setMapUser(u);
-    setAddClinicId('');
     try {
       const list = await api.users.listClinics(u.id);
-      setUserClinics(list as { id: string; name: string; mappingId: string }[]);
+      const mapped = list as { id: string; name: string; mappingId: string }[];
+      setUserClinics(mapped);
+      setMapClinicIdsDraft(mapped.map((c) => c.id));
     } catch {
       setUserClinics([]);
+      setMapClinicIdsDraft([]);
+    }
+  };
+
+  const toggleDraftClinic = (clinicId: string, checked: boolean) => {
+    setMapClinicIdsDraft((prev) =>
+      checked ? [...new Set([...prev, clinicId])] : prev.filter((id) => id !== clinicId)
+    );
+  };
+
+  const handleSaveMappings = async () => {
+    if (!mapUser) return;
+    if (mapClinicIdsDraft.length === 0) {
+      toast({
+        title: 'At least one clinic required',
+        description: 'Staff user must have at least one clinic access.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const current = new Set(userClinics.map((c) => c.id));
+    const draft = new Set(mapClinicIdsDraft);
+    const toAdd = [...draft].filter((id) => !current.has(id));
+    const toRemove = [...current].filter((id) => !draft.has(id));
+
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      toast({ title: 'No changes' });
+      return;
+    }
+
+    setMappingSaving(true);
+    try {
+      for (const clinicId of toAdd) {
+        await api.users.addClinic(mapUser.id, clinicId);
+      }
+      for (const clinicId of toRemove) {
+        await api.users.removeClinic(mapUser.id, clinicId);
+      }
+      toast({ title: 'Clinic access updated' });
+      await openMappings(mapUser);
+      await refreshUsers();
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'Failed to update clinic mapping',
+        variant: 'destructive',
+      });
+    } finally {
+      setMappingSaving(false);
     }
   };
 
@@ -113,23 +152,10 @@ const UsersAdminPage = () => {
         password: createForm.password,
         role: createForm.role,
         clinicIds: createForm.role === 'user' ? createForm.clinicIds : undefined,
-        ...(createForm.role === 'user'
-          ? {
-              staffRole: createForm.staffKind === 'nurse' ? 'nurse' : null,
-              linkedDoctorId: createForm.staffKind === 'nurse' ? null : createForm.linkedDoctorId,
-            }
-          : {}),
       });
       toast({ title: 'User created' });
       setShowCreate(false);
-      setCreateForm({
-        username: '',
-        password: '',
-        role: 'user',
-        clinicIds: [],
-        staffKind: 'full',
-        linkedDoctorId: null,
-      });
+      setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
       await refreshUsers();
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -153,7 +179,6 @@ const UsersAdminPage = () => {
         role: editRole,
         ...(editRole === 'user' ? { allowedNavPaths } : {}),
         ...(editRole === 'user' ? { staffRole: editStaffKind === 'nurse' ? 'nurse' : null } : {}),
-        ...(editRole === 'user' ? { linkedDoctorId: editStaffKind === 'nurse' ? null : editLinkedDoctorId } : {}),
       });
       toast({ title: 'User updated' });
       setEditing(null);
@@ -219,14 +244,7 @@ const UsersAdminPage = () => {
         <Button
           onClick={() => {
             setShowCreate(true);
-            setCreateForm({
-              username: '',
-              password: '',
-              role: 'user',
-              clinicIds: [],
-              staffKind: 'full',
-              linkedDoctorId: null,
-            });
+            setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -248,7 +266,6 @@ const UsersAdminPage = () => {
                 <tr className="border-b">
                   <th className="py-2 text-left">Username</th>
                   <th className="py-2 text-left">Role</th>
-                  <th className="py-2 text-left">OP doctor</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -263,11 +280,6 @@ const UsersAdminPage = () => {
                           vitals only
                         </span>
                       ) : null}
-                    </td>
-                    <td className="py-2 text-muted-foreground">
-                      {u.role === 'user' && u.staffRole !== 'nurse' && u.linkedDoctorId
-                        ? doctors.find((d) => d.id === u.linkedDoctorId)?.name ?? '—'
-                        : '—'}
                     </td>
                     <td className="py-2 text-right">
                       <div className="flex flex-wrap justify-end gap-1">
@@ -288,7 +300,6 @@ const UsersAdminPage = () => {
                             setEditNavRestricted(Boolean(paths && paths.length > 0));
                             setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
                             setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
-                            setEditLinkedDoctorId(u.linkedDoctorId ?? null);
                           }}
                         >
                           <Pencil className="h-4 w-4" />
@@ -355,60 +366,6 @@ const UsersAdminPage = () => {
               </Select>
             </div>
             {createForm.role === 'user' && (
-              <>
-                <div>
-                  <Label>Consultation form</Label>
-                  <Select
-                    value={createForm.staffKind}
-                    onValueChange={(v) =>
-                      setCreateForm((f) => ({
-                        ...f,
-                        staffKind: v as 'full' | 'nurse',
-                        linkedDoctorId: v === 'nurse' ? null : f.linkedDoctorId,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full">Full (OP / doctor)</SelectItem>
-                      <SelectItem value="nurse">Nurse — vitals only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Nurses record vitals only; that visit has no doctor until a clinician completes OP.
-                  </p>
-                </div>
-                {createForm.staffKind === 'full' && (
-                  <div>
-                    <Label>Default doctor (OP)</Label>
-                    <Select
-                      value={createForm.linkedDoctorId ?? '__none__'}
-                      onValueChange={(v) =>
-                        setCreateForm((f) => ({ ...f, linkedDoctorId: v === '__none__' ? null : v }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Optional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None — choose doctor each visit</SelectItem>
-                        {doctors.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      If set, the consultation form fixes this doctor (not changeable on the form).
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-            {createForm.role === 'user' && (
               <div className="space-y-2 rounded-lg border p-3">
                 <Label>Clinic access</Label>
                 {clinics.length === 0 ? (
@@ -467,48 +424,17 @@ const UsersAdminPage = () => {
             {editRole === 'user' && (
               <div>
                 <Label>Consultation form</Label>
-                <Select
-                  value={editStaffKind}
-                  onValueChange={(v) => {
-                    const kind = v as 'full' | 'nurse';
-                    setEditStaffKind(kind);
-                    if (kind === 'nurse') setEditLinkedDoctorId(null);
-                  }}
-                >
+                <Select value={editStaffKind} onValueChange={(v) => setEditStaffKind(v as 'full' | 'nurse')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="full">Full (OP / doctor)</SelectItem>
+                    <SelectItem value="full">Full (doctor / staff)</SelectItem>
                     <SelectItem value="nurse">Nurse — vitals only</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Nurses only see beneficiary + vitals; visit time is set when saving.
-                </p>
-              </div>
-            )}
-            {editRole === 'user' && editStaffKind === 'full' && (
-              <div>
-                <Label>Default doctor (OP)</Label>
-                <Select
-                  value={editLinkedDoctorId ?? '__none__'}
-                  onValueChange={(v) => setEditLinkedDoctorId(v === '__none__' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None — choose doctor each visit</SelectItem>
-                    {doctors.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  If set, the consultation form fixes this doctor (not changeable on the form).
+                  Nurses only see beneficiary + vitals; visit time is set when saving; doctor is auto-assigned.
                 </p>
               </div>
             )}
@@ -576,80 +502,70 @@ const UsersAdminPage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!mapUser} onOpenChange={(o) => !o && setMapUser(null)}>
+      <Dialog
+        open={!!mapUser}
+        onOpenChange={(o) => {
+          if (!o) {
+            setMapUser(null);
+            setMapClinicIdsDraft([]);
+            setUserClinics([]);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Clinic mapping</DialogTitle>
             <DialogDescription>Staff: {mapUser?.username}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <ul className="space-y-2 text-sm">
-              {userClinics.map((c) => (
-                <li key={c.id} className="flex items-center justify-between rounded border px-3 py-2">
-                  <span>{c.name}</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive"
-                    onClick={async () => {
-                      if (!mapUser) return;
-                      try {
-                        await api.users.removeClinic(mapUser.id, c.id);
-                        toast({ title: 'Removed' });
-                        await openMappings(mapUser);
-                        await refreshUsers();
-                      } catch (e) {
-                        toast({
-                          title: 'Error',
-                          description: e instanceof Error ? e.message : 'Failed',
-                          variant: 'destructive',
-                        });
-                      }
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            {clinicsNotMapped.length > 0 ? (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Selected: <strong>{mapClinicIdsDraft.length}</strong> / {clinics.length}
+              </span>
               <div className="flex gap-2">
-                <Select value={addClinicId || undefined} onValueChange={setAddClinicId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Add clinic…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clinicsNotMapped.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Button
-                  disabled={!addClinicId || !mapUser}
-                  onClick={async () => {
-                    if (!mapUser || !addClinicId) return;
-                    try {
-                      await api.users.addClinic(mapUser.id, addClinicId);
-                      toast({ title: 'Clinic linked' });
-                      setAddClinicId('');
-                      await openMappings(mapUser);
-                    } catch (e) {
-                      toast({
-                        title: 'Error',
-                        description: e instanceof Error ? e.message : 'Failed',
-                        variant: 'destructive',
-                      });
-                    }
-                  }}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMapClinicIdsDraft(clinics.map((c) => c.id))}
+                  disabled={clinics.length === 0}
                 >
-                  Add
+                  Select all
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMapClinicIdsDraft([])}
+                  disabled={clinics.length === 0}
+                >
+                  Clear
                 </Button>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">All clinics are already linked.</p>
-            )}
+            </div>
+            <div className="max-h-[280px] space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-2">
+              {clinics.length === 0 ? (
+                <p className="px-2 py-1 text-sm text-muted-foreground">Create clinics first.</p>
+              ) : (
+                clinics.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40">
+                    <Checkbox
+                      checked={mapClinicIdsDraft.includes(c.id)}
+                      onCheckedChange={(ch) => toggleDraftClinic(c.id, ch === true)}
+                    />
+                    {c.name}
+                  </label>
+                ))
+              )}
+            </div>
+            <Button onClick={handleSaveMappings} disabled={!mapUser || mappingSaving} className="w-full">
+              {mappingSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving clinic access...
+                </>
+              ) : (
+                'Save clinic access'
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

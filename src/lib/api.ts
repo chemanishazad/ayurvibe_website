@@ -103,16 +103,10 @@ export const api = {
       role: 'admin' | 'user';
       clinicIds?: string[];
       allowedNavPaths?: string[] | null;
-      staffRole?: 'nurse' | null;
-      linkedDoctorId?: string | null;
-    }) =>
-      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null; linkedDoctorId?: string | null }>(
-        '/api/users',
-        {
-          method: 'POST',
-          body: JSON.stringify(data),
-        },
-      ),
+    }) => fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
     update: (
       id: string,
       data: Partial<{
@@ -123,14 +117,7 @@ export const api = {
         linkedDoctorId: string | null;
       }>,
     ) =>
-      fetchApi<{
-        id: string;
-        username: string;
-        role: string;
-        allowedNavPaths?: string[] | null;
-        staffRole?: string | null;
-        linkedDoctorId?: string | null;
-      }>(
+      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null; staffRole?: string | null }>(
         `/api/users/${id}`,
         {
           method: 'PATCH',
@@ -247,6 +234,19 @@ export const api = {
       >(`/api/inventory/batches?clinicId=${encodeURIComponent(clinicId)}`),
     lowStock: (clinicId?: string) => fetchApi<Record<string, unknown>[]>(`/api/inventory/low-stock${clinicId ? `?clinicId=${clinicId}` : ''}`),
     update: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/inventory', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  /** Nurse OP vitals (patient master); doctors complete via `complete`. */
+  opVisits: {
+    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
+      return fetchApi<Record<string, unknown>[]>(`/api/op-visits${q ? `?${q}` : ''}`);
+    },
+    get: (id: string) => fetchApi<Record<string, unknown>>(`/api/op-visits/${id}`),
+    create: (data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>('/api/op-visits', { method: 'POST', body: JSON.stringify(data) }),
+    complete: (id: string, data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>(`/api/op-visits/${id}/complete`, { method: 'POST', body: JSON.stringify(data) }),
   },
   consultations: {
     list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
