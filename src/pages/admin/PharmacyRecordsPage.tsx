@@ -57,6 +57,18 @@ import {
 
 const PAGE_SIZES = [10, 20, 50] as const;
 
+const SALE_KIND_LABELS: Record<'direct' | 'consultation' | 'own', string> = {
+  direct: 'Direct',
+  consultation: 'Consultation',
+  own: 'Own',
+};
+
+const SALE_KIND_SEARCH_HINTS: Record<'direct' | 'consultation' | 'own', string> = {
+  direct: 'direct walk-in',
+  consultation: 'consultation',
+  own: 'own',
+};
+
 function formatSaleDate(s: string): string {
   const d = parseISO(s.slice(0, 10));
   return isValid(d) ? formatAppDate(d) : s.slice(0, 10);
@@ -104,6 +116,15 @@ function displayCustomerName(sale: PharmacySaleGroup): string {
   return sale.saleKind === 'direct' ? 'Walk-in sale' : '—';
 }
 
+function saleKindLabel(kind: PharmacySaleGroup['saleKind'], full = false): string {
+  if (full) {
+    if (kind === 'direct') return 'Direct sale';
+    if (kind === 'own') return 'Own use';
+    return 'Consultation pharmacy';
+  }
+  return SALE_KIND_LABELS[kind];
+}
+
 /** Show last 10 digits for Indian numbers stored with country code. */
 function formatMobileDisplay(raw: string | null | undefined): string {
   const d = String(raw || '').replace(/\D/g, '');
@@ -123,6 +144,138 @@ function treatmentBillRows(treatments: { name: string; price: string }[]) {
   });
   return rows;
 }
+
+function getDirectSaleTotals(sale: PharmacySaleGroup) {
+  const discountItems = sale.items.filter((it) => it.quantity === 0 && parseFloat(it.total || '0') < 0);
+  const medicineItems = sale.items.filter((it) => it.quantity > 0 || parseFloat(it.total || '0') >= 0);
+  const discountAmount = discountItems.reduce((sum, it) => sum + parseFloat(it.total || '0'), 0);
+  const medicineSubtotal = medicineItems.reduce((sum, it) => sum + parseFloat(it.total || '0'), 0);
+
+  return {
+    medicineItems,
+    discountAmount,
+    medicineSubtotal,
+    treatmentRows: discountAmount < 0 ? [{ name: 'Medicine Discount', price: String(discountAmount) }] : [],
+    treatmentTotal: discountAmount < 0 ? String(discountAmount) : '0',
+  };
+}
+
+type ConsultationMedicineApiRow = { medicineName: string; quantity: number; unitPrice: string; total?: string };
+type ConsultationTreatmentApiRow = { name: string; price: string };
+type BillMedicineRow = { medicineName: string; quantity: number; unitPrice: string; total: string };
+type PharmacyGroupedApiItem = {
+  id?: string;
+  medicineName?: string;
+  quantity?: number;
+  unitPrice?: string;
+  total?: string;
+  batchNumber?: string | null;
+  expiryDate?: string | null;
+};
+type PharmacyGroupedApiRecord = {
+  saleKind?: 'direct' | 'consultation' | 'own';
+  consultationId?: string | null;
+  saleDate?: string;
+  createdAt?: string;
+  customerName?: string | null;
+  customerMobile?: string | null;
+  consultationTreatmentTotal?: string;
+  items?: PharmacyGroupedApiItem[];
+};
+
+const responseMapper = {
+  toNumber(value: unknown): number {
+    return parseFloat(String(value ?? 0)) || 0;
+  },
+
+  recordToLedgerLine(record: Record<string, unknown>): PharmacyLedgerLine {
+    const saleKind = (record.saleKind as PharmacyLedgerLine['saleKind']) || 'direct';
+    const createdAtValue = record.createdAt;
+
+    return {
+      id: String(record.id ?? ''),
+      saleKind,
+      consultationId: (record.consultationId as string | null) ?? null,
+      medicineName: String(record.medicineName ?? ''),
+      quantity: Number(record.quantity ?? 0),
+      unitPrice: String(record.unitPrice ?? '0'),
+      total: String(record.total ?? '0'),
+      saleDate: String(record.saleDate ?? '').slice(0, 10),
+      createdAt:
+        typeof createdAtValue === 'string'
+          ? createdAtValue
+          : createdAtValue instanceof Date
+            ? createdAtValue.toISOString()
+            : '',
+      customerName: (record.customerName ?? record.patientName ?? record.name) as string | null | undefined,
+      customerMobile: (record.customerMobile ?? record.mobile ?? record.phone) as string | null | undefined,
+      consultationTreatmentTotal:
+        record.consultationTreatmentTotal != null ? String(record.consultationTreatmentTotal) : undefined,
+      batchNumber: (record.batchNumber as string | null | undefined) ?? null,
+      expiryDate: (record.expiryDate as string | null | undefined) ?? null,
+    };
+  },
+
+  recordsToLedgerLines(records: Record<string, unknown>[]): PharmacyLedgerLine[] {
+    const lines: PharmacyLedgerLine[] = [];
+
+    records.forEach((record) => {
+      const grouped = record as PharmacyGroupedApiRecord;
+      const groupedItems = Array.isArray(grouped.items) ? grouped.items : null;
+
+      if (groupedItems && groupedItems.length > 0) {
+        groupedItems.forEach((item) => {
+          lines.push(
+            responseMapper.recordToLedgerLine({
+              ...record,
+              id: item.id ?? '',
+              medicineName: item.medicineName ?? '',
+              quantity: item.quantity ?? 0,
+              unitPrice: item.unitPrice ?? '0',
+              total: item.total ?? '0',
+              batchNumber: item.batchNumber ?? null,
+              expiryDate: item.expiryDate ?? null,
+            }),
+          );
+        });
+        return;
+      }
+
+      lines.push(responseMapper.recordToLedgerLine(record));
+    });
+
+    return lines;
+  },
+
+  consultationMedicines(medicines: ConsultationMedicineApiRow[] = []): BillMedicineRow[] {
+    return medicines.map((medicine) => {
+      const unitPrice = responseMapper.toNumber(medicine.unitPrice);
+      const total = medicine.total != null ? responseMapper.toNumber(medicine.total) : medicine.quantity * unitPrice;
+      return {
+        medicineName: medicine.medicineName,
+        quantity: medicine.quantity,
+        unitPrice: String(unitPrice),
+        total: String(total),
+      };
+    });
+  },
+
+  consultationTreatments(treatments: ConsultationTreatmentApiRow[] = []): ConsultationTreatmentApiRow[] {
+    return treatments.map((treatment) => ({
+      name: treatment.name,
+      price: String(responseMapper.toNumber(treatment.price)),
+    }));
+  },
+
+  billMedicines(rows: BillMedicineRow[]): BillMedicineRow[] {
+    return rows.map((item) => ({
+      medicineName: item.medicineName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      total: item.total,
+    }));
+  },
+};
 
 const PharmacyRecordsPage = () => {
   const { effectiveClinicId, clinics } = useAdminClinic();
@@ -153,9 +306,9 @@ const PharmacyRecordsPage = () => {
         clinicId: targetClinicId,
         from: recordsDateFrom,
         to: recordsDateTo,
+        grouped: true,
       });
       setPharmacyRecords(data as Record<string, unknown>[]);
-      console.log('data',data)
       setRecordsSource('unified');
     } catch {
       try {
@@ -190,30 +343,7 @@ const PharmacyRecordsPage = () => {
   }, [recordsDateFrom, recordsDateTo, recordsSearch, recordsSaleKind, targetClinicId, perPage]);
 
   const ledgerLines = useMemo((): PharmacyLedgerLine[] => {
-    return (pharmacyRecords as Record<string, unknown>[]).map((r) => {
-      const row = r as Record<string, unknown>;
-      return {
-        id: String(r.id ?? ''),
-        saleKind: ((r.saleKind as PharmacyLedgerLine['saleKind']) || 'direct') as PharmacyLedgerLine['saleKind'],
-        consultationId: (r.consultationId as string | null) ?? null,
-        medicineName: String(r.medicineName ?? ''),
-        quantity: Number(r.quantity ?? 0),
-        unitPrice: String(r.unitPrice ?? '0'),
-        total: String(r.total ?? '0'),
-        saleDate: String(r.saleDate ?? '').slice(0, 10),
-        createdAt:
-          typeof r.createdAt === 'string'
-            ? r.createdAt
-            : r.createdAt instanceof Date
-              ? r.createdAt.toISOString()
-              : '',
-        customerName: (row.customerName ?? row.patientName ?? row.name) as string | null | undefined,
-        customerMobile: (row.customerMobile ?? row.mobile ?? row.phone) as string | null | undefined,
-        consultationTreatmentTotal: row.consultationTreatmentTotal != null ? String(row.consultationTreatmentTotal) : undefined,
-        batchNumber: (row.batchNumber as string | null | undefined) ?? null,
-        expiryDate: (row.expiryDate as string | null | undefined) ?? null,
-      };
-    });
+    return responseMapper.recordsToLedgerLines(pharmacyRecords as Record<string, unknown>[]);
   }, [pharmacyRecords]);
 
   const pharmacyGroups = useMemo(() => buildPharmacyGroups(ledgerLines), [ledgerLines]);
@@ -230,11 +360,7 @@ const PharmacyRecordsPage = () => {
         row.saleDate,
         row.customerName,
         row.customerMobile,
-        row.saleKind === 'direct'
-          ? 'direct walk-in'
-          : row.saleKind === 'own'
-            ? 'own'
-            : 'consultation',
+        SALE_KIND_SEARCH_HINTS[row.saleKind],
         ...row.items.map((i) => i.medicineName),
       ]
         .join(' ')
@@ -247,7 +373,6 @@ const PharmacyRecordsPage = () => {
   const recordsTotalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
 
   const pagedPharmacyGroups = useMemo(() => {
-    console.log(filteredPharmacyGroups);
     const start = (recordsPage - 1) * perPage;
     return filteredPharmacyGroups.slice(start, start + perPage);
   }, [filteredPharmacyGroups, recordsPage, perPage]);
@@ -268,7 +393,7 @@ const PharmacyRecordsPage = () => {
     api.consultations
       .get(cid)
       .then((data) => {
-        const tr = (data.treatments as { name: string; price: string }[]) || [];
+        const tr = responseMapper.consultationTreatments((data.treatments as ConsultationTreatmentApiRow[]) || []);
         if (tr.length === 0 && ledgerFallback > 0) {
           setSheetConsultationTreatments([{ name: 'Consultation & treatments', price: String(ledgerFallback) }]);
         } else {
@@ -325,16 +450,19 @@ const PharmacyRecordsPage = () => {
         toast({ title: 'No mobile', description: 'Patient has no mobile on file', variant: 'destructive' });
         return;
       }
-      const meds = ((data.medicines as Array<{ medicineName: string; quantity: number; unitPrice: string; total?: string }>) || []).map((m) => ({
-        medicineName: m.medicineName,
-        quantity: m.quantity,
-        unitPrice: String(m.unitPrice ?? 0),
-        total: String(m.total ?? m.quantity * parseFloat(m.unitPrice || '0')),
-      }));
-      const trts = ((data.treatments as Array<{ name: string; price: string }>) || []).map((t) => ({ name: t.name, price: String(t.price ?? 0) }));
-      const medTotal = String(data.medicineTotal ?? meds.reduce((s, m) => s + parseFloat(m.total || '0'), 0));
-      const trtTotal = String(data.treatmentTotal ?? trts.reduce((s, t) => s + parseFloat(t.price || '0'), 0));
-      const grand = parseFloat(medTotal) + parseFloat(trtTotal);
+      const meds = responseMapper.consultationMedicines((data.medicines as ConsultationMedicineApiRow[]) || []);
+      const trts = responseMapper.consultationTreatments((data.treatments as ConsultationTreatmentApiRow[]) || []);
+      const medTotalValue =
+        data.medicineTotal != null
+          ? responseMapper.toNumber(data.medicineTotal)
+          : meds.reduce((sum, item) => sum + responseMapper.toNumber(item.total), 0);
+      const trtTotalValue =
+        data.treatmentTotal != null
+          ? responseMapper.toNumber(data.treatmentTotal)
+          : trts.reduce((sum, item) => sum + responseMapper.toNumber(item.price), 0);
+      const medTotal = String(medTotalValue);
+      const trtTotal = String(trtTotalValue);
+      const grand = medTotalValue + trtTotalValue;
       const billDate = new Date().toISOString().slice(0, 10);
       const billTime = formatNowAppTime();
       api.whatsapp
@@ -344,7 +472,7 @@ const PharmacyRecordsPage = () => {
           billData: {
             customerName: String(data.patientName || ''),
             medicines: meds,
-            consultationFee: parseFloat(String(data.consultationFee ?? 0)),
+            consultationFee: responseMapper.toNumber(data.consultationFee),
             treatments: trts,
             medicineTotal: medTotal,
             treatmentTotal: trtTotal,
@@ -363,10 +491,7 @@ const PharmacyRecordsPage = () => {
   };
 
   const printDirectSaleRecord = (sale: PharmacySaleGroup, rowIndex: number) => {
-    const discountItems = sale.items.filter((it) => it.quantity === 0 && parseFloat(it.total || '0') < 0);
-    const medicineItems = sale.items.filter((it) => it.quantity > 0 || parseFloat(it.total || '0') >= 0);
-    const discountAmount = discountItems.reduce((s, it) => s + parseFloat(it.total || '0'), 0);
-    const medicineSubtotal = medicineItems.reduce((s, it) => s + parseFloat(it.total || '0'), 0);
+    const { medicineItems, medicineSubtotal, treatmentRows, treatmentTotal } = getDirectSaleTotals(sale);
     const printId = `record_${sale.saleDate}_${rowIndex}_${Date.now()}`;
     const clinicName = clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic';
     const now = new Date();
@@ -383,26 +508,18 @@ const PharmacyRecordsPage = () => {
       clinicName,
       doctorName: 'Dr.V.VAITHEESHWARI B.A.M.S.,',
       paymentMode: 'Cash',
-      medicines: medicineItems.map((m) => ({
-        medicineName: m.medicineName,
-        quantity: m.quantity,
-        unitPrice: m.unitPrice,
-        total: m.total,
-      })),
-      treatments: discountAmount < 0 ? [{ name: 'Medicine Discount', price: String(discountAmount) }] : [],
+      medicines: responseMapper.billMedicines(medicineItems),
+      treatments: treatmentRows,
       consultationFee: 0,
       medicineTotal: String(medicineSubtotal),
-      treatmentTotal: discountAmount < 0 ? String(discountAmount) : '0',
+      treatmentTotal,
     };
     savePharmacyPrintPayload(printId, printData);
     openPharmacyPrint(printId);
   };
 
   const whatsappDirectSaleRecord = (sale: PharmacySaleGroup) => {
-    const discountItems = sale.items.filter((it) => it.quantity === 0 && parseFloat(it.total || '0') < 0);
-    const medicineItems = sale.items.filter((it) => it.quantity > 0 || parseFloat(it.total || '0') >= 0);
-    const discountAmount = discountItems.reduce((s, it) => s + parseFloat(it.total || '0'), 0);
-    const medicineSubtotal = medicineItems.reduce((s, it) => s + parseFloat(it.total || '0'), 0);
+    const { medicineItems, discountAmount, medicineSubtotal, treatmentRows, treatmentTotal } = getDirectSaleTotals(sale);
     const grandTotal = medicineSubtotal + (discountAmount < 0 ? discountAmount : 0);
     let rawMobile = String(sale.customerMobile || '').replace(/\D/g, '');
     if (rawMobile.length > 10) rawMobile = rawMobile.slice(-10);
@@ -416,15 +533,10 @@ const PharmacyRecordsPage = () => {
         countryCode: '91',
         billData: {
           customerName: sale.customerName || 'Direct Sale',
-          medicines: medicineItems.map((m) => ({
-            medicineName: m.medicineName,
-            quantity: m.quantity,
-            unitPrice: m.unitPrice,
-            total: m.total,
-          })),
-          treatments: discountAmount < 0 ? [{ name: 'Medicine Discount', price: String(discountAmount) }] : [],
+          medicines: responseMapper.billMedicines(medicineItems),
+          treatments: treatmentRows,
           medicineTotal: String(medicineSubtotal),
-          treatmentTotal: discountAmount < 0 ? String(discountAmount) : '0',
+          treatmentTotal,
           grandTotal: grandTotal.toFixed(2),
           paymentMode: 'Cash',
           date: sale.saleDate,
@@ -584,11 +696,7 @@ const PharmacyRecordsPage = () => {
                               >
                                 <TableCell className="align-top py-2.5">
                                   <span className="inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary ring-1 ring-primary/15">
-                                    {sale.saleKind === 'direct'
-                                      ? 'Direct'
-                                      : sale.saleKind === 'own'
-                                        ? 'Own'
-                                        : 'Consultation'}
+                                    {saleKindLabel(sale.saleKind)}
                                   </span>
                                 </TableCell>
                                 <TableCell className="align-top py-2.5">
@@ -742,11 +850,7 @@ const PharmacyRecordsPage = () => {
                 <SheetDescription>
                   {formatGroupSheetDate(viewSale)}
                   {' · '}
-                  {viewSale.saleKind === 'direct'
-                    ? 'Direct sale'
-                    : viewSale.saleKind === 'own'
-                      ? 'Own use'
-                      : 'Consultation pharmacy'}
+                  {saleKindLabel(viewSale.saleKind, true)}
                 </SheetDescription>
               </SheetHeader>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">

@@ -34,6 +34,7 @@ type UserRow = {
   createdAt: string;
   allowedNavPaths?: string[] | null;
   staffRole?: string | null;
+  linkedDoctorId?: string | null;
 };
 
 const UsersAdminPage = () => {
@@ -44,6 +45,8 @@ const UsersAdminPage = () => {
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
+  const [doctors, setDoctors] = useState<{ id: string; name: string; clinicIds?: string[] }[]>([]);
+  const [userClinicNamesByUserId, setUserClinicNamesByUserId] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -58,6 +61,8 @@ const UsersAdminPage = () => {
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
   const [editStaffKind, setEditStaffKind] = useState<'full' | 'nurse'>('full');
+  const [editLinkedDoctorId, setEditLinkedDoctorId] = useState<string>('none');
+  const [editUserClinicIds, setEditUserClinicIds] = useState<string[]>([]);
   const [pwdUser, setPwdUser] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [mapUser, setMapUser] = useState<UserRow | null>(null);
@@ -66,14 +71,50 @@ const UsersAdminPage = () => {
   const [mappingSaving, setMappingSaving] = useState(false);
   const { toast } = useToast();
 
-  const refreshUsers = () =>
-    api.users.list().then((data) => setUsers(data as UserRow[])).catch(() => setUsers([]));
+  const refreshUsers = async () => {
+    try {
+      const data = (await api.users.list()) as UserRow[];
+      setUsers(data);
+      const staffUsers = data.filter((u) => u.role === 'user');
+      const mappingEntries = await Promise.all(
+        staffUsers.map(async (u) => {
+          try {
+            const mapped = (await api.users.listClinics(u.id)) as { id: string; name: string; mappingId: string }[];
+            return [u.id, mapped.map((c) => c.name)] as const;
+          } catch {
+            return [u.id, []] as const;
+          }
+        }),
+      );
+      setUserClinicNamesByUserId(Object.fromEntries(mappingEntries));
+    } catch {
+      setUsers([]);
+      setUserClinicNamesByUserId({});
+    }
+  };
 
   useEffect(() => {
-    Promise.all([refreshUsers(), api.clinics.list().then(setClinics).catch(() => setClinics([]))]).finally(() =>
-      setLoading(false),
-    );
+    Promise.all([
+      refreshUsers(),
+      api.clinics.list().then(setClinics).catch(() => setClinics([])),
+      api.doctors.list().then((list) => setDoctors(list as { id: string; name: string; clinicIds?: string[] }[])).catch(() => setDoctors([])),
+    ]).finally(() => setLoading(false));
   }, []);
+
+  const doctorNameById = useMemo(
+    () => Object.fromEntries(doctors.map((d) => [d.id, d.name] as const)),
+    [doctors],
+  );
+
+  const editDoctorOptions = useMemo(() => {
+    if (editRole !== 'user') return [];
+    if (editUserClinicIds.length === 0) return doctors;
+    return doctors.filter((d) => {
+      const assignedClinics = d.clinicIds || [];
+      if (assignedClinics.length === 0) return true;
+      return assignedClinics.some((cid) => editUserClinicIds.includes(cid));
+    });
+  }, [doctors, editRole, editUserClinicIds]);
 
   const openMappings = async (u: UserRow) => {
     setMapUser(u);
@@ -85,6 +126,28 @@ const UsersAdminPage = () => {
     } catch {
       setUserClinics([]);
       setMapClinicIdsDraft([]);
+    }
+  };
+
+  const openEditUser = async (u: UserRow) => {
+    setEditing(u);
+    setEditUsername(u.username);
+    setEditRole(u.role === 'admin' ? 'admin' : 'user');
+    const paths = u.allowedNavPaths;
+    setEditNavRestricted(Boolean(paths && paths.length > 0));
+    setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
+    setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
+    setEditLinkedDoctorId(u.linkedDoctorId || 'none');
+
+    if (u.role === 'user') {
+      try {
+        const mapped = await api.users.listClinics(u.id);
+        setEditUserClinicIds((mapped as { id: string; name: string; mappingId: string }[]).map((c) => c.id));
+      } catch {
+        setEditUserClinicIds([]);
+      }
+    } else {
+      setEditUserClinicIds([]);
     }
   };
 
@@ -179,6 +242,9 @@ const UsersAdminPage = () => {
         role: editRole,
         ...(editRole === 'user' ? { allowedNavPaths } : {}),
         ...(editRole === 'user' ? { staffRole: editStaffKind === 'nurse' ? 'nurse' : null } : {}),
+        ...(editRole === 'user'
+          ? { linkedDoctorId: editLinkedDoctorId === 'none' ? null : editLinkedDoctorId }
+          : {}),
       });
       toast({ title: 'User updated' });
       setEditing(null);
@@ -266,6 +332,7 @@ const UsersAdminPage = () => {
                 <tr className="border-b">
                   <th className="py-2 text-left">Username</th>
                   <th className="py-2 text-left">Role</th>
+                  <th className="py-2 text-left">Clinic access</th>
                   <th className="py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -280,6 +347,32 @@ const UsersAdminPage = () => {
                           vitals only
                         </span>
                       ) : null}
+                      {u.role === 'user' && u.linkedDoctorId ? (
+                        <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-normal text-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
+                          Dr: {doctorNameById[u.linkedDoctorId] || 'Assigned'}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-2">
+                      {u.role === 'admin' ? (
+                        <span className="text-xs text-muted-foreground">All clinics</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {(userClinicNamesByUserId[u.id] || []).slice(0, 2).map((clinicName) => (
+                            <span key={clinicName} className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                              {clinicName}
+                            </span>
+                          ))}
+                          {(userClinicNamesByUserId[u.id] || []).length > 2 ? (
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                              +{(userClinicNamesByUserId[u.id] || []).length - 2}
+                            </span>
+                          ) : null}
+                          {(userClinicNamesByUserId[u.id] || []).length === 0 ? (
+                            <span className="text-xs text-muted-foreground">No clinics mapped</span>
+                          ) : null}
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 text-right">
                       <div className="flex flex-wrap justify-end gap-1">
@@ -292,15 +385,7 @@ const UsersAdminPage = () => {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            setEditing(u);
-                            setEditUsername(u.username);
-                            setEditRole(u.role === 'admin' ? 'admin' : 'user');
-                            const paths = u.allowedNavPaths;
-                            setEditNavRestricted(Boolean(paths && paths.length > 0));
-                            setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
-                            setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
-                          }}
+                          onClick={() => void openEditUser(u)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -435,6 +520,32 @@ const UsersAdminPage = () => {
                 </Select>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Nurses only see beneficiary + vitals; visit time is set when saving; doctor is auto-assigned.
+                </p>
+              </div>
+            )}
+            {editRole === 'user' && (
+              <div>
+                <Label>Linked doctor (optional)</Label>
+                <Select value={editLinkedDoctorId} onValueChange={setEditLinkedDoctorId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No linked doctor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No linked doctor</SelectItem>
+                    {editDoctorOptions.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id}>
+                        {doc.name}
+                      </SelectItem>
+                    ))}
+                    {editLinkedDoctorId !== 'none' && !editDoctorOptions.some((d) => d.id === editLinkedDoctorId) ? (
+                      <SelectItem value={editLinkedDoctorId}>
+                        {doctorNameById[editLinkedDoctorId] || 'Current linked doctor'}
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Doctors are filtered by this staff user's clinic access.
                 </p>
               </div>
             )}

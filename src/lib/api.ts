@@ -271,7 +271,7 @@ export const api = {
   },
   pharmacyRecords: {
     /** Walk-in direct sales + consultation pharmacy line items (unified ledger). */
-    list: (params?: { clinicId?: string; from?: string; to?: string }) => {
+    list: (params?: { clinicId?: string; from?: string; to?: string; grouped?: boolean }) => {
       const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<
