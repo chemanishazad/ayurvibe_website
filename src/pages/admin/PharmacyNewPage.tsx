@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { formatAppDate, formatBillDisplayDateTime, formatNowAppTime } from '@/lib/datetime';
 import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
+import { openPharmacyPrint, savePharmacyPrintPayload } from '@/lib/print-handoff';
 import { COUNTRY_CODES } from '@/lib/country-codes';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus } from 'lucide-react';
@@ -117,10 +118,15 @@ const PharmacyNewPage = () => {
   const { toast } = useToast();
 
   const targetClinicId = effectiveClinicId ?? undefined;
+  const clinicSelectionRequired = !!(isAdmin && !targetClinicId);
 
   useEffect(() => {
+    if (!targetClinicId) {
+      setPatientMaster([]);
+      return;
+    }
     api.patients
-      .list(targetClinicId ? { clinicId: targetClinicId } : {})
+      .list({ clinicId: targetClinicId })
       .then((data) => setPatientMaster((data as PatientMasterRow[]) || []))
       .catch(() => setPatientMaster([]));
   }, [targetClinicId]);
@@ -340,19 +346,17 @@ const PharmacyNewPage = () => {
           const billTime = formatNowAppTime();
           const billDateLabel = formatBillDisplayDateTime(billDate, billTime);
           try {
-            localStorage.setItem(
-              `print_pharmacy_${consId}`,
-              JSON.stringify(
-                buildPharmacyPrintPayload(data as Record<string, unknown>, {
-                  paymentMode,
-                  billDate,
-                  billTime,
-                  billDateLabel,
-                }),
-              ),
+            savePharmacyPrintPayload(
+              consId,
+              buildPharmacyPrintPayload(data as Record<string, unknown>, {
+                paymentMode,
+                billDate,
+                billTime,
+                billDateLabel,
+              }),
             );
           } catch {}
-          window.open(`${window.location.origin}/print/pharmacy/${consId}`, '_blank', 'noopener,noreferrer');
+          openPharmacyPrint(consId);
           navigate('/admin/pharmacy');
           const rawMobile = (data.patientMobile as string) || '';
           const digits = rawMobile.replace(/\D/g, '');
@@ -388,7 +392,7 @@ const PharmacyNewPage = () => {
             }).catch(() => {});
           }
         }).catch(() => {
-          window.open(`${window.location.origin}/print/pharmacy/${consId}`, '_blank', 'noopener,noreferrer');
+          openPharmacyPrint(consId);
           navigate('/admin/pharmacy');
         });
       } else {
@@ -454,8 +458,8 @@ const PharmacyNewPage = () => {
           medicineTotal: billMedicineTotal,
           treatmentTotal: billTreatmentTotal,
         };
-        try { localStorage.setItem(`print_pharmacy_${printId}`, JSON.stringify(printData)); } catch {}
-        window.open(`${window.location.origin}/print/pharmacy/${printId}`, '_blank', 'noopener,noreferrer');
+        savePharmacyPrintPayload(printId, printData);
+        openPharmacyPrint(printId);
         if (customerMobile && !skipWhatsApp) {
           api.whatsapp.sendBill({
             mobile: customerMobile,
@@ -513,21 +517,35 @@ const PharmacyNewPage = () => {
       const billTime = formatNowAppTime();
       try {
         const paymentMode = options?.paymentMode ?? '—';
-        localStorage.setItem(
-          `print_pharmacy_${id}`,
-          JSON.stringify(
-            buildPharmacyPrintPayload(data as Record<string, unknown>, {
-              paymentMode,
-              billDate,
-              billTime,
-              billDateLabel: formatBillDisplayDateTime(billDate, billTime),
-            }),
-          ),
+        savePharmacyPrintPayload(
+          id,
+          buildPharmacyPrintPayload(data as Record<string, unknown>, {
+            paymentMode,
+            billDate,
+            billTime,
+            billDateLabel: formatBillDisplayDateTime(billDate, billTime),
+          }),
         );
       } catch {}
-      window.open(`${window.location.origin}/print/pharmacy/${id}`, '_blank', 'noopener,noreferrer');
+      openPharmacyPrint(id);
     }).catch(() => toast({ title: 'Failed to load', variant: 'destructive' }));
   };
+
+  if (clinicSelectionRequired) {
+    return (
+      <div className="flex flex-1 min-h-0 flex-col gap-4">
+        <PageHeader
+          title="New pharmacy invoice"
+          description="Select a clinic in the header to create invoices."
+        />
+        <Card className="border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/40">
+          <CardContent className="py-4 text-sm text-amber-900 dark:text-amber-100">
+            Pick a clinic first, then open this page again to continue billing.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

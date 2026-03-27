@@ -51,6 +51,11 @@ type Props = {
   handlePrint: (id: string) => void;
   onNewConsult: () => void;
   targetClinicId?: string;
+  /** OP queue: hide follow-up / print; adjust empty state. */
+  listKind?: 'consultations' | 'op';
+  newConsultLabel?: string;
+  /** Nurses cannot open the doctor completion form from the OP queue. */
+  disableRowOpen?: boolean;
 };
 
 const dash = (v: unknown): string => {
@@ -80,7 +85,11 @@ export const ConsultationListTable: React.FC<Props> = ({
   handlePrint,
   onNewConsult,
   targetClinicId,
+  listKind = 'consultations',
+  newConsultLabel = 'New consult',
+  disableRowOpen = false,
 }) => {
+  const isOpQueue = listKind === 'op';
   const sorted = React.useMemo(
     () =>
       [...consultations].sort((a, b) => {
@@ -106,11 +115,15 @@ export const ConsultationListTable: React.FC<Props> = ({
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-4 ring-primary/5 transition-transform duration-300 hover:scale-105">
           <Stethoscope className="h-7 w-7" />
         </div>
-        <p className="font-semibold text-foreground">No consultations yet</p>
-        <p className="mt-1 max-w-sm px-4 text-sm text-muted-foreground">Create a new consult or pick another clinic to see records.</p>
+        <p className="font-semibold text-foreground">{isOpQueue ? 'No OP visits in queue' : 'No consultations yet'}</p>
+        <p className="mt-1 max-w-sm px-4 text-sm text-muted-foreground">
+          {isOpQueue
+            ? 'Record vitals under New OP, or switch clinic to see other branches.'
+            : 'Create a new consult or pick another clinic to see records.'}
+        </p>
         <Button className="mt-5 shadow-sm transition-all hover:shadow-md active:scale-[0.98]" size="sm" disabled={!targetClinicId} onClick={onNewConsult}>
           <Plus className="mr-2 h-4 w-4" />
-          New consult
+          {newConsultLabel}
         </Button>
       </div>
     );
@@ -118,7 +131,7 @@ export const ConsultationListTable: React.FC<Props> = ({
 
   return (
     <div className="space-y-4">
-      {upcomingFollowUps.length > 0 && (
+      {!isOpQueue && upcomingFollowUps.length > 0 && (
         <div className="rounded-lg border border-amber-200/80 bg-amber-50/40 px-3 py-2 dark:border-amber-800/50 dark:bg-amber-950/20">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100/90 px-3 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-300/50 dark:bg-amber-950/60 dark:text-amber-200">
@@ -169,10 +182,11 @@ export const ConsultationListTable: React.FC<Props> = ({
                 <TableRow
                   key={c.id}
                   className={cn(
-                    'cursor-pointer',
+                    !disableRowOpen && 'cursor-pointer',
+                    disableRowOpen && 'cursor-default',
                     activeConsId === c.id && 'bg-primary/5',
                   )}
-                  onClick={() => openConsultationRecord(c)}
+                  onClick={disableRowOpen ? undefined : () => openConsultationRecord(c)}
                 >
                   <TableCell className="align-top">
                     <span
@@ -231,12 +245,22 @@ export const ConsultationListTable: React.FC<Props> = ({
                   </TableCell>
                   <TableCell className="align-top text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-0.5">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(c)} title="Follow-up">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(c.id)} title="Print">
-                        <Printer className="h-4 w-4" />
-                      </Button>
+                      {!isOpQueue && (
+                        <>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openFollowUp(c)} title="Follow-up">
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handlePrint(c.id)} title="Print">
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      {isOpQueue && !disableRowOpen && (
+                        <span className="text-[11px] text-muted-foreground px-1 py-1">Click to complete</span>
+                      )}
+                      {isOpQueue && disableRowOpen && (
+                        <span className="text-[11px] text-muted-foreground/60 px-1 py-1">Pending doctor</span>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

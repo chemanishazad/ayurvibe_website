@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/pagination';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
+import { getAuthUser } from '@/pages/Login';
 
 type PatientRow = Record<string, unknown> & { consultationCount?: number; lastConsultationId?: string };
 
@@ -131,7 +132,13 @@ const PatientsPage = () => {
   };
 
   const handleView = (patientId: string) => {
-    navigate('/admin/consultations', { state: { patientId } });
+    const u = getAuthUser();
+    const isNurse = u?.role === 'user' && u?.staffRole === 'nurse';
+    if (isNurse) {
+      navigate('/admin/op', { state: { patientId } });
+    } else {
+      navigate('/admin/consultations', { state: { patientId } });
+    }
   };
 
   const handleEdit = (patientId: string) => {

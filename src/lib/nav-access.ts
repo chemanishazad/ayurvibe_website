@@ -14,6 +14,7 @@ import {
   Building2,
   UserCog,
   Scale,
+  HeartPulse,
 } from 'lucide-react';
 
 /** Single source for admin “Users & access” checkboxes and sidebar filtering. */
@@ -26,6 +27,7 @@ export const ADMIN_NAV_CATALOG: {
   { path: '/admin/dashboard', label: 'Dashboard', group: 'Overview', icon: LayoutDashboard },
   { path: '/admin/patients', label: 'Patients', group: 'Clinical', icon: Users },
   { path: '/admin/doctors', label: 'Doctors', group: 'Clinical', icon: UsersRound },
+  { path: '/admin/op', label: 'OP', group: 'Clinical', icon: HeartPulse },
   { path: '/admin/consultations', label: 'Consultations', group: 'Clinical', icon: Stethoscope },
   { path: '/admin/pharmacy', label: 'Pharmacy', group: 'Clinical', icon: Pill },
   { path: '/admin/treatment-plans', label: 'Treatment Plans', group: 'Clinical', icon: ClipboardList },
@@ -68,6 +70,8 @@ export const STAFF_HIDDEN_NAV_PATHS = new Set([
 export type AuthUserSession = {
   role: string;
   allowedNavPaths?: string[] | null;
+  /** When `nurse`, OP vitals only — no full Consultations module. */
+  staffRole?: string | null;
 };
 
 function pathMatchesAllowed(pathname: string, allowedPrefix: string): boolean {
@@ -80,8 +84,12 @@ function pathMatchesAllowed(pathname: string, allowedPrefix: string): boolean {
 export function userMayAccessRoute(user: AuthUserSession | null, pathname: string): boolean {
   if (!user) return false;
   if (user.role === 'admin') return true;
-  const allowed = user.allowedNavPaths;
   const p = pathname.replace(/\/$/, '') || '/';
+  /** Nurses record vitals under OP only; consultation charts are for doctors. */
+  if (user.role === 'user' && user.staffRole === 'nurse' && pathMatchesAllowed(p, '/admin/consultations')) {
+    return false;
+  }
+  const allowed = user.allowedNavPaths;
   if (allowed && allowed.length > 0) {
     return allowed.some((prefix) => pathMatchesAllowed(p, prefix));
   }
@@ -94,15 +102,24 @@ export function userMayAccessRoute(user: AuthUserSession | null, pathname: strin
   return true;
 }
 
+function stripConsultationsForNurse(items: NavGroup['items'], isNurse: boolean): NavGroup['items'] {
+  if (!isNurse) return items;
+  return items.filter((item) => item.path !== '/admin/consultations');
+}
+
 export function getNavGroupsForSession(user: AuthUserSession | null): NavGroup[] {
   const full = getFullNavGroups();
   if (!user || user.role === 'admin') return full;
+  const isNurse = user.role === 'user' && user.staffRole === 'nurse';
   const allowed = user.allowedNavPaths;
   if (allowed && allowed.length > 0) {
     return full
       .map((g) => ({
         ...g,
-        items: g.items.filter((item) => allowed.some((prefix) => pathMatchesAllowed(item.path, prefix))),
+        items: stripConsultationsForNurse(
+          g.items.filter((item) => allowed.some((prefix) => pathMatchesAllowed(item.path, prefix))),
+          isNurse,
+        ),
       }))
       .filter((g) => g.items.length > 0);
   }
@@ -110,7 +127,10 @@ export function getNavGroupsForSession(user: AuthUserSession | null): NavGroup[]
     .filter((g) => g.label !== 'Administration')
     .map((g) => ({
       ...g,
-      items: g.items.filter((item) => !STAFF_HIDDEN_NAV_PATHS.has(item.path)),
+      items: stripConsultationsForNurse(
+        g.items.filter((item) => !STAFF_HIDDEN_NAV_PATHS.has(item.path)),
+        isNurse,
+      ),
     }))
     .filter((g) => g.items.length > 0);
 }
