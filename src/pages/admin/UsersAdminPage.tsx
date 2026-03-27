@@ -349,7 +349,7 @@ const UsersAdminPage = () => {
                       ) : null}
                       {u.role === 'user' && u.linkedDoctorId ? (
                         <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-normal text-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
-                          Dr: {doctorNameById[u.linkedDoctorId] || 'Assigned'}
+                          {doctorNameById[u.linkedDoctorId] || 'Assigned'}
                         </span>
                       ) : null}
                     </td>
