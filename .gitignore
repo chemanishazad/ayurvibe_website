@@ -25,3 +25,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# sitemaps (generated files)
+public/sitemap*.xml
+public/sitemap*.xml.gz
+public/sitemap_index*.xml
+public/sitemap_index*.xml.gz
