@@ -321,9 +321,9 @@ const UsersAdminPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Accounts</CardTitle>
-          <CardDescription>
+          {/* <CardDescription>
             Roles: <strong>admin</strong> (full access, no clinic mapping) or <strong>staff</strong> (clinic-scoped).
-          </CardDescription>
+          </CardDescription> */}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
