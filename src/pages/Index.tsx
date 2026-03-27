@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { FormEvent, useState } from 'react';
 // (imports restored above after cleanup)
 import { Button } from '@/components/ui/button';
 import SEO from '@/components/SEO';
@@ -64,24 +64,106 @@ const Index = () => {
   const [emailAddr, setEmailAddr] = useState('');
   const [inquiryType, setInquiryType] = useState('Appointment');
   const [notes, setNotes] = useState('');
+  const [formErrors, setFormErrors] = useState({
+    fullName: '',
+    age: '',
+    mobile: '',
+    emailAddr: '',
+    inquiryType: '',
+    notes: '',
+  });
 
-  const sendEmail = async () => {
+  const validateBookingForm = () => {
+    const errors = {
+      fullName: '',
+      age: '',
+      mobile: '',
+      emailAddr: '',
+      inquiryType: '',
+      notes: '',
+    };
+
+    const trimmedName = fullName.trim();
+    const trimmedAge = age.trim();
+    const trimmedMobile = mobile.trim();
+    const trimmedEmail = emailAddr.trim();
+    const trimmedNotes = notes.trim();
+
+    if (!trimmedName) {
+      errors.fullName = 'Full name is required';
+    } else if (!/^[a-zA-Z.\s'-]{3,}$/.test(trimmedName)) {
+      errors.fullName = 'Enter a valid full name';
+    }
+
+    if (!trimmedAge) {
+      errors.age = 'Age is required';
+    } else {
+      const ageNum = Number(trimmedAge);
+      if (!Number.isInteger(ageNum) || ageNum < 1 || ageNum > 120) {
+        errors.age = 'Enter a valid age between 1 and 120';
+      }
+    }
+
+    if (!trimmedMobile) {
+      errors.mobile = 'Mobile number is required';
+    } else {
+      const digitsOnly = trimmedMobile.replace(/\D/g, '');
+      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+        errors.mobile = 'Enter a valid mobile number';
+      }
+    }
+
+    if (!trimmedEmail) {
+      errors.emailAddr = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errors.emailAddr = 'Enter a valid email address';
+    }
+
+    if (!inquiryType.trim()) {
+      errors.inquiryType = 'Please select inquiry type';
+    }
+
+    if (!trimmedNotes) {
+      errors.notes = 'Message is required';
+    } else if (trimmedNotes.length < 10) {
+      errors.notes = 'Message should be at least 10 characters';
+    }
+
+    setFormErrors(errors);
+    return Object.values(errors).every((err) => !err);
+  };
+
+  const sendEmail = async (e?: FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
+    if (!validateBookingForm()) {
+      toast({
+        title: 'Please check the form',
+        description: 'Fix the highlighted fields and try again.',
+      });
+      return;
+    }
+
     setIsSending(true);
     const serviceId = 'service_0du2i3q';
     const templateId = 'template_laoe4hx';
     const userId = 'jCbJ4C1pc_xXhy0Fn';
+    const trimmedName = fullName.trim();
+    const trimmedAge = age.trim();
+    const trimmedMobile = mobile.trim();
+    const trimmedEmail = emailAddr.trim();
+    const trimmedNotes = notes.trim();
 
     const templateParams = {
-      name: fullName,
-      age,
-      mobile,
-      email: emailAddr,
-      to_email: emailAddr,
-      to_name: fullName,
+      name: trimmedName,
+      age: trimmedAge,
+      mobile: trimmedMobile,
+      email: trimmedEmail,
+      to_email: trimmedEmail,
+      to_name: trimmedName,
       from_name: 'Sri Vinayaga Ayurvibe',
-      reply_to: emailAddr,
+      reply_to: trimmedEmail,
       inquiry_type: inquiryType,
-      message: notes,
+      message: trimmedNotes,
       time: new Date().toString(),
     } as Record<string, unknown>;
 
@@ -107,6 +189,14 @@ const Index = () => {
         setEmailAddr('');
         setNotes('');
         setInquiryType('Appointment');
+        setFormErrors({
+          fullName: '',
+          age: '',
+          mobile: '',
+          emailAddr: '',
+          inquiryType: '',
+          notes: '',
+        });
         setShowThankYou(true);
       } else {
         const text = await response.text();
@@ -891,7 +981,7 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-start">
+          <div className="grid lg:grid-cols-2 gap-12 items-stretch">
             {/* Booking Form */}
             <Card className="border-none shadow-soft">
               <CardHeader>
@@ -901,31 +991,81 @@ const Index = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <form className="space-y-6" onSubmit={sendEmail} noValidate>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" placeholder="Enter your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                    <Input
+                      id="name"
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChange={(e) => {
+                        setFullName(e.target.value);
+                        if (formErrors.fullName) setFormErrors((prev) => ({ ...prev, fullName: '' }));
+                      }}
+                      aria-invalid={!!formErrors.fullName}
+                    />
+                    {formErrors.fullName ? <p className="text-sm text-destructive">{formErrors.fullName}</p> : null}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="age">Age</Label>
-                    <Input id="age" type="number" placeholder="Your age" value={age} onChange={(e) => setAge(e.target.value)} />
+                    <Input
+                      id="age"
+                      type="number"
+                      placeholder="Your age"
+                      value={age}
+                      onChange={(e) => {
+                        setAge(e.target.value);
+                        if (formErrors.age) setFormErrors((prev) => ({ ...prev, age: '' }));
+                      }}
+                      aria-invalid={!!formErrors.age}
+                    />
+                    {formErrors.age ? <p className="text-sm text-destructive">{formErrors.age}</p> : null}
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone">Mobile</Label>
-                    <Input id="phone" type="tel" placeholder="+91 81229 39197" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+91 81229 39197"
+                      value={mobile}
+                      onChange={(e) => {
+                        setMobile(e.target.value);
+                        if (formErrors.mobile) setFormErrors((prev) => ({ ...prev, mobile: '' }));
+                      }}
+                      aria-invalid={!!formErrors.mobile}
+                    />
+                    {formErrors.mobile ? <p className="text-sm text-destructive">{formErrors.mobile}</p> : null}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="your@email.com" value={emailAddr} onChange={(e) => setEmailAddr(e.target.value)} />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={emailAddr}
+                      onChange={(e) => {
+                        setEmailAddr(e.target.value);
+                        if (formErrors.emailAddr) setFormErrors((prev) => ({ ...prev, emailAddr: '' }));
+                      }}
+                      aria-invalid={!!formErrors.emailAddr}
+                    />
+                    {formErrors.emailAddr ? <p className="text-sm text-destructive">{formErrors.emailAddr}</p> : null}
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="inquiry">Inquiry Type</Label>
-                  <Select value={inquiryType} onValueChange={setInquiryType}>
+                  <Select
+                    value={inquiryType}
+                    onValueChange={(value) => {
+                      setInquiryType(value);
+                      if (formErrors.inquiryType) setFormErrors((prev) => ({ ...prev, inquiryType: '' }));
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select inquiry type" />
                     </SelectTrigger>
@@ -939,6 +1079,7 @@ const Index = () => {
                       <SelectItem value="General Inquiry">General Inquiry</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formErrors.inquiryType ? <p className="text-sm text-destructive">{formErrors.inquiryType}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -948,11 +1089,16 @@ const Index = () => {
                     placeholder="Tell us about your health concerns or questions..."
                     rows={4}
                     value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
+                    onChange={(e) => {
+                      setNotes(e.target.value);
+                      if (formErrors.notes) setFormErrors((prev) => ({ ...prev, notes: '' }));
+                    }}
+                    aria-invalid={!!formErrors.notes}
                   />
+                  {formErrors.notes ? <p className="text-sm text-destructive">{formErrors.notes}</p> : null}
                 </div>
 
-                <Button onClick={sendEmail} disabled={isSending} className="w-full bg-primary hover:bg-primary/90 text-lg py-6">
+                <Button type="submit" disabled={isSending} className="w-full bg-primary hover:bg-primary/90 text-lg py-6">
                   {isSending ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -965,11 +1111,12 @@ const Index = () => {
                     </>
                   )}
                 </Button>
+                </form>
               </CardContent>
             </Card>
 
             {/* Map Only */}
-            <div className="space-y-6">
+            <div className="h-full">
               <HospitalMap />
             </div>
           </div>
@@ -1067,7 +1214,7 @@ const Index = () => {
           
           <div className="text-center">
             <p className="text-primary-foreground/70">
-              © 2025 Sri Vinayaga Ayurvibe. All rights reserved. • Healing with love, wisdom, and compassion.
+              © 2026 Sri Vinayaga Ayurvibe. All rights reserved. • Healing with love, wisdom, and compassion.
             </p>
           </div>
         </div>

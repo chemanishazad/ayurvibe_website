@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { formatPatientAgeDisplay } from '@/lib/patient-age';
 import { Search, UserPlus, Eye, Pencil, X, CalendarDays, Users, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatAppDateTime } from '@/lib/datetime';
 import {
   Select,
   SelectContent,
@@ -31,6 +31,9 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import FullScreenLoader from '@/components/FullScreenLoader';
+import { useAdminClinic } from '@/contexts/AdminClinicContext';
+import { getAuthUser } from '@/pages/Login';
+
 type PatientRow = Record<string, unknown> & { consultationCount?: number; lastConsultationId?: string };
 
 const PAGE_SIZES = [10, 20, 50];
@@ -38,6 +41,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 
 const PatientsPage = () => {
   const navigate = useNavigate();
+  const { effectiveClinicId, isAdmin } = useAdminClinic();
   const [rawPatients, setRawPatients] = useState<PatientRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -68,6 +72,7 @@ const PatientsPage = () => {
     if (nextFilters.search?.trim()) params.search = nextFilters.search.trim();
     if (nextFilters.from?.trim()) params.from = nextFilters.from.trim();
     if (nextFilters.to?.trim()) params.to = nextFilters.to.trim();
+    if (isAdmin && effectiveClinicId) params.clinicId = effectiveClinicId;
     api.patients
       .list(params)
       .then((data) => {
@@ -100,7 +105,7 @@ const PatientsPage = () => {
       loadPatients(filters);
     }, timeoutMs);
     return () => clearTimeout(timer);
-  }, [filters.search, filters.from, filters.to]);
+  }, [filters.search, filters.from, filters.to, isAdmin, effectiveClinicId]);
 
   const handleFromDateChange = (value: string) => {
     setFilters((f) => {
@@ -127,7 +132,13 @@ const PatientsPage = () => {
   };
 
   const handleView = (patientId: string) => {
-    navigate('/admin/consultations', { state: { patientId } });
+    const u = getAuthUser();
+    const isNurse = u?.role === 'user' && u?.staffRole === 'nurse';
+    if (isNurse) {
+      navigate('/admin/op', { state: { patientId } });
+    } else {
+      navigate('/admin/consultations', { state: { patientId } });
+    }
   };
 
   const handleEdit = (patientId: string) => {
@@ -301,7 +312,7 @@ const PatientsPage = () => {
                             )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap py-2 text-sm tabular-nums text-muted-foreground">
-                            {p.createdAt ? format(new Date(p.createdAt as string), 'dd-MM-yyyy HH:mm') : '—'}
+                            {p.createdAt ? formatAppDateTime(p.createdAt as string) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-right">
                             <div className="flex flex-wrap items-center justify-end gap-2">

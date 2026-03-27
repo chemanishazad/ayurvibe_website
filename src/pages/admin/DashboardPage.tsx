@@ -17,6 +17,7 @@ import {
   CalendarRange,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
+import { formatChartDateLabel, formatIsoDateToApp } from '@/lib/datetime';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
@@ -265,7 +266,10 @@ const DashboardPage = () => {
     fetchData();
   }, [fetchData]);
 
-  const dateRangeLabel = appliedFrom === appliedTo ? appliedFrom : `${appliedFrom} to ${appliedTo}`;
+  const dateRangeLabel =
+    appliedFrom === appliedTo
+      ? formatIsoDateToApp(appliedFrom)
+      : `${formatIsoDateToApp(appliedFrom)} to ${formatIsoDateToApp(appliedTo)}`;
 
   if (error) {
     return (
@@ -432,10 +436,10 @@ const DashboardPage = () => {
                           <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={CHART_COLORS[1]} stopOpacity={0.3} /><stop offset="95%" stopColor={CHART_COLORS[1]} stopOpacity={0} /></linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => formatChartDateLabel(String(v))} />
                         <YAxis yAxisId="left" tickFormatter={(v) => v.toString()} />
                         <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(value: number, name: string) => (name === 'revenue' ? [`₹${value.toLocaleString()}`, 'Revenue'] : [value, 'Visits'])} labelFormatter={(label) => `Date: ${label}`} />
+                        <Tooltip formatter={(value: number, name: string) => (name === 'revenue' ? [`₹${value.toLocaleString()}`, 'Revenue'] : [value, 'Visits'])} labelFormatter={(label) => `Date: ${formatChartDateLabel(label)}`} />
                         <Legend />
                         <Area yAxisId="left" type="monotone" dataKey="visits" stroke={CHART_COLORS[0]} fill="url(#colorVisits)" name="Visits" strokeWidth={2} />
                         <Area yAxisId="right" type="monotone" dataKey="revenue" stroke={CHART_COLORS[1]} fill="url(#colorRevenue)" name="Revenue" strokeWidth={2} />
@@ -586,10 +590,10 @@ const DashboardPage = () => {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={analyticsData.chartData.map((d) => ({ ...d, name: d.date }))}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => formatChartDateLabel(String(v))} />
                           <YAxis yAxisId="left" />
                           <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip formatter={(v: number, name: string) => (name === 'revenue' ? [`₹${v.toLocaleString()}`, 'Revenue'] : [v, 'Visits'])} />
+                          <Tooltip formatter={(v: number, name: string) => (name === 'revenue' ? [`₹${v.toLocaleString()}`, 'Revenue'] : [v, 'Visits'])} labelFormatter={(label) => `Date: ${formatChartDateLabel(label)}`} />
                           <Legend />
                           <Line yAxisId="left" type="monotone" dataKey="visits" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} name="Visits" />
                           <Line yAxisId="right" type="monotone" dataKey="revenue" stroke={CHART_COLORS[1]} strokeWidth={2} dot={{ r: 4 }} name="Revenue" />

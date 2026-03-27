@@ -42,6 +42,7 @@ const InventoryPage = () => {
     sellingPrice: '',
     purchaseDate: new Date().toISOString().slice(0, 10),
     expiryDate: '',
+    batchNumber: '',
     uomCode: '',
   });
   const { toast } = useToast();
@@ -126,6 +127,7 @@ const InventoryPage = () => {
         sellingPrice: purchaseForm.sellingPrice ? parseFloat(purchaseForm.sellingPrice) : undefined,
         purchaseDate: purchaseForm.purchaseDate || undefined,
         expiryDate: purchaseForm.expiryDate || undefined,
+        batchNumber: purchaseForm.batchNumber.trim() || undefined,
       });
       toast({ title: 'Purchase recorded' });
       setShowPurchase(false);
@@ -137,6 +139,7 @@ const InventoryPage = () => {
         sellingPrice: '',
         purchaseDate: new Date().toISOString().slice(0, 10),
         expiryDate: '',
+        batchNumber: '',
         uomCode: '',
       });
       api.inventory.list(targetClinicId).then(setInventory);
@@ -342,6 +345,14 @@ const InventoryPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <Label>Batch number</Label>
+                <Input
+                  value={purchaseForm.batchNumber}
+                  onChange={(e) => setPurchaseForm((f) => ({ ...f, batchNumber: e.target.value }))}
+                  placeholder="Manufacturer batch / lot"
+                />
+              </div>
+              <div>
                 <Label>Expiry Date</Label>
                 <Input
                   type="date"
@@ -349,7 +360,6 @@ const InventoryPage = () => {
                   onChange={(e) => setPurchaseForm((f) => ({ ...f, expiryDate: e.target.value }))}
                 />
               </div>
-              <div />
             </div>
             <div className="flex gap-2">
               <Button onClick={handlePurchase}>Record Purchase</Button>

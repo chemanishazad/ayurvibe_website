@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { formatAppDate } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -141,7 +142,7 @@ const UpcomingFollowUpsPage: React.FC = () => {
                   <TableBody>
                     {filteredItems.map((item) => {
                       const d = parseISO(item.date);
-                      const dateLabel = isNaN(d.getTime()) ? item.date : format(d, 'dd MMM yyyy');
+                      const dateLabel = isNaN(d.getTime()) ? item.date : formatAppDate(d);
                       const isActive = selected?.id === item.id;
                       return (
                         <TableRow
@@ -185,7 +186,7 @@ const UpcomingFollowUpsPage: React.FC = () => {
                     <p className="mt-0.5">
                       {(() => {
                         const d = parseISO(selected.date);
-                        return isNaN(d.getTime()) ? selected.date : format(d, 'dd MMM yyyy');
+                        return isNaN(d.getTime()) ? selected.date : formatAppDate(d);
                       })()}
                     </p>
                   </div>
