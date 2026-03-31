@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -167,7 +167,7 @@ const patientInitials = (name: string) => {
 
 const ConsultationsPage = () => {
   const user = getAuthUser();
-  const isNurseStaff = user?.role === 'user' && user?.staffRole === 'nurse';
+  const isNurseStaff = user?.role === 'nurse' || (user?.role === 'user' && user?.staffRole === 'nurse');
   const { effectiveClinicId, setSelectedClinicId } = useAdminClinic();
   const targetClinicId = effectiveClinicId ?? undefined;
   const location = useLocation();
@@ -194,8 +194,21 @@ const ConsultationsPage = () => {
 
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
   const linkedDoctorId = (user?.linkedDoctorId ?? '').trim();
-  const opCompleteUsesLinkedDoctor =
-    isOpDoctorCompleteRoute && !!linkedDoctorId && doctors.some((d) => d.id === linkedDoctorId);
+  const isDoctorLogin = user?.role === 'doctor';
+  const defaultDoctorIdForUser = useMemo(() => {
+    if (linkedDoctorId && doctors.some((d) => d.id === linkedDoctorId)) {
+      return linkedDoctorId;
+    }
+    if (isDoctorLogin) {
+      return linkedDoctorId;
+    }
+    // Legacy fallback for old "user" role.
+    if (user?.role === 'user' && doctors.length > 0) {
+      return doctors[0].id;
+    }
+    return '';
+  }, [doctors, linkedDoctorId, isDoctorLogin, user?.role]);
+  const forceMappedDoctorReadOnly = Boolean(isDoctorLogin && linkedDoctorId);
   const [medicinesMaster, setMedicinesMaster] = useState<{ id: string; name: string }[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -565,9 +578,38 @@ const ConsultationsPage = () => {
     }
     api.doctors
       .list({ clinicId: targetClinicId })
-      .then((data) => setDoctors((data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name }))))
+      .then(async (data) => {
+        const scoped = (data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name }));
+        if (!linkedDoctorId || scoped.some((d) => d.id === linkedDoctorId)) {
+          setDoctors(scoped);
+          return;
+        }
+        try {
+          const allDoctors = (await api.doctors.list()) as { id: string; name: string }[];
+          const linkedDoctor = allDoctors.find((d) => d.id === linkedDoctorId);
+          if (linkedDoctor) {
+            setDoctors([...scoped, { id: linkedDoctor.id, name: linkedDoctor.name }]);
+            return;
+          }
+        } catch {
+          // fallback to scoped list
+        }
+        setDoctors(scoped);
+      })
       .catch(() => setDoctors([]));
-  }, [targetClinicId]);
+  }, [targetClinicId, linkedDoctorId]);
+
+  // Auto-pick mapped doctor on consult form for non-nurse users.
+  useEffect(() => {
+    if (!isFormRoute || isNurseStaff || !defaultDoctorIdForUser) return;
+    setForm((f) => (f.doctorId ? f : { ...f, doctorId: defaultDoctorIdForUser }));
+  }, [defaultDoctorIdForUser, isFormRoute, isNurseStaff]);
+
+  // OP completion may hydrate doctorId as empty; enforce mapped/default doctor again.
+  useEffect(() => {
+    if (!isOpDoctorCompleteRoute || isNurseStaff || !defaultDoctorIdForUser) return;
+    setForm((f) => (f.doctorId?.trim() ? f : { ...f, doctorId: defaultDoctorIdForUser }));
+  }, [isOpDoctorCompleteRoute, isNurseStaff, defaultDoctorIdForUser]);
 
   useEffect(() => {
     api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
@@ -790,7 +832,7 @@ const ConsultationsPage = () => {
 
       const created = (await api.consultations.create({
         ...basePayload,
-        doctorId: form.doctorId,
+        doctorId: isDoctorLogin ? linkedDoctorId : form.doctorId,
       })) as { id?: string };
       setConsultationErrors([]);
       toast({
@@ -804,7 +846,7 @@ const ConsultationsPage = () => {
         patientName: savedPatientName,
         patientMedicalHistory: form.patientMedicalHistory,
         patientGender: form.patientGender,
-        doctorId: '',
+        doctorId: defaultDoctorIdForUser,
         consultationDate: format(new Date(), 'yyyy-MM-dd'),
         consultationTime: format(new Date(), 'HH:mm'),
         followUpDate: '',
@@ -858,7 +900,7 @@ const ConsultationsPage = () => {
       patientName: '',
       patientMedicalHistory: '',
       patientGender: '',
-      doctorId: '',
+      doctorId: isNurseStaff ? '' : defaultDoctorIdForUser,
       consultationDate: format(new Date(), 'yyyy-MM-dd'),
       consultationTime: format(new Date(), 'HH:mm'),
       followUpDate: '',
@@ -1249,16 +1291,14 @@ const ConsultationsPage = () => {
               </div>
             )}
             {!isNurseStaff && (
-            opCompleteUsesLinkedDoctor ? (
+            forceMappedDoctorReadOnly ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="sm:col-span-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
                   <Label className="text-muted-foreground">Examining doctor</Label>
                   <p className="mt-1 text-base font-semibold text-foreground">
                     {doctors.find((d) => d.id === linkedDoctorId)?.name ?? '—'}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Your account is linked to this doctor — the consultation will be saved under this name.
-                  </p>
+                 
                 </div>
                 <div>
                   <Label>Date <span className="text-destructive">*</span></Label>

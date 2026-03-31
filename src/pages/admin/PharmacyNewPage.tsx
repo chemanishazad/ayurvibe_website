@@ -32,7 +32,7 @@ import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
 import { openPharmacyPrint, savePharmacyPrintPayload } from '@/lib/print-handoff';
 import { COUNTRY_CODES } from '@/lib/country-codes';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus } from 'lucide-react';
+import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus, Package } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -84,6 +84,20 @@ type SaleLine = {
   unitPrice: number;
 };
 
+type ActiveTreatmentPlanRow = {
+  id: string;
+  name: string;
+  totalCost: string | number | null;
+  advancePaid: string | number | null;
+  balanceDue: string | number | null;
+  endDate: string;
+};
+
+function parseMoney(v: unknown): number {
+  const n = parseFloat(String(v ?? 0));
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Hide browser steppers on numeric inputs (consultation fee, treatment price, etc.) */
 const INPUT_NO_SPIN =
   '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
@@ -99,11 +113,14 @@ const PharmacyNewPage = () => {
   const [medicineOpen, setMedicineOpen] = useState<number | null>(null);
   const [discountPopoverOpen, setDiscountPopoverOpen] = useState(false);
   const [discountDraft, setDiscountDraft] = useState<{ type: 'percent' | 'fixed'; value: number }>({ type: 'percent', value: 10 });
+  const [activeTreatmentPlans, setActiveTreatmentPlans] = useState<ActiveTreatmentPlanRow[]>([]);
+  const [activePlansLoading, setActivePlansLoading] = useState(false);
   const PAYMENT_MODES = ['Cash', 'Card', 'UPI', 'Bank Transfer', 'Other'] as const;
   const [form, setForm] = useState({
     /** direct = walk-in; consultation = bill linked to a visit; own = internal / clinic use */
     saleMode: 'direct' as 'direct' | 'consultation' | 'own',
     consultationId: null as string | null,
+    patientId: null as string | null,
     consultationLabel: 'Direct sale',
     consultationFee: 0,
     treatments: [] as { name: string; price: number }[],
@@ -130,6 +147,19 @@ const PharmacyNewPage = () => {
       .then((data) => setPatientMaster((data as PatientMasterRow[]) || []))
       .catch(() => setPatientMaster([]));
   }, [targetClinicId]);
+
+  useEffect(() => {
+    if (form.saleMode !== 'consultation' || !form.patientId || !targetClinicId) {
+      setActiveTreatmentPlans([]);
+      return;
+    }
+    setActivePlansLoading(true);
+    api.treatmentPlans
+      .list({ patientId: form.patientId, clinicId: targetClinicId, activeOnly: true })
+      .then((rows) => setActiveTreatmentPlans((rows as ActiveTreatmentPlanRow[]) || []))
+      .catch(() => setActiveTreatmentPlans([]))
+      .finally(() => setActivePlansLoading(false));
+  }, [form.saleMode, form.patientId, targetClinicId]);
 
   useEffect(() => {
     if (targetClinicId) {
@@ -253,6 +283,22 @@ const PharmacyNewPage = () => {
     }));
   };
 
+  const appendTreatmentLineFromPlan = (plan: ActiveTreatmentPlanRow) => {
+    const bal = parseMoney(plan.balanceDue);
+    setForm((f) => ({
+      ...f,
+      treatments: [...f.treatments, { name: `${plan.name} (balance)`, price: bal }],
+    }));
+  };
+
+  const appendAllPlanBalanceLines = () => {
+    const lines = activeTreatmentPlans
+      .filter((p) => parseMoney(p.balanceDue) > 0)
+      .map((p) => ({ name: `${p.name} (balance)`, price: parseMoney(p.balanceDue) }));
+    if (lines.length === 0) return;
+    setForm((f) => ({ ...f, treatments: [...f.treatments, ...lines] }));
+  };
+
   const updateItem = (idx: number, field: string, value: number | string) => {
     setForm((f) => ({
       ...f,
@@ -336,6 +382,7 @@ const PharmacyNewPage = () => {
           medicineDiscount: null,
           saleMode: 'direct',
           consultationId: null,
+          patientId: null,
           consultationLabel: 'Direct sale',
         }));
         const consId = form.consultationId!;
@@ -599,6 +646,7 @@ const PharmacyNewPage = () => {
                               ...f,
                               saleMode: 'direct' as const,
                               consultationId: null,
+                              patientId: null,
                               consultationLabel: 'Direct sale',
                               consultationFee: 0,
                               treatments: [],
@@ -616,6 +664,7 @@ const PharmacyNewPage = () => {
                               ...f,
                               saleMode: 'own' as const,
                               consultationId: null,
+                              patientId: null,
                               consultationLabel: 'Own use (internal)',
                               consultationFee: 0,
                               treatments: [],
@@ -651,6 +700,7 @@ const PharmacyNewPage = () => {
                                   ...f,
                                   saleMode: 'consultation' as const,
                                   consultationId: p.lastConsultationId,
+                                  patientId: p.id,
                                   consultationLabel: `${p.name}${datePart} (latest visit)`,
                                   consultationFee: 0,
                                 }));
@@ -744,6 +794,72 @@ const PharmacyNewPage = () => {
                       placeholder="0"
                     />
                   </div>
+
+                  {form.patientId && (
+                    <div className="rounded-lg border border-border/80 bg-muted/25 p-3 space-y-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Package className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">Active treatment packages</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Package total, advance paid, and balance. Add a line to bill advance or balance on this invoice; adjust the amount if partial.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="shrink-0"
+                          disabled={activePlansLoading || activeTreatmentPlans.every((p) => parseMoney(p.balanceDue) <= 0)}
+                          onClick={appendAllPlanBalanceLines}
+                        >
+                          Add all balances
+                        </Button>
+                      </div>
+                      {activePlansLoading ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading plans…
+                        </p>
+                      ) : activeTreatmentPlans.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No active treatment plan for this patient at this clinic.</p>
+                      ) : (
+                        <ul className="space-y-2 text-sm">
+                          {activeTreatmentPlans.map((plan) => {
+                            const total = parseMoney(plan.totalCost);
+                            const adv = parseMoney(plan.advancePaid);
+                            const bal = parseMoney(plan.balanceDue);
+                            return (
+                              <li
+                                key={plan.id}
+                                className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-background/80 p-2 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-medium">{plan.name}</span>
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    Total ₹{total.toLocaleString()} · Advance ₹{adv.toLocaleString()} · Balance ₹{bal.toLocaleString()}
+                                    {plan.endDate ? ` · ends ${formatAppDate(String(plan.endDate).slice(0, 10) + 'T12:00:00')}` : ''}
+                                  </span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="shrink-0 w-full sm:w-auto"
+                                  disabled={bal <= 0}
+                                  onClick={() => appendTreatmentLineFromPlan(plan)}
+                                >
+                                  Add balance line
+                                </Button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <div>

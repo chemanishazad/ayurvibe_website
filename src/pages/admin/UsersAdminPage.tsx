@@ -33,15 +33,15 @@ type UserRow = {
   role: string;
   createdAt: string;
   allowedNavPaths?: string[] | null;
-  staffRole?: string | null;
   linkedDoctorId?: string | null;
+  linkedDoctorName?: string | null;
+  clinicAccessNames?: string[];
 };
+
+type AccountRole = 'admin' | 'doctor' | 'nurse';
 
 const UsersAdminPage = () => {
   const me = getAuthUser();
-  if (me?.role !== 'admin') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
@@ -52,15 +52,15 @@ const UsersAdminPage = () => {
   const [createForm, setCreateForm] = useState({
     username: '',
     password: '',
-    role: 'user' as 'admin' | 'user',
+    accountRole: 'doctor' as AccountRole,
     clinicIds: [] as string[],
+    linkedDoctorId: 'none',
   });
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [editUsername, setEditUsername] = useState('');
-  const [editRole, setEditRole] = useState<'admin' | 'user'>('user');
+  const [editAccountRole, setEditAccountRole] = useState<AccountRole>('doctor');
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
-  const [editStaffKind, setEditStaffKind] = useState<'full' | 'nurse'>('full');
   const [editLinkedDoctorId, setEditLinkedDoctorId] = useState<string>('none');
   const [editUserClinicIds, setEditUserClinicIds] = useState<string[]>([]);
   const [pwdUser, setPwdUser] = useState<UserRow | null>(null);
@@ -75,18 +75,13 @@ const UsersAdminPage = () => {
     try {
       const data = (await api.users.list()) as UserRow[];
       setUsers(data);
-      const staffUsers = data.filter((u) => u.role === 'user');
-      const mappingEntries = await Promise.all(
-        staffUsers.map(async (u) => {
-          try {
-            const mapped = (await api.users.listClinics(u.id)) as { id: string; name: string; mappingId: string }[];
-            return [u.id, mapped.map((c) => c.name)] as const;
-          } catch {
-            return [u.id, []] as const;
-          }
-        }),
+      setUserClinicNamesByUserId(
+        Object.fromEntries(
+          data
+            .filter((u) => u.role !== 'admin')
+            .map((u) => [u.id, u.clinicAccessNames ?? []] as const),
+        ),
       );
-      setUserClinicNamesByUserId(Object.fromEntries(mappingEntries));
     } catch {
       setUsers([]);
       setUserClinicNamesByUserId({});
@@ -107,14 +102,24 @@ const UsersAdminPage = () => {
   );
 
   const editDoctorOptions = useMemo(() => {
-    if (editRole !== 'user') return [];
+    if (editAccountRole === 'admin') return [];
     if (editUserClinicIds.length === 0) return doctors;
     return doctors.filter((d) => {
       const assignedClinics = d.clinicIds || [];
       if (assignedClinics.length === 0) return true;
       return assignedClinics.some((cid) => editUserClinicIds.includes(cid));
     });
-  }, [doctors, editRole, editUserClinicIds]);
+  }, [doctors, editAccountRole, editUserClinicIds]);
+
+  const createDoctorOptions = useMemo(() => {
+    if (createForm.accountRole === 'admin') return [];
+    if (createForm.clinicIds.length === 0) return doctors;
+    return doctors.filter((d) => {
+      const assignedClinics = d.clinicIds || [];
+      if (assignedClinics.length === 0) return true;
+      return assignedClinics.some((cid) => createForm.clinicIds.includes(cid));
+    });
+  }, [doctors, createForm.accountRole, createForm.clinicIds]);
 
   const openMappings = async (u: UserRow) => {
     setMapUser(u);
@@ -132,14 +137,13 @@ const UsersAdminPage = () => {
   const openEditUser = async (u: UserRow) => {
     setEditing(u);
     setEditUsername(u.username);
-    setEditRole(u.role === 'admin' ? 'admin' : 'user');
+    setEditAccountRole(u.role === 'admin' ? 'admin' : u.role === 'nurse' ? 'nurse' : 'doctor');
     const paths = u.allowedNavPaths;
     setEditNavRestricted(Boolean(paths && paths.length > 0));
     setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
-    setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
     setEditLinkedDoctorId(u.linkedDoctorId || 'none');
 
-    if (u.role === 'user') {
+    if (u.role !== 'admin') {
       try {
         const mapped = await api.users.listClinics(u.id);
         setEditUserClinicIds((mapped as { id: string; name: string; mappingId: string }[]).map((c) => c.id));
@@ -162,7 +166,7 @@ const UsersAdminPage = () => {
     if (mapClinicIdsDraft.length === 0) {
       toast({
         title: 'At least one clinic required',
-        description: 'Staff user must have at least one clinic access.',
+        description: 'Doctor/Nurse user must have at least one clinic access.',
         variant: 'destructive',
       });
       return;
@@ -204,8 +208,12 @@ const UsersAdminPage = () => {
       toast({ title: 'Username and password (6+ chars) required', variant: 'destructive' });
       return;
     }
-    if (createForm.role === 'user' && createForm.clinicIds.length === 0) {
-      toast({ title: 'Staff users need at least one clinic', variant: 'destructive' });
+    if (createForm.accountRole !== 'admin' && createForm.clinicIds.length === 0) {
+      toast({ title: 'Doctor/Nurse users need at least one clinic', variant: 'destructive' });
+      return;
+    }
+    if (createForm.accountRole === 'doctor' && createForm.linkedDoctorId === 'none') {
+      toast({ title: 'Doctor user must be mapped to a doctor name', variant: 'destructive' });
       return;
     }
     setLoading(true);
@@ -213,12 +221,16 @@ const UsersAdminPage = () => {
       await api.users.create({
         username: createForm.username.trim(),
         password: createForm.password,
-        role: createForm.role,
-        clinicIds: createForm.role === 'user' ? createForm.clinicIds : undefined,
+        role: createForm.accountRole,
+        clinicIds: createForm.accountRole !== 'admin' ? createForm.clinicIds : undefined,
+        linkedDoctorId:
+          createForm.accountRole !== 'admin' && createForm.linkedDoctorId !== 'none'
+            ? createForm.linkedDoctorId
+            : null,
       });
       toast({ title: 'User created' });
       setShowCreate(false);
-      setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
+      setCreateForm({ username: '', password: '', accountRole: 'doctor', clinicIds: [], linkedDoctorId: 'none' });
       await refreshUsers();
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -229,22 +241,25 @@ const UsersAdminPage = () => {
 
   const handleUpdate = async () => {
     if (!editing || !editUsername.trim()) return;
+    if (editAccountRole === 'doctor' && editLinkedDoctorId === 'none') {
+      toast({ title: 'Doctor user must be mapped to a doctor name', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     try {
       const allowedNavPaths: string[] | null | undefined =
-        editRole === 'user'
+        editAccountRole !== 'admin'
           ? editNavRestricted && editNavPaths.length > 0
             ? [...new Set(editNavPaths)]
             : null
           : undefined;
       await api.users.update(editing.id, {
         username: editUsername.trim(),
-        role: editRole,
-        ...(editRole === 'user' ? { allowedNavPaths } : {}),
-        ...(editRole === 'user' ? { staffRole: editStaffKind === 'nurse' ? 'nurse' : null } : {}),
-        ...(editRole === 'user'
+        role: editAccountRole,
+        ...(editAccountRole !== 'admin' ? { allowedNavPaths } : {}),
+        ...(editAccountRole !== 'admin'
           ? { linkedDoctorId: editLinkedDoctorId === 'none' ? null : editLinkedDoctorId }
-          : {}),
+          : { linkedDoctorId: null }),
       });
       toast({ title: 'User updated' });
       setEditing(null);
@@ -297,20 +312,24 @@ const UsersAdminPage = () => {
     }));
   };
 
+  if (me?.role !== 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
   if (loading && users.length === 0) {
     return <FullScreenLoader label="Loading users..." />;
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Users & access"
-        description="Administrator and staff logins. Staff must be mapped to one or more clinics to sign in."
+        description="Administrator, doctor, and nurse logins. Doctor/Nurse users must be mapped to one or more clinics to sign in."
       >
         <Button
           onClick={() => {
             setShowCreate(true);
-            setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
+            setCreateForm({ username: '', password: '', accountRole: 'doctor', clinicIds: [], linkedDoctorId: 'none' });
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -318,53 +337,58 @@ const UsersAdminPage = () => {
         </Button>
       </PageHeader>
 
-      <Card>
-        <CardHeader>
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
           <CardTitle>Accounts</CardTitle>
-          {/* <CardDescription>
-            Roles: <strong>admin</strong> (full access, no clinic mapping) or <strong>staff</strong> (clinic-scoped).
-          </CardDescription> */}
+          <CardDescription>
+            Manage login users, assign roles, and control clinic-level access.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border/60">
+            <table className="min-w-[860px] w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th className="py-2 text-left">Username</th>
-                  <th className="py-2 text-left">Role</th>
-                  <th className="py-2 text-left">Clinic access</th>
-                  <th className="py-2 text-right">Actions</th>
+                <tr className="border-b bg-muted/40">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Username</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clinic access</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className="border-b">
-                    <td className="py-2 font-medium">{u.username}</td>
-                    <td className="py-2 capitalize">
-                      {u.role}
-                      {u.role === 'user' && u.staffRole === 'nurse' ? (
-                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
-                          vitals only
-                        </span>
-                      ) : null}
-                      {u.role === 'user' && u.linkedDoctorId ? (
-                        <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-normal text-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
-                          {doctorNameById[u.linkedDoctorId] || 'Assigned'}
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      No users found.
+                    </td>
+                  </tr>
+                ) : users.map((u) => (
+                  <tr key={u.id} className="border-b transition-colors hover:bg-muted/20">
+                    <td className="px-4 py-3 align-top">
+                      <div className="font-medium">{u.username}</div>
+                    </td>
+                    <td className="px-4 py-3 align-top capitalize">
+                      <span className="inline-flex rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-medium">
+                        {u.role}
+                      </span>
+                      {u.role !== 'admin' && u.linkedDoctorId ? (
+                        <span className="ml-2 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-normal text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                          {u.linkedDoctorName || doctorNameById[u.linkedDoctorId] || 'Assigned'}
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-2">
+                    <td className="px-4 py-3 align-top">
                       {u.role === 'admin' ? (
                         <span className="text-xs text-muted-foreground">All clinics</span>
                       ) : (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {(userClinicNamesByUserId[u.id] || []).slice(0, 2).map((clinicName) => (
-                            <span key={clinicName} className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                            <span key={clinicName} className="rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-xs">
                               {clinicName}
                             </span>
                           ))}
                           {(userClinicNamesByUserId[u.id] || []).length > 2 ? (
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            <span className="rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                               +{(userClinicNamesByUserId[u.id] || []).length - 2}
                             </span>
                           ) : null}
@@ -374,28 +398,31 @@ const UsersAdminPage = () => {
                         </div>
                       )}
                     </td>
-                    <td className="py-2 text-right">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        {u.role === 'user' && (
-                          <Button size="sm" variant="outline" onClick={() => openMappings(u)}>
+                    <td className="px-4 py-3 text-right align-top">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {u.role !== 'admin' && (
+                          <Button size="sm" variant="outline" className="h-8" onClick={() => openMappings(u)}>
                             <Link2 className="mr-1 h-3.5 w-3.5" />
                             Clinics
                           </Button>
                         )}
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
+                          className="h-8 w-8"
+                          title={`Edit ${u.username}`}
                           onClick={() => void openEditUser(u)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setPwdUser(u)}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title={`Reset password for ${u.username}`} onClick={() => setPwdUser(u)}>
                           <KeyRound className="h-4 w-4" />
                         </Button>
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
-                          className="text-destructive hover:text-destructive"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          title={`Delete ${u.username}`}
                           onClick={() => handleDelete(u)}
                           disabled={u.id === me?.id}
                         >
@@ -415,7 +442,7 @@ const UsersAdminPage = () => {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New user</DialogTitle>
-            <DialogDescription>Staff users need clinic access to log in.</DialogDescription>
+            <DialogDescription>Doctor/Nurse users need clinic access to log in.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -438,19 +465,26 @@ const UsersAdminPage = () => {
             <div>
               <Label>Role</Label>
               <Select
-                value={createForm.role}
-                onValueChange={(v) => setCreateForm((f) => ({ ...f, role: v as 'admin' | 'user' }))}
+                value={createForm.accountRole}
+                onValueChange={(v) =>
+                  setCreateForm((f) => ({
+                    ...f,
+                    accountRole: v as AccountRole,
+                    linkedDoctorId: v === 'admin' ? 'none' : f.linkedDoctorId,
+                  }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">Staff (clinic user)</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="doctor">Doctor</SelectItem>
+                  <SelectItem value="nurse">Nurse</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {createForm.role === 'user' && (
+            {createForm.accountRole !== 'admin' && (
               <div className="space-y-2 rounded-lg border p-3">
                 <Label>Clinic access</Label>
                 {clinics.length === 0 ? (
@@ -466,6 +500,32 @@ const UsersAdminPage = () => {
                     </label>
                   ))
                 )}
+              </div>
+            )}
+            {createForm.accountRole !== 'admin' && (
+              <div>
+                <Label>{createForm.accountRole === 'nurse' ? 'Linked doctor (optional)' : 'Mapped doctor (required)'}</Label>
+                <Select
+                  value={createForm.linkedDoctorId}
+                  onValueChange={(v) => setCreateForm((f) => ({ ...f, linkedDoctorId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No linked doctor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {createForm.accountRole === 'nurse' ? <SelectItem value="none">No linked doctor</SelectItem> : null}
+                    {createDoctorOptions.map((doc) => (
+                      <SelectItem key={doc.id} value={doc.id}>
+                        {doc.name}
+                      </SelectItem>
+                    ))}
+                    {createForm.linkedDoctorId !== 'none' && !createDoctorOptions.some((d) => d.id === createForm.linkedDoctorId) ? (
+                      <SelectItem value={createForm.linkedDoctorId}>
+                        {doctorNameById[createForm.linkedDoctorId] || 'Current linked doctor'}
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <Button onClick={handleCreate} disabled={loading} className="w-full">
@@ -488,12 +548,14 @@ const UsersAdminPage = () => {
             <div>
               <Label>Role</Label>
               <Select
-                value={editRole}
+                value={editAccountRole}
                 onValueChange={(v) => {
-                  setEditRole(v as 'admin' | 'user');
+                  const nextRole = v as AccountRole;
+                  setEditAccountRole(nextRole);
                   if (v === 'admin') {
                     setEditNavRestricted(false);
                     setEditNavPaths([]);
+                    setEditLinkedDoctorId('none');
                   }
                 }}
               >
@@ -501,37 +563,21 @@ const UsersAdminPage = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">Staff</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="doctor">Doctor</SelectItem>
+                  <SelectItem value="nurse">Nurse</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {editRole === 'user' && (
+            {editAccountRole !== 'admin' && (
               <div>
-                <Label>Consultation form</Label>
-                <Select value={editStaffKind} onValueChange={(v) => setEditStaffKind(v as 'full' | 'nurse')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full">Full (doctor / staff)</SelectItem>
-                    <SelectItem value="nurse">Nurse — vitals only</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Nurses only see beneficiary + vitals; visit time is set when saving; doctor is auto-assigned.
-                </p>
-              </div>
-            )}
-            {editRole === 'user' && (
-              <div>
-                <Label>Linked doctor (optional)</Label>
+                <Label>{editAccountRole === 'nurse' ? 'Linked doctor (optional)' : 'Mapped doctor (required)'}</Label>
                 <Select value={editLinkedDoctorId} onValueChange={setEditLinkedDoctorId}>
                   <SelectTrigger>
                     <SelectValue placeholder="No linked doctor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No linked doctor</SelectItem>
+                    {editAccountRole === 'nurse' ? <SelectItem value="none">No linked doctor</SelectItem> : null}
                     {editDoctorOptions.map((doc) => (
                       <SelectItem key={doc.id} value={doc.id}>
                         {doc.name}
@@ -545,11 +591,11 @@ const UsersAdminPage = () => {
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Doctors are filtered by this staff user's clinic access.
+                  Doctors are filtered by this user&apos;s clinic access.
                 </p>
               </div>
             )}
-            {editRole === 'user' && (
+            {editAccountRole !== 'admin' && (
               <div className="space-y-3 rounded-lg border p-3">
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <Checkbox
@@ -563,7 +609,7 @@ const UsersAdminPage = () => {
                   Custom sidebar (pick sections)
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Leave off for the default staff menu (clinical + inventory; no masters). Turn on to grant only checked items—e.g. nurses: Patients, Consultations, Pharmacy.
+                  Leave off for the default doctor/nurse menu (clinical + inventory; no masters). Turn on to grant only checked items.
                 </p>
                 {editNavRestricted && (
                   <div className="max-h-[220px] space-y-2 overflow-y-auto rounded-md border bg-muted/30 p-2">
@@ -626,7 +672,7 @@ const UsersAdminPage = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Clinic mapping</DialogTitle>
-            <DialogDescription>Staff: {mapUser?.username}</DialogDescription>
+            <DialogDescription>User: {mapUser?.username}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">

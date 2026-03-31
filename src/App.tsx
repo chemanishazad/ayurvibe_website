@@ -5,37 +5,38 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import BlogPost from "./pages/BlogPost";
-import SectionPage from "./pages/SectionPage";
 import Login from "./pages/Login";
 import AdminRoute, { AdminOnlyRoute } from "./components/AdminRoute";
 import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
-import AdminShell from "./pages/admin/AdminShell";
-import DashboardPage from "./pages/admin/DashboardPage";
-import PatientsPage from "./pages/admin/PatientsPage";
-import NewPatientPage from "./pages/admin/NewPatientPage";
-import EditPatientPage from "./pages/admin/EditPatientPage";
-import ConsultationsPage from "./pages/admin/ConsultationsPage";
-import PharmacyRecordsPage from "./pages/admin/PharmacyRecordsPage";
-import PharmacyNewPage from "./pages/admin/PharmacyNewPage";
-import ConsultationPrintPage from "./pages/admin/ConsultationPrintPage";
-import PharmacyPrintPage from "./pages/admin/PharmacyPrintPage";
-import TreatmentPlansPage from "./pages/admin/TreatmentPlansPage";
-import MedicinesPage from "./pages/admin/MedicinesPage";
-import SuppliersPage from "./pages/admin/SuppliersPage";
-import InventoryPage from "./pages/admin/InventoryPage";
-import ReportsPage from "./pages/admin/ReportsPage";
-import UpcomingFollowUpsPage from "./pages/admin/UpcomingFollowUpsPage";
-import DirectSalesPage from "./pages/admin/DirectSalesPage";
-import DoctorsPage from "./pages/admin/DoctorsPage";
-import ClinicsPage from "./pages/admin/ClinicsPage";
-import UsersAdminPage from "./pages/admin/UsersAdminPage";
-import UomAdminPage from "./pages/admin/UomAdminPage";
 import SEORedirect from "./components/SEORedirect";
 import SEO from "@/components/SEO";
 
 const queryClient = new QueryClient();
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const BlogPost = React.lazy(() => import("./pages/BlogPost"));
+const SectionPage = React.lazy(() => import("./pages/SectionPage"));
+const AdminShell = React.lazy(() => import("./pages/admin/AdminShell"));
+const DashboardPage = React.lazy(() => import("./pages/admin/DashboardPage"));
+const PatientsPage = React.lazy(() => import("./pages/admin/PatientsPage"));
+const NewPatientPage = React.lazy(() => import("./pages/admin/NewPatientPage"));
+const EditPatientPage = React.lazy(() => import("./pages/admin/EditPatientPage"));
+const ConsultationsPage = React.lazy(() => import("./pages/admin/ConsultationsPage"));
+const PharmacyRecordsPage = React.lazy(() => import("./pages/admin/PharmacyRecordsPage"));
+const PharmacyNewPage = React.lazy(() => import("./pages/admin/PharmacyNewPage"));
+const ConsultationPrintPage = React.lazy(() => import("./pages/admin/ConsultationPrintPage"));
+const PharmacyPrintPage = React.lazy(() => import("./pages/admin/PharmacyPrintPage"));
+const TreatmentPlansPage = React.lazy(() => import("./pages/admin/TreatmentPlansPage"));
+const TreatmentPlanNewPage = React.lazy(() => import("./pages/admin/TreatmentPlanNewPage"));
+const MedicinesPage = React.lazy(() => import("./pages/admin/MedicinesPage"));
+const SuppliersPage = React.lazy(() => import("./pages/admin/SuppliersPage"));
+const InventoryPage = React.lazy(() => import("./pages/admin/InventoryPage"));
+const ReportsPage = React.lazy(() => import("./pages/admin/ReportsPage"));
+const UpcomingFollowUpsPage = React.lazy(() => import("./pages/admin/UpcomingFollowUpsPage"));
+const DirectSalesPage = React.lazy(() => import("./pages/admin/DirectSalesPage"));
+const DoctorsPage = React.lazy(() => import("./pages/admin/DoctorsPage"));
+const ClinicsPage = React.lazy(() => import("./pages/admin/ClinicsPage"));
+const UsersAdminPage = React.lazy(() => import("./pages/admin/UsersAdminPage"));
+const UomAdminPage = React.lazy(() => import("./pages/admin/UomAdminPage"));
 
 // Listens to route changes for SPA page_view tracking
 const AnalyticsListener = () => {
@@ -44,9 +45,9 @@ const AnalyticsListener = () => {
   React.useEffect(() => {
     // Respect availability & user consent (Cookiebot defines window.Cookiebot when loaded)
     const sendPageView = () => {
-      // @ts-ignore
+      // @ts-expect-error gtag is injected by analytics script at runtime
       if (window.gtag && (!window.Cookiebot || window.Cookiebot.consent.statistics)) {
-        // @ts-ignore
+        // @ts-expect-error gtag is injected by analytics script at runtime
         window.gtag('event', 'page_view', {
           page_path: location.pathname + location.search,
           page_location: window.location.href,
@@ -68,7 +69,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AnalyticsListener />
-        <Routes>
+        <React.Suspense fallback={null}>
+          <Routes>
           {/* Root */}
           <Route 
             path="/" 
@@ -117,6 +119,7 @@ const App = () => (
               <Route path="pharmacy" element={<PharmacyRecordsPage />} />
               <Route path="pharmacy/new" element={<PharmacyNewPage />} />
               <Route path="treatment-plans" element={<TreatmentPlansPage />} />
+              <Route path="treatment-plans/new" element={<TreatmentPlanNewPage />} />
               <Route path="medicines" element={<AdminOnlyRoute><MedicinesPage /></AdminOnlyRoute>} />
               <Route path="suppliers" element={<AdminOnlyRoute><SuppliersPage /></AdminOnlyRoute>} />
               <Route path="inventory" element={<InventoryPage />} />
@@ -169,7 +172,8 @@ const App = () => (
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          </Routes>
+        </React.Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

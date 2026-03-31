@@ -133,7 +133,7 @@ const PatientsPage = () => {
 
   const handleView = (patientId: string) => {
     const u = getAuthUser();
-    const isNurse = u?.role === 'user' && u?.staffRole === 'nurse';
+    const isNurse = u?.role === 'nurse' || (u?.role === 'user' && u?.staffRole === 'nurse');
     if (isNurse) {
       navigate('/admin/op', { state: { patientId } });
     } else {

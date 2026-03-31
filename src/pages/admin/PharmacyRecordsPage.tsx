@@ -14,7 +14,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import { Search, Loader2, Printer, MessageCircle, Plus, CalendarDays, Eye } from 'lucide-react';
+import { Search, Loader2, Printer, MessageCircle, Plus, CalendarDays, Eye, AlertTriangle } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -294,9 +294,26 @@ const PharmacyRecordsPage = () => {
   const [sheetConsultationTreatments, setSheetConsultationTreatments] = useState<{ name: string; price: string }[] | null>(
     null,
   );
+  const [treatmentPlanOutstanding, setTreatmentPlanOutstanding] = useState<{ count: number; balanceDue: number } | null>(null);
   const { toast } = useToast();
 
   const targetClinicId = effectiveClinicId ?? undefined;
+
+  useEffect(() => {
+    if (!targetClinicId) {
+      setTreatmentPlanOutstanding(null);
+      return;
+    }
+    api.dashboard
+      .clinic(targetClinicId)
+      .then((d) =>
+        setTreatmentPlanOutstanding({
+          count: d.treatmentPlanOutstandingCount ?? 0,
+          balanceDue: d.treatmentPlanOutstandingBalanceDue ?? 0,
+        }),
+      )
+      .catch(() => setTreatmentPlanOutstanding(null));
+  }, [targetClinicId]);
 
   const fetchPharmacyRecords = useCallback(async () => {
     if (!targetClinicId) return;
@@ -615,6 +632,29 @@ const PharmacyRecordsPage = () => {
               </div>
             </div>
           </div>
+
+          {targetClinicId && treatmentPlanOutstanding && treatmentPlanOutstanding.balanceDue > 0 && (
+            <div className="shrink-0 border-b border-amber-200/80 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100 sm:px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="flex gap-2 min-w-0">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+                  <p className="min-w-0 leading-snug">
+                    <span className="font-medium">Treatment package balance: </span>
+                    ₹{treatmentPlanOutstanding.balanceDue.toLocaleString()} outstanding across{' '}
+                    {treatmentPlanOutstanding.count} active plan(s). Bill advances or balances on{' '}
+                    <Link to="/admin/pharmacy/new" className="font-medium underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-50">
+                      New invoice
+                    </Link>
+                    ; track plans under{' '}
+                    <Link to="/admin/treatment-plans" className="font-medium underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-50">
+                      Treatment plans
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 sm:px-4">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-card">

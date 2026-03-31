@@ -179,8 +179,8 @@ const DashboardPage = () => {
   const isAdmin = user?.role === 'admin';
   const { effectiveClinicId, clinics } = useAdminClinic();
   const adminFilterClinicName = effectiveClinicId ? clinics.find((c) => c.id === effectiveClinicId)?.name : null;
-  const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const initialRange = getDateRangeForPeriod('daily');
+  const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const initialRange = getDateRangeForPeriod('weekly');
   const [dateFrom, setDateFrom] = useState(initialRange.from);
   const [dateTo, setDateTo] = useState(initialRange.to);
   const [appliedFrom, setAppliedFrom] = useState(initialRange.from);
@@ -512,8 +512,8 @@ const DashboardPage = () => {
         />
 
         {loading ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {[...Array(5)].map((_, i) => (
               <Card key={i} className="overflow-hidden border-border/60">
                 <CardHeader className="pb-2"><div className="h-4 w-24 bg-muted animate-pulse rounded" /></CardHeader>
                 <CardContent><div className="h-8 w-32 bg-muted animate-pulse rounded" /></CardContent>
@@ -526,20 +526,49 @@ const DashboardPage = () => {
               <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">
                 Summary — <span className="text-muted-foreground font-normal">{dateRangeLabel}</span>
               </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Patients" value={clinicData.todayPatients} icon={Users} />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                <StatCard title="Patients" value={clinicData.patientCount ?? clinicData.todayPatients} icon={Users} />
                 <StatCard title="Consultations" value={clinicData.consultationsCount} icon={Stethoscope} />
+                <StatCard title="Treatments" value={clinicData.treatmentCount ?? 0} icon={FileText} />
+                <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
                 <StatCard title="Total Revenue" value={`₹${clinicData.dailyRevenue.toLocaleString()}`} icon={IndianRupee} accent="success" />
-                <StatCard title="Medicine Sales" value={`₹${clinicData.medicineSales.toLocaleString()}`} icon={Pill} />
+                <StatCard title="Medicine Sales" value={`₹${(clinicData.medicineSalesAmount ?? clinicData.medicineSales).toLocaleString()}`} icon={Pill} />
+                <StatCard title="Total Profit" value={`₹${clinicData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
               </div>
             </div>
 
             <div className="scroll-mt-4">
               <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Revenue breakdown</h2>
-              <div className="grid gap-3 lg:grid-cols-3">
+              <div className="grid gap-3 lg:grid-cols-5">
                 <StatCard title="Consultation Fees" value={`₹${clinicData.consultationAmount.toLocaleString()}`} icon={FileText} />
                 <StatCard title="Prescription Medicine" value={`₹${clinicData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
                 <StatCard title="Direct Medicine Sales" value={`₹${clinicData.directMedicineSales.toLocaleString()}`} icon={ShoppingCart} />
+                <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
+                <StatCard title="Treatment + Medicine" value={`₹${(clinicData.treatmentMedicineSalesAmount ?? 0).toLocaleString()}`} icon={TrendingUp} />
+              </div>
+            </div>
+
+            <div className="scroll-mt-4">
+              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Treatment monitoring</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+                <StatCard title="Active Plans" value={clinicData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
+                <StatCard title="1 Day Plans" value={clinicData.treatmentPlanDayCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Week Plans" value={clinicData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Month Plans" value={clinicData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Long Plans" value={clinicData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Plan Medicine Items" value={clinicData.treatmentPlanMedicineCount ?? 0} icon={Pill} />
+                <StatCard
+                  title="Plan Medicine Value"
+                  value={`₹${(clinicData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  icon={IndianRupee}
+                />
+                <StatCard
+                  title="Package balance due"
+                  value={`₹${(clinicData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()}`}
+                  subtitle={`${clinicData.treatmentPlanOutstandingCount ?? 0} active plan(s) with balance`}
+                  icon={AlertTriangle}
+                  accent="warning"
+                />
               </div>
             </div>
 
