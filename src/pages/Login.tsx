@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/Logo';
-import { Eye, EyeOff, Lock, Loader2, User } from 'lucide-react';
+import { Eye, EyeOff, Lock, Loader2, User, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { loginSchema, type LoginFormValues } from '@/schema/auth';
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'auth_token';
@@ -63,14 +66,20 @@ export function setAdminAuthenticated(value: boolean): void {
 }
 
 const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-
   const { toast } = useToast();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { username: '', password: '' },
+  });
 
   if (isAdminAuthenticated()) {
     return <Navigate to="/admin/dashboard" replace />;
@@ -78,21 +87,22 @@ const Login = () => {
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/admin/dashboard';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const onSubmit = async (values: LoginFormValues) => {
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: values.username, password: values.password }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        toast({ title: 'Login failed', description: data.error || 'Invalid credentials', variant: 'destructive' });
-        setIsLoading(false);
+        // Show the error inline on the password field for credential errors
+        if (res.status === 401) {
+          setError('password', { message: data.error || 'Invalid username or password' });
+        } else {
+          toast({ title: 'Login failed', description: data.error || 'Something went wrong', variant: 'destructive' });
+        }
         return;
       }
 
@@ -100,10 +110,9 @@ const Login = () => {
       sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
       toast({ title: 'Welcome back', description: 'You have signed in successfully.' });
       navigate(from, { replace: true });
-    } catch (err) {
+    } catch {
       toast({ title: 'Login failed', description: 'Network error. Is the backend running?', variant: 'destructive' });
     }
-    setIsLoading(false);
   };
 
   return (
@@ -124,8 +133,9 @@ const Login = () => {
           </div>
         </CardHeader>
         <CardContent className="pt-1">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Username */}
+            <div className="space-y-1.5">
               <Label htmlFor="username">Username</Label>
               <div className="relative">
                 <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -133,19 +143,28 @@ const Login = () => {
                   id="username"
                   type="text"
                   placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  required
-                  disabled={isLoading}
-                  className="pl-10 transition-[border-color,box-shadow] duration-200 hover:border-primary/30"
+                  disabled={isSubmitting}
+                  aria-invalid={!!errors.username}
+                  className={`pl-10 transition-[border-color,box-shadow] duration-200 hover:border-primary/30 ${
+                    errors.username ? 'border-destructive focus-visible:ring-destructive/30' : ''
+                  }`}
+                  {...register('username')}
                 />
               </div>
+              {errors.username && (
+                <p className="flex items-center gap-1.5 text-xs text-destructive" role="alert">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {errors.username.message}
+                </p>
+              )}
             </div>
-            <div className="space-y-2">
+
+            {/* Password */}
+            <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -153,31 +172,39 @@ const Login = () => {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  required
-                  disabled={isLoading}
-                  className="pl-10 pr-10 transition-[border-color,box-shadow] duration-200 hover:border-primary/30"
+                  disabled={isSubmitting}
+                  aria-invalid={!!errors.password}
+                  className={`pl-10 pr-10 transition-[border-color,box-shadow] duration-200 hover:border-primary/30 ${
+                    errors.password ? 'border-destructive focus-visible:ring-destructive/30' : ''
+                  }`}
+                  {...register('password')}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute inset-y-0 right-0 flex items-center rounded-md px-3 text-muted-foreground transition-colors duration-200 hover:bg-muted/60 hover:text-foreground"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="flex items-center gap-1.5 text-xs text-destructive" role="alert">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {errors.password.message}
+                </p>
+              )}
             </div>
+
             <Button
               type="submit"
               className="w-full font-medium transition-all duration-200 hover:shadow-md active:scale-[0.99]"
               size="lg"
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Signing in...
@@ -186,7 +213,6 @@ const Login = () => {
                 'Sign in'
               )}
             </Button>
-            {/* { <p className="text-center text-xs text-muted-foreground">Authorized users only.</p> } */}
           </form>
         </CardContent>
       </Card>

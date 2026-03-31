@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { formatPatientAgeDisplay } from '@/lib/patient-age';
 import { Search, UserPlus, Eye, Pencil, X, CalendarDays, Users, Loader2 } from 'lucide-react';
 import { formatAppDateTime } from '@/lib/datetime';
+import { useQuery } from '@tanstack/react-query';
 import {
   Select,
   SelectContent,
@@ -30,26 +31,48 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { getAuthUser } from '@/pages/Login';
 
 type PatientRow = Record<string, unknown> & { consultationCount?: number; lastConsultationId?: string };
 
-const PAGE_SIZES = [10, 20, 50];
 const SEARCH_DEBOUNCE_MS = 350;
 
 const PatientsPage = () => {
   const navigate = useNavigate();
   const { effectiveClinicId, isAdmin } = useAdminClinic();
-  const [rawPatients, setRawPatients] = useState<PatientRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState({ search: '', from: '', to: '' });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const initializedRef = useRef(false);
-  const requestIdRef = useRef(0);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(filters.search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  const queryParams = {
+    search: debouncedSearch.trim(),
+    from: filters.from.trim(),
+    to: filters.to.trim(),
+    ...(isAdmin && effectiveClinicId ? { clinicId: effectiveClinicId } : {}),
+  };
+
+  const { data: rawPatients = [], isLoading, isFetching } = useQuery<PatientRow[]>({
+    queryKey: ['patients', queryParams],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (queryParams.search) params.search = queryParams.search;
+      if (queryParams.from) params.from = queryParams.from;
+      if (queryParams.to) params.to = queryParams.to;
+      if (queryParams.clinicId) params.clinicId = queryParams.clinicId;
+      return api.patients.list(params) as Promise<PatientRow[]>;
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  const isRefreshing = isFetching && !isLoading;
 
   const totalPatients = rawPatients.length;
   const totalPages = Math.max(1, Math.ceil(totalPatients / perPage));
@@ -62,50 +85,9 @@ const PatientsPage = () => {
     return page - 2 + i;
   });
 
-  const loadPatients = (nextFilters: typeof filters, opts?: { fullScreen?: boolean }) => {
-    const requestId = ++requestIdRef.current;
-    const fullScreen = opts?.fullScreen ?? false;
-    if (fullScreen) setLoading(true);
-    else setIsRefreshing(true);
-    setPage(1);
-    const params: Record<string, string> = {};
-    if (nextFilters.search?.trim()) params.search = nextFilters.search.trim();
-    if (nextFilters.from?.trim()) params.from = nextFilters.from.trim();
-    if (nextFilters.to?.trim()) params.to = nextFilters.to.trim();
-    if (isAdmin && effectiveClinicId) params.clinicId = effectiveClinicId;
-    api.patients
-      .list(params)
-      .then((data) => {
-        if (requestId === requestIdRef.current) setRawPatients(data as PatientRow[]);
-      })
-      .catch(() => {
-        if (requestId === requestIdRef.current) setRawPatients([]);
-      })
-      .finally(() => {
-        if (requestId === requestIdRef.current) {
-          setLoading(false);
-          setIsRefreshing(false);
-        }
-      });
-  };
-
-  useEffect(() => {
-    loadPatients(filters, { fullScreen: true });
-    initializedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (page > totalPages && totalPages > 0) setPage(totalPages);
-  }, [perPage, totalPages]);
-
-  useEffect(() => {
-    if (!initializedRef.current) return;
-    const timeoutMs = filters.search.trim() ? SEARCH_DEBOUNCE_MS : 0;
-    const timer = setTimeout(() => {
-      loadPatients(filters);
-    }, timeoutMs);
-    return () => clearTimeout(timer);
-  }, [filters.search, filters.from, filters.to, isAdmin, effectiveClinicId]);
+  // Reset to page 1 when data changes
+  useEffect(() => { setPage(1); }, [debouncedSearch, filters.from, filters.to, effectiveClinicId]);
+  useEffect(() => { if (page > totalPages && totalPages > 0) setPage(totalPages); }, [perPage, totalPages]);
 
   const handleFromDateChange = (value: string) => {
     setFilters((f) => {
@@ -127,23 +109,16 @@ const PatientsPage = () => {
     });
   };
 
-  const handleClearFilters = () => {
-    setFilters({ search: '', from: '', to: '' });
-  };
+  const handleClearFilters = () => setFilters({ search: '', from: '', to: '' });
 
   const handleView = (patientId: string) => {
     const u = getAuthUser();
     const isNurse = u?.role === 'nurse' || (u?.role === 'user' && u?.staffRole === 'nurse');
-    if (isNurse) {
-      navigate('/admin/op', { state: { patientId } });
-    } else {
-      navigate('/admin/consultations', { state: { patientId } });
-    }
+    if (isNurse) navigate('/admin/op', { state: { patientId } });
+    else navigate('/admin/consultations', { state: { patientId } });
   };
 
-  const handleEdit = (patientId: string) => {
-    navigate(`/admin/patients/${patientId}/edit`);
-  };
+  const handleEdit = (patientId: string) => navigate(`/admin/patients/${patientId}/edit`);
 
   const patientInitials = (name: string) => {
     const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
@@ -152,8 +127,18 @@ const PatientsPage = () => {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  if (loading) {
-    return <FullScreenLoader label="Loading patients..." />;
+  const PAGE_SIZES = [10, 20, 50];
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+        <Card className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+          <CardContent className="p-4">
+            <div className="space-y-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -345,7 +330,7 @@ const PatientsPage = () => {
             </div>
           </div>
 
-          {!loading && rawPatients.length > 0 && (
+          {!isLoading && rawPatients.length > 0 && (
             <div className="z-20 shrink-0 border-t border-border/60 bg-muted/20 px-3 py-2 transition-colors duration-200 hover:bg-muted/30 sm:px-4">
               <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

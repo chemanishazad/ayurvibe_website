@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/PageHeader';
@@ -9,104 +9,78 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Plus, Pencil, Trash2, AlertCircle, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { cn } from '@/lib/utils';
+
+const clinicNameSchema = z.object({ name: z.string().min(1, 'Clinic name is required').trim() });
+type ClinicNameForm = z.infer<typeof clinicNameSchema>;
+
+const FieldError = ({ message }: { message?: string }) =>
+  message ? (
+    <p className="flex items-center gap-1.5 text-xs text-destructive mt-1" role="alert">
+      <AlertCircle className="h-3.5 w-3.5 shrink-0" />{message}
+    </p>
+  ) : null;
 
 const ClinicsPage = () => {
   const user = getAuthUser();
-  if (user?.role !== 'admin') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
+  if (user?.role !== 'admin') { return <Navigate to="/admin/dashboard" replace />; }
 
-  const [rows, setRows] = useState<{ id: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
-  const [name, setName] = useState('');
   const { toast } = useToast();
   const { refreshClinics } = useAdminClinic();
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
 
-  const refresh = () =>
-    api.clinics
-      .list()
-      .then(setRows)
-      .catch(() => setRows([]));
+  const createForm = useForm<ClinicNameForm>({ resolver: zodResolver(clinicNameSchema), defaultValues: { name: '' } });
+  const editForm = useForm<ClinicNameForm>({ resolver: zodResolver(clinicNameSchema), defaultValues: { name: '' } });
 
-  useEffect(() => {
-    refresh().finally(() => setLoading(false));
-  }, []);
+  const { data: rows = [], isLoading } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['clinics'],
+    queryFn: () => api.clinics.list() as Promise<{ id: string; name: string }[]>,
+  });
 
-  const handleCreate = async () => {
-    if (!name.trim()) {
-      toast({ title: 'Name required', variant: 'destructive' });
-      return;
-    }
-    setLoading(true);
-    try {
-      await api.clinics.create(name.trim());
-      toast({ title: 'Clinic created' });
-      setShowForm(false);
-      setName('');
-      await refresh();
-      refreshClinics();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['clinics'] }); refreshClinics(); };
 
-  const handleUpdate = async () => {
-    if (!editing || !name.trim()) return;
-    setLoading(true);
-    try {
-      await api.clinics.update(editing.id, { name: name.trim() });
-      toast({ title: 'Clinic updated' });
-      setEditing(null);
-      await refresh();
-      refreshClinics();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const createMutation = useMutation({
+    mutationFn: (d: ClinicNameForm) => api.clinics.create(d.name.trim()),
+    onSuccess: () => { toast({ title: 'Clinic created' }); setShowForm(false); createForm.reset(); invalidate(); },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
 
-  const handleDelete = async (c: { id: string; name: string }) => {
-    if (!confirm(`Delete clinic "${c.name}"? This removes linked data per database rules.`)) return;
-    try {
-      await api.clinics.delete(c.id);
-      toast({ title: 'Clinic deleted' });
-      await refresh();
-      refreshClinics();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    }
-  };
+  const updateMutation = useMutation({
+    mutationFn: (d: ClinicNameForm) => api.clinics.update(editing!.id, { name: d.name.trim() }),
+    onSuccess: () => { toast({ title: 'Clinic updated' }); setEditing(null); invalidate(); },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
 
-  if (loading && rows.length === 0) {
-    return <FullScreenLoader label="Loading clinics..." />;
+  const deleteMutation = useMutation({
+    mutationFn: (c: { id: string; name: string }) => api.clinics.delete(c.id),
+    onSuccess: () => { toast({ title: 'Clinic deleted' }); invalidate(); },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <PageHeader title="Clinics" description="Locations for inventory, consultations, and staff access." />
+        <Card><CardContent className="pt-6">
+          <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted" />)}</div>
+        </CardContent></Card>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
       <PageHeader title="Clinics" description="Locations for inventory, consultations, and staff access.">
-        <Button
-          onClick={() => {
-            setShowForm(true);
-            setEditing(null);
-            setName('');
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add clinic
+        <Button onClick={() => { setShowForm(true); setEditing(null); createForm.reset(); }}>
+          <Plus className="mr-2 h-4 w-4" />Add clinic
         </Button>
       </PageHeader>
 
@@ -133,24 +107,14 @@ const ClinicsPage = () => {
                       <td className="py-2">{c.name}</td>
                       <td className="py-2 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditing(c);
-                              setName(c.name);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(c)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      <Button size="sm" variant="ghost"
+                        onClick={() => { setEditing(c); editForm.reset({ name: c.name }); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                        onClick={() => { if (!confirm(`Delete clinic "${c.name}"? This removes linked data per database rules.`)) return; deleteMutation.mutate(c); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                         </div>
                       </td>
                     </tr>
@@ -164,36 +128,37 @@ const ClinicsPage = () => {
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New clinic</DialogTitle>
-            <DialogDescription>Display name only.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Perumbakkam" />
+          <DialogHeader><DialogTitle>New clinic</DialogTitle><DialogDescription>Display name only.</DialogDescription></DialogHeader>
+          <form onSubmit={createForm.handleSubmit((d) => createMutation.mutate(d))}>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label>Name <span className="text-destructive">*</span></Label>
+                <Input className={cn('mt-1', createForm.formState.errors.name && 'border-destructive')} placeholder="e.g. Perumbakkam" {...createForm.register('name')} />
+                <FieldError message={createForm.formState.errors.name?.message} />
+              </div>
+              <Button type="submit" disabled={createMutation.isPending} className="w-full">
+                {createMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</> : 'Create'}
+              </Button>
             </div>
-            <Button onClick={handleCreate} disabled={loading} className="w-full">
-              Create
-            </Button>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename clinic</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <DialogHeader><DialogTitle>Rename clinic</DialogTitle></DialogHeader>
+          <form onSubmit={editForm.handleSubmit((d) => updateMutation.mutate(d))}>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label>Name <span className="text-destructive">*</span></Label>
+                <Input className={cn('mt-1', editForm.formState.errors.name && 'border-destructive')} {...editForm.register('name')} />
+                <FieldError message={editForm.formState.errors.name?.message} />
+              </div>
+              <Button type="submit" disabled={updateMutation.isPending} className="w-full">
+                {updateMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : 'Save'}
+              </Button>
             </div>
-            <Button onClick={handleUpdate} disabled={loading} className="w-full">
-              Save
-            </Button>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

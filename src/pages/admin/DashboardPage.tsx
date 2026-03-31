@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
+import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
   Users,
@@ -185,68 +186,41 @@ const DashboardPage = () => {
   const [dateTo, setDateTo] = useState(initialRange.to);
   const [appliedFrom, setAppliedFrom] = useState(initialRange.from);
   const [appliedTo, setAppliedTo] = useState(initialRange.to);
-  const [adminData, setAdminData] = useState<Awaited<ReturnType<typeof api.dashboard.admin>> | null>(null);
-  const [clinicData, setClinicData] = useState<Awaited<ReturnType<typeof api.dashboard.clinic>> | null>(null);
-  const [analyticsData, setAnalyticsData] = useState<Awaited<ReturnType<typeof api.dashboard.analytics>> | null>(null);
-  const [medicineSalesData, setMedicineSalesData] = useState<{ medicineName: string; quantity: number; total: number }[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  // Determine clinic scope for the current user / admin filter
+  const clinicScope = isAdmin ? (effectiveClinicId || undefined) : (user?.clinicId ?? undefined);
+  const showClinicView = isAdmin ? !!effectiveClinicId : true;
+
+  const { data: dashData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['dashboard', isAdmin, clinicScope, showClinicView, chartPeriod, appliedFrom, appliedTo],
+    queryFn: async () => {
       const dateParams = { from: appliedFrom, to: appliedTo };
-      if (isAdmin) {
-        const clinicOpt = effectiveClinicId || undefined;
-        if (effectiveClinicId) {
-          const [clinic, analytics, medicineSales] = await Promise.all([
-            api.dashboard.clinic(effectiveClinicId, dateParams),
-            api.dashboard.analytics({
-              clinicId: clinicOpt,
-              period: chartPeriod,
-              from: appliedFrom,
-              to: appliedTo,
-            }),
-            api.reports.medicineSales({ clinicId: clinicOpt, from: appliedFrom, to: appliedTo }),
-          ]);
-          setAdminData(null);
-          setClinicData(clinic);
-          setAnalyticsData(analytics);
-          setMedicineSalesData(medicineSales);
-        } else {
-          const [admin, analytics, medicineSales] = await Promise.all([
-            api.dashboard.admin(dateParams),
-            api.dashboard.analytics({
-              clinicId: undefined,
-              period: chartPeriod,
-              from: appliedFrom,
-              to: appliedTo,
-            }),
-            api.reports.medicineSales({ clinicId: undefined, from: appliedFrom, to: appliedTo }),
-          ]);
-          setAdminData(admin);
-          setClinicData(null);
-          setAnalyticsData(analytics);
-          setMedicineSalesData(medicineSales);
-        }
-      } else {
-        const clinicId = user?.clinicId;
+      const analyticsParams = { clinicId: clinicScope, period: chartPeriod, from: appliedFrom, to: appliedTo };
+      if (showClinicView) {
         const [clinic, analytics, medicineSales] = await Promise.all([
-          api.dashboard.clinic(clinicId, dateParams),
-          api.dashboard.analytics({ clinicId, period: chartPeriod, from: appliedFrom, to: appliedTo }),
-          api.reports.medicineSales({ clinicId, from: appliedFrom, to: appliedTo }),
+          api.dashboard.clinic(clinicScope, dateParams),
+          api.dashboard.analytics(analyticsParams),
+          api.reports.medicineSales({ clinicId: clinicScope, from: appliedFrom, to: appliedTo }),
         ]);
-        setClinicData(clinic);
-        setAnalyticsData(analytics);
-        setMedicineSalesData(medicineSales);
+        return { kind: 'clinic' as const, clinic, analytics, medicineSales };
+      } else {
+        const [admin, analytics, medicineSales] = await Promise.all([
+          api.dashboard.admin(dateParams),
+          api.dashboard.analytics(analyticsParams),
+          api.reports.medicineSales({ clinicId: undefined, from: appliedFrom, to: appliedTo }),
+        ]);
+        return { kind: 'admin' as const, admin, analytics, medicineSales };
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, user?.clinicId, effectiveClinicId, chartPeriod, appliedFrom, appliedTo]);
+    },
+    staleTime: 60_000, // 1 min cache
+    retry: 1,
+  });
+
+  const adminData = dashData?.kind === 'admin' ? dashData.admin : null;
+  const clinicData = dashData?.kind === 'clinic' ? dashData.clinic : null;
+  const analyticsData = dashData?.analytics ?? null;
+  const medicineSalesData = dashData?.medicineSales ?? null;
+  const error = queryError instanceof Error ? queryError.message : queryError ? 'Failed to load dashboard' : null;
 
   const handlePeriodChange = useCallback((period: 'daily' | 'weekly' | 'monthly') => {
     setChartPeriod(period);
@@ -261,10 +235,6 @@ const DashboardPage = () => {
     setAppliedFrom(dateFrom);
     setAppliedTo(dateTo);
   }, [dateFrom, dateTo]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const dateRangeLabel =
     appliedFrom === appliedTo
@@ -288,7 +258,7 @@ const DashboardPage = () => {
         <Card className="border-destructive/50">
           <CardContent className="pt-6">
             <p className="text-destructive">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={fetchData}>Retry</Button>
+            <Button variant="outline" className="mt-4" onClick={() => refetch()}>Retry</Button>
           </CardContent>
         </Card>
       </div>
