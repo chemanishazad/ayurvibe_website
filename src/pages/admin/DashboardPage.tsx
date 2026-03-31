@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
@@ -16,6 +17,7 @@ import {
   Wallet,
   RefreshCw,
   CalendarRange,
+  Package,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { formatChartDateLabel, formatIsoDateToApp } from '@/lib/datetime';
@@ -81,6 +83,18 @@ const StatCard = ({
 
 const dateInputClass =
   'h-9 rounded-md border border-input bg-background px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
+
+function DashboardSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="scroll-mt-4 space-y-3">
+      <div className="border-b border-border/60 pb-2">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {hint ? <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 const FilterBar = ({
   chartPeriod,
@@ -281,8 +295,20 @@ const DashboardPage = () => {
       <div className="space-y-6 pb-6">
         <PageHeader
           title="Admin dashboard"
-          description="All clinics combined. Use the header clinic filter to see one location only."
-        />
+          description="All branches for the selected dates. Treatment package balances are included in the network view. Use the header clinic selector to switch to a single branch (same metrics as clinic staff)."
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/treatment-plans" className="gap-1.5">
+                <Package className="h-4 w-4" />
+                Treatment plans
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/pharmacy">Pharmacy</Link>
+            </Button>
+          </div>
+        </PageHeader>
 
         <FilterBar
           chartPeriod={chartPeriod}
@@ -306,10 +332,25 @@ const DashboardPage = () => {
           </div>
         ) : (
           <>
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">
-                Overview — <span className="text-muted-foreground font-normal">{dateRangeLabel}</span>
-              </h2>
+            {(adminData.treatmentPlanOutstandingBalanceDue ?? 0) > 0 && (
+              <Card className="border-amber-300/80 bg-amber-50/90 dark:border-amber-800 dark:bg-amber-950/40">
+                <CardContent className="flex flex-col gap-2 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-amber-950 dark:text-amber-100">
+                    <span className="font-semibold">Network treatment package balance: </span>
+                    ₹{(adminData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()} across{' '}
+                    {adminData.treatmentPlanOutstandingCount ?? 0} plan(s) with money due — details in Treatment packages
+                    below.
+                  </p>
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link to="/admin/treatment-plans">Open plans</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            <DashboardSection
+              title="Overview"
+              hint={`${dateRangeLabel} · All clinics — registrations, visits, and sales in the selected range.`}
+            >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard title="Total Clinics" value={adminData.totalClinics} icon={Building2} />
                 <StatCard title="Total Patients" value={adminData.totalPatients} subtitle="All registered" icon={Users} />
@@ -318,17 +359,83 @@ const DashboardPage = () => {
                 <StatCard title="Medicine Sales" value={`₹${adminData.medicineSales.toLocaleString()}`} icon={Pill} />
                 <StatCard title="Total Profit" value={`₹${adminData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
               </div>
-            </div>
+            </DashboardSection>
 
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Revenue breakdown</h2>
+            <DashboardSection
+              title="Treatment packages (network)"
+              hint="Active plans count plans whose dates overlap the range above. Package balance due is money still owed on plans that have not ended (end date ≥ today). Plan medicine value is an estimated retail value of medicines linked to those plans."
+            >
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+                <StatCard title="Active plans" value={adminData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
+                <StatCard title="1 day plans" value={adminData.treatmentPlanDayCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Week plans" value={adminData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Month plans" value={adminData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Long plans" value={adminData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Plan medicine items" value={adminData.treatmentPlanMedicineCount ?? 0} icon={Pill} />
+                <StatCard
+                  title="Plan medicine value"
+                  value={`₹${(adminData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  icon={IndianRupee}
+                />
+                <StatCard
+                  title="Package balance due"
+                  value={`₹${(adminData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()}`}
+                  subtitle={`${adminData.treatmentPlanOutstandingCount ?? 0} active plan(s) with balance`}
+                  icon={AlertTriangle}
+                  accent="warning"
+                />
+              </div>
+              {(adminData.clinicWisePackageBalance ?? []).length > 0 && (
+                <Card className="overflow-hidden border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Package balance by clinic</CardTitle>
+                    <CardDescription>Outstanding treatment package money where end date has not passed</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[min(18rem,50vw)] min-h-[220px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={(adminData.clinicWisePackageBalance ?? []).map((c) => ({
+                            name: c.clinicName.length > 14 ? `${c.clinicName.slice(0, 14)}…` : c.clinicName,
+                            fullName: c.clinicName,
+                            balance: c.balanceDue,
+                            plans: c.outstandingCount,
+                          }))}
+                          layout="vertical"
+                          margin={{ left: 8, right: 24 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                          <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                          <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                          <Tooltip
+                            content={({ active, payload }) =>
+                              active && payload?.[0] ? (
+                                <div className="rounded-lg border bg-background p-3 shadow-md text-sm">
+                                  <p className="font-medium">{payload[0].payload.fullName}</p>
+                                  <p className="text-muted-foreground">
+                                    Balance ₹{payload[0].payload.balance?.toLocaleString()} · {payload[0].payload.plans} plan(s)
+                                  </p>
+                                </div>
+                              ) : null
+                            }
+                          />
+                          <Bar dataKey="balance" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Balance due" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </DashboardSection>
+
+            <DashboardSection title="Revenue breakdown" hint="Fees and medicine sales in the selected period (all clinics).">
               <div className="grid gap-3 lg:grid-cols-4">
                 <StatCard title="Consultation Fees" value={`₹${adminData.consultationAmount.toLocaleString()}`} icon={FileText} />
                 <StatCard title="Prescription Medicine" value={`₹${adminData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
                 <StatCard title="Direct Medicine Sales" value={`₹${adminData.directMedicineSales.toLocaleString()}`} icon={ShoppingCart} />
                 <StatCard title="Total Revenue" value={`₹${adminData.dailyRevenue.toLocaleString()}`} icon={Wallet} accent="success" />
               </div>
-            </div>
+            </DashboardSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="overflow-hidden border-border/60 shadow-sm">
@@ -465,10 +572,24 @@ const DashboardPage = () => {
           title={isAdmin && adminFilterClinicName ? `Clinic · ${adminFilterClinicName}` : 'Clinic dashboard'}
           description={
             isAdmin && adminFilterClinicName
-              ? 'Filtered to this clinic only. Choose “All clinics” in the header for a full-network view.'
-              : 'Overview by date range'
+              ? 'This branch only. Choose “All clinics” in the header for network-wide totals (including package balance across branches).'
+              : 'Your clinic for the selected dates. Package balance reflects treatment plans with money still owed.'
           }
-        />
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/treatment-plans" className="gap-1.5">
+                <Package className="h-4 w-4" />
+                Plans
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/pharmacy/new" className="gap-1.5">
+                New invoice
+              </Link>
+            </Button>
+          </div>
+        </PageHeader>
 
         <FilterBar
           chartPeriod={chartPeriod}
@@ -492,10 +613,38 @@ const DashboardPage = () => {
           </div>
         ) : (
           <>
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">
-                Summary — <span className="text-muted-foreground font-normal">{dateRangeLabel}</span>
-              </h2>
+            {(clinicData.treatmentPlanOutstandingBalanceDue ?? 0) > 0 && (
+              <Card className="border-amber-300/80 bg-amber-50/90 dark:border-amber-800 dark:bg-amber-950/40">
+                <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-300">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-amber-950 dark:text-amber-100">Treatment package balance</p>
+                      <p className="text-sm text-amber-900/90 dark:text-amber-200/90">
+                        ₹{(clinicData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()} outstanding across{' '}
+                        {clinicData.treatmentPlanOutstandingCount ?? 0} active plan(s). Record payments on a pharmacy
+                        invoice or update plans under Treatment plans.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link to="/admin/pharmacy/new">New invoice</Link>
+                    </Button>
+                    <Button size="sm" variant="outline" className="border-amber-800/30 bg-background/80 dark:bg-background/20" asChild>
+                      <Link to="/admin/treatment-plans">View plans</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <DashboardSection
+              title="Summary"
+              hint={`${dateRangeLabel} · Patients seen, OP activity, sales, and profit for this clinic workspace.`}
+            >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
                 <StatCard title="Patients" value={clinicData.patientCount ?? clinicData.todayPatients} icon={Users} />
                 <StatCard title="Consultations" value={clinicData.consultationsCount} icon={Stethoscope} />
@@ -505,10 +654,9 @@ const DashboardPage = () => {
                 <StatCard title="Medicine Sales" value={`₹${(clinicData.medicineSalesAmount ?? clinicData.medicineSales).toLocaleString()}`} icon={Pill} />
                 <StatCard title="Total Profit" value={`₹${clinicData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
               </div>
-            </div>
+            </DashboardSection>
 
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Revenue breakdown</h2>
+            <DashboardSection title="Revenue breakdown" hint="Fees billed in the period plus prescription and direct medicine sales.">
               <div className="grid gap-3 lg:grid-cols-5">
                 <StatCard title="Consultation Fees" value={`₹${clinicData.consultationAmount.toLocaleString()}`} icon={FileText} />
                 <StatCard title="Prescription Medicine" value={`₹${clinicData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
@@ -516,19 +664,21 @@ const DashboardPage = () => {
                 <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
                 <StatCard title="Treatment + Medicine" value={`₹${(clinicData.treatmentMedicineSalesAmount ?? 0).toLocaleString()}`} icon={TrendingUp} />
               </div>
-            </div>
+            </DashboardSection>
 
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Treatment monitoring</h2>
+            <DashboardSection
+              title="Treatment plans & packages"
+              hint="Active plans overlap the selected date range. Package balance due = plans not yet ended (end ≥ today) with balance &gt; 0 — same numbers as Treatment plans and pharmacy banners."
+            >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-                <StatCard title="Active Plans" value={clinicData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
-                <StatCard title="1 Day Plans" value={clinicData.treatmentPlanDayCount ?? 0} icon={CalendarRange} />
-                <StatCard title="Week Plans" value={clinicData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
-                <StatCard title="Month Plans" value={clinicData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
-                <StatCard title="Long Plans" value={clinicData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
-                <StatCard title="Plan Medicine Items" value={clinicData.treatmentPlanMedicineCount ?? 0} icon={Pill} />
+                <StatCard title="Active plans" value={clinicData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
+                <StatCard title="1 day plans" value={clinicData.treatmentPlanDayCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Week plans" value={clinicData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Month plans" value={clinicData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Long plans" value={clinicData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Plan medicine items" value={clinicData.treatmentPlanMedicineCount ?? 0} icon={Pill} />
                 <StatCard
-                  title="Plan Medicine Value"
+                  title="Plan medicine value"
                   value={`₹${(clinicData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
                   icon={IndianRupee}
                 />
@@ -540,7 +690,7 @@ const DashboardPage = () => {
                   accent="warning"
                 />
               </div>
-            </div>
+            </DashboardSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="overflow-hidden border-border/60 shadow-sm">

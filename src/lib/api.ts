@@ -506,6 +506,21 @@ export const api = {
       dailyPrescriptionMedicine: number;
       dailyDirectMedicine: number;
       clinicWiseRevenue: { clinicId: string; clinicName: string; revenue: number }[];
+      activeTreatmentPlans?: number;
+      treatmentPlanDayCount?: number;
+      treatmentPlanWeekCount?: number;
+      treatmentPlanMonthCount?: number;
+      treatmentPlanLongCount?: number;
+      treatmentPlanMedicineCount?: number;
+      treatmentPlanMedicineEstimatedAmount?: number;
+      treatmentPlanOutstandingCount?: number;
+      treatmentPlanOutstandingBalanceDue?: number;
+      clinicWisePackageBalance?: Array<{
+        clinicId: string;
+        clinicName: string;
+        outstandingCount: number;
+        balanceDue: number;
+      }>;
     }>(`/api/dashboard/admin${q ? `?${q}` : ''}`);
     },
     analytics: (params?: { clinicId?: string; period?: string; from?: string; to?: string }) => {
