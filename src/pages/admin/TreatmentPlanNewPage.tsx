@@ -16,7 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { addDays, format, subDays } from 'date-fns';
 
 const MASTER_NONE = '__master_none__';
@@ -25,8 +25,6 @@ const MASTER_NONE = '__master_none__';
 const INPUT_NO_SPIN =
   '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
-type ConsumableRow = { medicineId: string; quantityUsed: string; notes: string };
-
 type PatientRow = { id: string; name: string; mobile: string };
 
 const TreatmentPlanNewPage = () => {
@@ -34,7 +32,6 @@ const TreatmentPlanNewPage = () => {
   const { effectiveClinicId: targetClinicId, isAdmin } = useAdminClinic();
   const [patients, setPatients] = useState<PatientRow[]>([]);
   const [masters, setMasters] = useState<Record<string, unknown>[]>([]);
-  const [medicines, setMedicines] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -46,10 +43,12 @@ const TreatmentPlanNewPage = () => {
     startDate: format(new Date(), 'yyyy-MM-dd'),
     endDate: '',
     instructions: '',
+    /** Typical daily session window (HH:mm) — shown on schedule for staff/patient monitoring. */
+    preferredSessionStart: '',
+    preferredSessionEnd: '',
     /** Package fee: total, advance, balance = total − advance (shown live; stored on save). */
     totalCost: '',
     advancePaid: '',
-    consumables: [] as ConsumableRow[],
   });
   const { toast } = useToast();
 
@@ -59,10 +58,6 @@ const TreatmentPlanNewPage = () => {
     const balance = Math.max(0, total - advance);
     return { total, advance, balance };
   }, [form.totalCost, form.advancePaid]);
-
-  useEffect(() => {
-    api.medicines.list().then(setMedicines).catch(() => setMedicines([]));
-  }, []);
 
   useEffect(() => {
     const params: Record<string, string> = {};
@@ -133,31 +128,21 @@ const TreatmentPlanNewPage = () => {
     };
   }, [form.patientId, targetClinicId]);
 
-  const addConsumable = () => {
-    const med = medicines[0] as { id: string } | undefined;
-    if (!med) return;
-    setForm((f) => ({
-      ...f,
-      consumables: [...f.consumables, { medicineId: med.id, quantityUsed: '', notes: '' }],
-    }));
-  };
-
-  const removeConsumable = (idx: number) => {
-    setForm((f) => ({ ...f, consumables: f.consumables.filter((_, i) => i !== idx) }));
-  };
-
-  const updateConsumable = (idx: number, field: keyof ConsumableRow, value: string) => {
-    setForm((f) => ({
-      ...f,
-      consumables: f.consumables.map((m, i) => (i === idx ? { ...m, [field]: value } : m)),
-    }));
-  };
-
   const handleSubmit = async () => {
     if (!form.patientId || !form.name || !form.startDate || !form.endDate) {
       toast({
         title: 'Missing fields',
         description: 'Patient, plan name, start and end dates are required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const ps = form.preferredSessionStart.trim();
+    const pe = form.preferredSessionEnd.trim();
+    if ((ps && !pe) || (!ps && pe)) {
+      toast({
+        title: 'Usual session time',
+        description: 'Set both start and end, or leave both empty.',
         variant: 'destructive',
       });
       return;
@@ -186,13 +171,8 @@ const TreatmentPlanNewPage = () => {
         totalCost: packageMoney.total,
         advancePaid: packageMoney.advance,
         instructions: form.instructions || undefined,
-        consumables: form.consumables
-          .filter((c) => c.medicineId)
-          .map((c) => ({
-            medicineId: c.medicineId,
-            quantityUsed: c.quantityUsed.trim() || undefined,
-            notes: c.notes.trim() || undefined,
-          })),
+        preferredSessionStart: ps || undefined,
+        preferredSessionEnd: pe || undefined,
       });
       toast({ title: 'Treatment plan created' });
       navigate('/admin/treatment-plans');
@@ -213,7 +193,7 @@ const TreatmentPlanNewPage = () => {
     <div className="space-y-8">
       <PageHeader
         title="New treatment plan"
-        description="Set package total and advance here; balance is calculated. Add session consumables (oils, etc.) below. Further payments can be recorded on Pharmacy → New invoice."
+        description="Set package total and advance; balance is calculated. Record medicines and session supplies when you update each day’s session on Treatment plans — not here."
       >
         <Button variant="outline" size="sm" asChild>
           <Link to="/admin/treatment-plans">
@@ -340,6 +320,76 @@ const TreatmentPlanNewPage = () => {
             <Label>End date</Label>
             <Input type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} />
           </div>
+
+          <div className="rounded-lg border border-border/80 bg-muted/15 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Usual session time</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Typical daily window for this package — appears on the treatment board and schedule so patients and staff
+                can see the agreed slot at a glance. Optional; you still book exact times per day in Treatment plans.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Morning', start: '09:00', end: '12:00' },
+                { label: 'Afternoon', start: '13:00', end: '16:00' },
+                { label: 'Evening', start: '17:00', end: '20:00' },
+              ].map((slot) => (
+                <Button
+                  key={slot.label}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      preferredSessionStart: slot.start,
+                      preferredSessionEnd: slot.end,
+                    }))
+                  }
+                >
+                  {slot.label}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    preferredSessionStart: '',
+                    preferredSessionEnd: '',
+                  }))
+                }
+              >
+                Clear
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="tp-pref-start">Start (24h)</Label>
+                <Input
+                  id="tp-pref-start"
+                  type="time"
+                  value={form.preferredSessionStart}
+                  onChange={(e) => setForm((f) => ({ ...f, preferredSessionStart: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tp-pref-end">End (24h)</Label>
+                <Input
+                  id="tp-pref-end"
+                  type="time"
+                  value={form.preferredSessionEnd}
+                  onChange={(e) => setForm((f) => ({ ...f, preferredSessionEnd: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <Label>Instructions</Label>
             <Textarea
@@ -392,56 +442,6 @@ const TreatmentPlanNewPage = () => {
               <span className="text-muted-foreground">Balance due (calculated)</span>
               <span className="font-semibold tabular-nums text-foreground">₹{packageMoney.balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Session consumables</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Oils, powders, or stock used during therapy — quantity or notes only (no dosage schedule).
-                </p>
-              </div>
-              <Button size="sm" variant="outline" onClick={addConsumable} disabled={medicines.length === 0}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-            </div>
-            {form.consumables.length > 0 && (
-              <div className="mt-2 space-y-2">
-                {form.consumables.map((row, i) => (
-                  <div key={i} className="rounded border p-2 space-y-2">
-                    <Select value={row.medicineId} onValueChange={(v) => updateConsumable(i, 'medicineId', v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Item" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {medicines.map((med) => (
-                          <SelectItem key={(med as { id: string }).id} value={(med as { id: string }).id}>
-                            {(med as { name: string }).name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="Qty (e.g. 50 ml)"
-                        value={row.quantityUsed}
-                        onChange={(e) => updateConsumable(i, 'quantityUsed', e.target.value)}
-                      />
-                      <Input
-                        placeholder="Notes"
-                        value={row.notes}
-                        onChange={(e) => updateConsumable(i, 'notes', e.target.value)}
-                      />
-                    </div>
-                    <Button size="sm" variant="ghost" onClick={() => removeConsumable(i)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           <Button

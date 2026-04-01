@@ -73,7 +73,12 @@ async function runRequest<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = (data?.error as string | undefined) || res.statusText || 'Request failed';
+    const d = data as Record<string, unknown> | null | undefined;
+    const message =
+      (typeof d?.error === 'string' ? d.error : undefined) ||
+      (typeof d?.message === 'string' ? d.message : undefined) ||
+      res.statusText ||
+      'Request failed';
     const code = (data?.code as string | undefined) || undefined;
 
     // Only 401 means the session token is invalid. Do not logout on generic 403
@@ -411,8 +416,75 @@ export const api = {
       const q = new URLSearchParams(p).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/treatment-plans${q ? `?${q}` : ''}`);
     },
+    schedule: (params: { clinicId: string; date?: string }) => {
+      const p: Record<string, string> = { clinicId: params.clinicId };
+      if (params.date) p.date = params.date;
+      const q = new URLSearchParams(p).toString();
+      return fetchApi<{
+        date: string;
+        rows: Array<{
+          planDayId: string;
+          dayNumber: number;
+          planDate: string;
+          dayStatus: string;
+          dayNotes: string | null;
+          treatmentPlanId: string;
+          planName: string;
+          preferredSessionStart: string | null;
+          preferredSessionEnd: string | null;
+          patientId: string;
+          patientName: string;
+          patientMobile: string;
+          appointmentId: string | null;
+          therapistId: string | null;
+          roomId: string | null;
+          startTime: string | null;
+          endTime: string | null;
+          therapistName: string | null;
+          roomNumber: string | null;
+        }>;
+      }>(`/api/treatment-plans/schedule?${q}`);
+    },
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/treatment-plans/${id}`),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/treatment-plans', { method: 'POST', body: JSON.stringify(data) }),
+    planDaySessionLines: (planDayId: string) =>
+      fetchApi<{
+        oral: Array<{
+          id: string;
+          medicineId: string;
+          medicineName: string;
+          dosage: string | null;
+          frequency: string | null;
+          specialInstructions: string | null;
+        }>;
+        consumables: Array<{
+          id: string;
+          medicineId: string;
+          medicineName: string;
+          quantityUsed: string | null;
+          notes: string | null;
+        }>;
+      }>(`/api/treatment-plans/plan-days/${planDayId}/session-lines`),
+    addPlanDayOralMedicine: (planDayId: string, data: Record<string, unknown>) =>
+      fetchApi<{ id: string }>(`/api/treatment-plans/plan-days/${planDayId}/oral-medicines`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deletePlanDayOralMedicine: (planDayId: string, lineId: string) =>
+      fetchApi<{ success: boolean; id: string }>(
+        `/api/treatment-plans/plan-days/${planDayId}/oral-medicines/${lineId}`,
+        { method: 'DELETE' },
+      ),
+    addPlanDayConsumable: (planDayId: string, data: Record<string, unknown>) =>
+      fetchApi<{ id: string }>(`/api/treatment-plans/plan-days/${planDayId}/consumables`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deletePlanDayConsumable: (planDayId: string, lineId: string) =>
+      fetchApi<{ success: boolean; id: string }>(
+        `/api/treatment-plans/plan-days/${planDayId}/consumables/${lineId}`,
+        { method: 'DELETE' },
+      ),
   },
   treatmentMasters: {
     list: (params?: { clinicId?: string }) => {
