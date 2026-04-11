@@ -363,7 +363,7 @@ const DashboardPage = () => {
 
             <DashboardSection
               title="Treatment packages (network)"
-              hint="Active plans count plans whose dates overlap the range above. Package balance due is money still owed on plans that have not ended (end date ≥ today). Plan medicine value is an estimated retail value of medicines linked to those plans."
+              hint="Active plans overlap the selected date range. Line counts include daily session oral lines and supplies (Treatment plans) plus any legacy plan-level prescriptions. Retail estimate uses selling price (one unit per session line; legacy × duration days). Package balance = plans not ended with balance due."
             >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
                 <StatCard title="Active plans" value={adminData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
@@ -371,10 +371,16 @@ const DashboardPage = () => {
                 <StatCard title="Week plans" value={adminData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
                 <StatCard title="Month plans" value={adminData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
                 <StatCard title="Long plans" value={adminData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
-                <StatCard title="Plan medicine items" value={adminData.treatmentPlanMedicineCount ?? 0} icon={Pill} />
                 <StatCard
-                  title="Plan medicine value"
+                  title="Plan medicine lines"
+                  value={adminData.treatmentPlanMedicineCount ?? 0}
+                  subtitle={`${adminData.treatmentPlanSessionOralLineCount ?? 0} oral · ${adminData.treatmentPlanSessionConsumableLineCount ?? 0} supplies${(adminData.legacyPlanMedicineLineCount ?? 0) > 0 ? ` · ${adminData.legacyPlanMedicineLineCount} legacy` : ''}`}
+                  icon={Pill}
+                />
+                <StatCard
+                  title="Est. retail (plans)"
                   value={`₹${(adminData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  subtitle="Session + legacy"
                   icon={IndianRupee}
                 />
                 <StatCard
@@ -668,7 +674,7 @@ const DashboardPage = () => {
 
             <DashboardSection
               title="Treatment plans & packages"
-              hint="Active plans overlap the selected date range. Package balance due = plans not yet ended (end ≥ today) with balance &gt; 0 — same numbers as Treatment plans and pharmacy banners."
+              hint="Line counts include daily session oral + supplies plus any legacy plan prescriptions. Est. retail combines session lines (×1 selling price) and legacy (× duration). Package balance matches Treatment plans and pharmacy banners."
             >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
                 <StatCard title="Active plans" value={clinicData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
@@ -676,10 +682,16 @@ const DashboardPage = () => {
                 <StatCard title="Week plans" value={clinicData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
                 <StatCard title="Month plans" value={clinicData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
                 <StatCard title="Long plans" value={clinicData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
-                <StatCard title="Plan medicine items" value={clinicData.treatmentPlanMedicineCount ?? 0} icon={Pill} />
                 <StatCard
-                  title="Plan medicine value"
+                  title="Plan medicine lines"
+                  value={clinicData.treatmentPlanMedicineCount ?? 0}
+                  subtitle={`${clinicData.treatmentPlanSessionOralLineCount ?? 0} oral · ${clinicData.treatmentPlanSessionConsumableLineCount ?? 0} supplies${(clinicData.legacyPlanMedicineLineCount ?? 0) > 0 ? ` · ${clinicData.legacyPlanMedicineLineCount} legacy` : ''}`}
+                  icon={Pill}
+                />
+                <StatCard
+                  title="Est. retail (plans)"
                   value={`₹${(clinicData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  subtitle="Session + legacy"
                   icon={IndianRupee}
                 />
                 <StatCard

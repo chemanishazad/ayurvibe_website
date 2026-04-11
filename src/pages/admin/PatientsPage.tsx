@@ -31,16 +31,33 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { useAdminClinic } from '@/contexts/AdminClinicContext';
+import { ADMIN_ALL_CLINICS_VALUE, useAdminClinic } from '@/contexts/AdminClinicContext';
 import { getAuthUser } from '@/pages/Login';
 
 type PatientRow = Record<string, unknown> & { consultationCount?: number; lastConsultationId?: string };
 
 const SEARCH_DEBOUNCE_MS = 350;
+const PATIENTS_BRANCH_KEY = 'ayurvibe_patients_clinic_scope';
 
 const PatientsPage = () => {
   const navigate = useNavigate();
-  const { effectiveClinicId, isAdmin } = useAdminClinic();
+  const { effectiveClinicId, isAdmin, clinics } = useAdminClinic();
+  const [patientsBranch, setPatientsBranch] = useState(() => {
+    try {
+      return sessionStorage.getItem(PATIENTS_BRANCH_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const setPatientsBranchPersist = (v: string) => {
+    setPatientsBranch(v);
+    try {
+      if (v) sessionStorage.setItem(PATIENTS_BRANCH_KEY, v);
+      else sessionStorage.removeItem(PATIENTS_BRANCH_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
   const [filters, setFilters] = useState({ search: '', from: '', to: '' });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -52,11 +69,13 @@ const PatientsPage = () => {
     return () => clearTimeout(timer);
   }, [filters.search]);
 
+  const clinicIdForList = isAdmin ? patientsBranch || undefined : effectiveClinicId ?? undefined;
+
   const queryParams = {
     search: debouncedSearch.trim(),
     from: filters.from.trim(),
     to: filters.to.trim(),
-    ...(isAdmin && effectiveClinicId ? { clinicId: effectiveClinicId } : {}),
+    ...(clinicIdForList ? { clinicId: clinicIdForList } : {}),
   };
 
   const { data: rawPatients = [], isLoading, isFetching } = useQuery<PatientRow[]>({
@@ -66,7 +85,7 @@ const PatientsPage = () => {
       if (queryParams.search) params.search = queryParams.search;
       if (queryParams.from) params.from = queryParams.from;
       if (queryParams.to) params.to = queryParams.to;
-      if (queryParams.clinicId) params.clinicId = queryParams.clinicId;
+      if (queryParams.clinicId) params.clinicId = queryParams.clinicId as string;
       return api.patients.list(params) as Promise<PatientRow[]>;
     },
     placeholderData: (prev) => prev,
@@ -86,7 +105,9 @@ const PatientsPage = () => {
   });
 
   // Reset to page 1 when data changes
-  useEffect(() => { setPage(1); }, [debouncedSearch, filters.from, filters.to, effectiveClinicId]);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, filters.from, filters.to, effectiveClinicId, patientsBranch]);
   useEffect(() => { if (page > totalPages && totalPages > 0) setPage(totalPages); }, [perPage, totalPages]);
 
   const handleFromDateChange = (value: string) => {
@@ -160,6 +181,27 @@ const PatientsPage = () => {
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                {isAdmin && clinics.length > 0 && (
+                  <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-0.5">
+                    <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Branch</span>
+                    <Select
+                      value={patientsBranch || ADMIN_ALL_CLINICS_VALUE}
+                      onValueChange={(v) => setPatientsBranchPersist(v === ADMIN_ALL_CLINICS_VALUE ? '' : v)}
+                    >
+                      <SelectTrigger className="h-8 w-[min(56vw,200px)] border-0 bg-transparent text-xs shadow-none">
+                        <SelectValue placeholder="All branches" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ADMIN_ALL_CLINICS_VALUE}>All branches</SelectItem>
+                        {clinics.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {isRefreshing && (
                   <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />

@@ -68,6 +68,18 @@ export function formatChartDateLabel(label: string | number | undefined): string
   return formatIsoDateToApp(s);
 }
 
+/**
+ * Calendar date in the user's local timezone as `yyyy-MM-dd`.
+ * Prefer this over `toISOString().slice(0, 10)` for "today" — ISO is UTC and can be the previous day
+ * for evening/night in Asia (e.g. 00:43 IST on the 4th is still the 3rd in UTC).
+ */
+export function localDateYmd(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 /** Current time string for bills / print (12h). */
 export function formatNowAppTime(): string {
   return formatAppTime(new Date());

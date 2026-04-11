@@ -37,6 +37,7 @@ const DoctorsPage = React.lazy(() => import("./pages/admin/DoctorsPage"));
 const ClinicsPage = React.lazy(() => import("./pages/admin/ClinicsPage"));
 const UsersAdminPage = React.lazy(() => import("./pages/admin/UsersAdminPage"));
 const UomAdminPage = React.lazy(() => import("./pages/admin/UomAdminPage"));
+const TherapistsRoomsPage = React.lazy(() => import("./pages/admin/TherapistsRoomsPage"));
 
 // Listens to route changes for SPA page_view tracking
 const AnalyticsListener = () => {
@@ -127,6 +128,7 @@ const App = () => (
               <Route path="reports" element={<ReportsPage />} />
               <Route path="upcoming-follow-ups" element={<UpcomingFollowUpsPage />} />
               <Route path="clinics" element={<ClinicsPage />} />
+              <Route path="therapists-rooms" element={<AdminOnlyRoute><TherapistsRoomsPage /></AdminOnlyRoute>} />
               <Route path="users" element={<UsersAdminPage />} />
               <Route path="uom" element={<UomAdminPage />} />
             </Route>

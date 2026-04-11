@@ -5,9 +5,7 @@ export const medicineSchema = z.object({
     .string({ required_error: 'Medicine name is required' })
     .min(1, 'Medicine name is required')
     .trim(),
-  uom: z
-    .string({ required_error: 'Unit of measure is required' })
-    .min(1, 'Unit of measure is required'),
+  uom: z.string().max(50),
   purchasePrice: z
     .string()
     .regex(/^\d+(\.\d{1,2})?$/, 'Enter a valid purchase price')

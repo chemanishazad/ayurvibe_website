@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
+import { formatWhatsAppBillText, openWhatsAppWithText, type WhatsAppBillLine } from '@/lib/whatsapp-bill-text';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { Search, Loader2, Printer, MessageCircle, Plus, CalendarDays, Eye, AlertTriangle } from 'lucide-react';
 import {
@@ -30,6 +31,7 @@ import {
   formatBillDisplayDateTime,
   formatIsoDateToApp,
   formatNowAppTime,
+  localDateYmd,
 } from '@/lib/datetime';
 import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
 import { openPharmacyPrint, savePharmacyPrintPayload } from '@/lib/print-handoff';
@@ -160,9 +162,25 @@ function getDirectSaleTotals(sale: PharmacySaleGroup) {
   };
 }
 
-type ConsultationMedicineApiRow = { medicineName: string; quantity: number; unitPrice: string; total?: string };
+type ConsultationMedicineApiRow = {
+  medicineName: string;
+  quantity: number;
+  unitPrice: string;
+  total?: string;
+  batchNumber?: string | null;
+  expiryDate?: string | null;
+  uom?: string | null;
+};
 type ConsultationTreatmentApiRow = { name: string; price: string };
-type BillMedicineRow = { medicineName: string; quantity: number; unitPrice: string; total: string };
+type BillMedicineRow = {
+  medicineName: string;
+  quantity: number;
+  unitPrice: string;
+  total: string;
+  batchNumber?: string;
+  expiryDate?: string;
+  uom?: string;
+};
 type PharmacyGroupedApiItem = {
   id?: string;
   medicineName?: string;
@@ -256,6 +274,9 @@ const responseMapper = {
         quantity: medicine.quantity,
         unitPrice: String(unitPrice),
         total: String(total),
+        batchNumber: medicine.batchNumber ?? undefined,
+        expiryDate: medicine.expiryDate ?? undefined,
+        uom: medicine.uom ?? undefined,
       };
     });
   },
@@ -268,12 +289,7 @@ const responseMapper = {
   },
 
   billMedicines(rows: BillMedicineRow[]): BillMedicineRow[] {
-    return rows.map((item) => ({
-      medicineName: item.medicineName,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      total: item.total,
-    }));
+    return rows.map((item) => ({ ...item }));
   },
 };
 
@@ -281,8 +297,8 @@ const PharmacyRecordsPage = () => {
   const { effectiveClinicId, clinics } = useAdminClinic();
   const [pharmacyRecords, setPharmacyRecords] = useState<Record<string, unknown>[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
-  const [recordsDateFrom, setRecordsDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [recordsDateTo, setRecordsDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [recordsDateFrom, setRecordsDateFrom] = useState(() => localDateYmd());
+  const [recordsDateTo, setRecordsDateTo] = useState(() => localDateYmd());
   const [recordsSearch, setRecordsSearch] = useState('');
   const [recordsSaleKind, setRecordsSaleKind] = useState<'all' | 'direct' | 'consultation' | 'own'>('all');
   const [recordsPage, setRecordsPage] = useState(1);
@@ -440,7 +456,7 @@ const PharmacyRecordsPage = () => {
   const handlePrint = (id: string, options?: { paymentMode?: string }) => {
     api.consultations.get(id).then((data) => {
       const now = new Date();
-      const billDate = now.toISOString().slice(0, 10);
+      const billDate = localDateYmd(now);
       const billTime = formatNowAppTime();
       try {
         const paymentMode = options?.paymentMode ?? '—';
@@ -480,30 +496,53 @@ const PharmacyRecordsPage = () => {
       const medTotal = String(medTotalValue);
       const trtTotal = String(trtTotalValue);
       const grand = medTotalValue + trtTotalValue;
-      const billDate = new Date().toISOString().slice(0, 10);
+      const billDate = localDateYmd();
       const billTime = formatNowAppTime();
+      const rawMob = (data.patientMobile as string) || '';
+      const mobDigits = rawMob.replace(/\D/g, '');
+      const patientMobileDisplay =
+        mobDigits.length === 10 && !rawMob.includes('+') ? `+91 ${mobDigits}` : rawMob;
+      const billPayload: WhatsAppBillLine = {
+        customerName: String(data.patientName || ''),
+        medicines: meds,
+        consultationFee: responseMapper.toNumber(data.consultationFee),
+        treatments: trts,
+        medicineTotal: medTotal,
+        treatmentTotal: trtTotal,
+        grandTotal: grand.toFixed(2),
+        paymentMode: '—',
+        date: formatBillDisplayDateTime(billDate, billTime),
+        clinicName: data.clinicName as string,
+        patientMobile: patientMobileDisplay || undefined,
+        billTitle: 'Pharmacy sale',
+        saleType: 'Consultation pharmacy',
+      };
+      const cc = digits.length === 10 ? '91' : undefined;
       api.whatsapp
         .sendBill({
           mobile: digits,
-          countryCode: digits.length === 10 ? '91' : undefined,
-          billData: {
-            customerName: String(data.patientName || ''),
-            medicines: meds,
-            consultationFee: responseMapper.toNumber(data.consultationFee),
-            treatments: trts,
-            medicineTotal: medTotal,
-            treatmentTotal: trtTotal,
-            grandTotal: grand.toFixed(2),
-            paymentMode: '—',
-            date: formatBillDisplayDateTime(billDate, billTime),
-            clinicName: data.clinicName as string,
-          },
+          countryCode: cc,
+          billData: billPayload,
         })
         .then((r) => {
-          if (r.sent) toast({ title: 'Bill sent via WhatsApp', description: 'Invoice delivered to customer' });
-          else if (r.error) toast({ title: 'WhatsApp not sent', description: r.error, variant: 'destructive' });
+          toast({
+            title: 'WhatsApp: invoice sent',
+            description:
+              r.note ??
+              'Meta accepted the message. If the phone shows nothing within a minute, check Meta Business Suite → WhatsApp → Message history.',
+          });
         })
-        .catch(() => {});
+        .catch((e) => {
+          openWhatsAppWithText(digits, formatWhatsAppBillText(billPayload), cc);
+          toast({
+            title: 'WhatsApp API error',
+            description:
+              e instanceof ApiError
+                ? e.message
+                : 'Could not send via Cloud API. WhatsApp Web opened with the bill text as fallback.',
+            variant: 'destructive',
+          });
+        });
     }).catch(() => toast({ title: 'Failed to load bill', variant: 'destructive' }));
   };
 
@@ -512,7 +551,7 @@ const PharmacyRecordsPage = () => {
     const printId = `record_${sale.saleDate}_${rowIndex}_${Date.now()}`;
     const clinicName = clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic';
     const now = new Date();
-    const billDate = now.toISOString().slice(0, 10);
+    const billDate = localDateYmd(now);
     const billTime = formatNowAppTime();
     const printData = {
       patientName: sale.customerName || 'Direct Sale',
@@ -544,27 +583,45 @@ const PharmacyRecordsPage = () => {
       toast({ title: 'No mobile', description: 'No mobile number on this sale', variant: 'destructive' });
       return;
     }
+    const billPayload: WhatsAppBillLine = {
+      customerName: sale.customerName || 'Direct Sale',
+      medicines: responseMapper.billMedicines(medicineItems),
+      treatments: treatmentRows,
+      medicineTotal: String(medicineSubtotal),
+      treatmentTotal,
+      grandTotal: grandTotal.toFixed(2),
+      paymentMode: 'Cash',
+      date: sale.saleDate,
+      clinicName: clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic',
+      patientMobile: `+91 ${rawMobile}`,
+      billTitle: 'Pharmacy sale',
+      saleType: 'Direct sale',
+    };
     api.whatsapp
       .sendBill({
         mobile: rawMobile,
         countryCode: '91',
-        billData: {
-          customerName: sale.customerName || 'Direct Sale',
-          medicines: responseMapper.billMedicines(medicineItems),
-          treatments: treatmentRows,
-          medicineTotal: String(medicineSubtotal),
-          treatmentTotal,
-          grandTotal: grandTotal.toFixed(2),
-          paymentMode: 'Cash',
-          date: sale.saleDate,
-          clinicName: clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic',
-        },
+        billData: billPayload,
       })
       .then((r) => {
-        if (r.sent) toast({ title: 'Bill sent via WhatsApp', description: 'Invoice delivered to customer' });
-        else if (r.error) toast({ title: 'WhatsApp not sent', description: r.error, variant: 'destructive' });
+        toast({
+          title: 'WhatsApp: invoice sent',
+          description:
+            r.note ??
+            'Meta accepted the message. If the phone shows nothing within a minute, check Meta Business Suite → WhatsApp → Message history.',
+        });
       })
-      .catch(() => {});
+      .catch((e) => {
+        openWhatsAppWithText(rawMobile, formatWhatsAppBillText(billPayload), '91');
+        toast({
+          title: 'WhatsApp API error',
+          description:
+            e instanceof ApiError
+              ? e.message
+              : 'Could not send via Cloud API. WhatsApp Web opened with the bill text as fallback.',
+          variant: 'destructive',
+        });
+      });
   };
 
   return (

@@ -110,6 +110,7 @@ type ConsultationRow = Record<string, unknown> & {
 };
 
 type PrescriptionItem = {
+  /** Empty when the row is a new medicine name (created on save). */
   medicineId: string;
   medicineName: string;
   dosage: string;
@@ -123,6 +124,8 @@ type PrescriptionItem = {
   withMilk: boolean;
   withHoney: boolean;
   withGhee: boolean;
+  withGingerJuice: boolean;
+  withLemonJuice: boolean;
 };
 
 const fmtDateWithTime = (date: string, time?: string | null) =>
@@ -283,6 +286,11 @@ const ConsultationsPage = () => {
     prescription: [] as PrescriptionItem[],
   });
   const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
+  const [prescriptionSearch, setPrescriptionSearch] = useState('');
+
+  useEffect(() => {
+    if (prescriptionOpen == null) setPrescriptionSearch('');
+  }, [prescriptionOpen]);
   const [followUpDateOpen, setFollowUpDateOpen] = useState(false);
   const [patientSearchOpen, setPatientSearchOpen] = useState(false);
   const [consultationErrors, setConsultationErrors] = useState<string[]>([]);
@@ -413,6 +421,8 @@ const ConsultationsPage = () => {
             withMilk?: boolean;
             withHoney?: boolean;
             withGhee?: boolean;
+            withGingerJuice?: boolean;
+            withLemonJuice?: boolean;
           }>) || [];
         setForm((f) => ({
           ...f,
@@ -454,6 +464,8 @@ const ConsultationsPage = () => {
             withMilk: Boolean(p.withMilk),
             withHoney: Boolean(p.withHoney),
             withGhee: Boolean(p.withGhee),
+            withGingerJuice: Boolean(p.withGingerJuice),
+            withLemonJuice: Boolean(p.withLemonJuice),
           })),
         }));
         api.patients.get(String(cons.patientId)).then((p) => {
@@ -488,6 +500,8 @@ const ConsultationsPage = () => {
           withMilk?: boolean;
           withHoney?: boolean;
           withGhee?: boolean;
+          withGingerJuice?: boolean;
+          withLemonJuice?: boolean;
         }>) || [];
       if (user?.role === 'admin' && cons.clinicId) setSelectedClinicId(cons.clinicId as string);
       let ph = defaultPersonalHistory();
@@ -557,6 +571,8 @@ const ConsultationsPage = () => {
           withMilk: Boolean(p.withMilk),
           withHoney: Boolean(p.withHoney),
           withGhee: Boolean(p.withGhee),
+          withGingerJuice: Boolean(p.withGingerJuice),
+          withLemonJuice: Boolean(p.withLemonJuice),
         })),
       }));
     }).catch((err) => {
@@ -637,15 +653,13 @@ const ConsultationsPage = () => {
   }, [targetClinicId, user?.role, form.patientId, isOpListView, isListRoute, isOpSection]);
 
   const addPrescription = () => {
-    const first = medicinesMaster[0];
-    if (!first) return;
     setForm((f) => ({
       ...f,
       prescription: [
         ...f.prescription,
         {
-          medicineId: first.id,
-          medicineName: first.name,
+          medicineId: '',
+          medicineName: '',
           dosage: '',
           durationDays: '',
           timeMorning: false,
@@ -657,9 +671,12 @@ const ConsultationsPage = () => {
           withMilk: false,
           withHoney: false,
           withGhee: false,
+          withGingerJuice: false,
+          withLemonJuice: false,
         },
       ],
     }));
+    setPrescriptionSearch('');
     setPrescriptionOpen(form.prescription.length);
   };
 
@@ -671,6 +688,7 @@ const ConsultationsPage = () => {
       ),
     }));
     setPrescriptionOpen(null);
+    setPrescriptionSearch('');
   };
 
   const removePrescription = (idx: number) => {
@@ -724,20 +742,26 @@ const ConsultationsPage = () => {
         dietLifestyleAdvice: form.dietLifestyleAdvice || undefined,
         menstrualHistory: form.patientGender?.toLowerCase() === 'female' ? form.menstrualHistory : undefined,
         ayurvedaExamination: form.ayurvedaExamination,
-        prescription: form.prescription.filter((p) => p.medicineId).map((p) => ({
-          medicineId: p.medicineId,
-          dosage: p.dosage || undefined,
-          durationDays: toNum(p.durationDays),
-          timeMorning: p.timeMorning,
-          timeAfternoon: p.timeAfternoon,
-          timeNight: p.timeNight,
-          foodRelation: p.foodRelation || undefined,
-          quantity: p.quantity || undefined,
-          withHotWater: p.withHotWater,
-          withMilk: p.withMilk,
-          withHoney: p.withHoney,
-          withGhee: p.withGhee,
-        })),
+        prescription: form.prescription
+          .filter((p) => p.medicineId || p.medicineName?.trim())
+          .map((p) => ({
+            ...(p.medicineId
+              ? { medicineId: p.medicineId }
+              : { medicineName: p.medicineName.trim() }),
+            dosage: p.dosage || undefined,
+            durationDays: toNum(p.durationDays),
+            timeMorning: p.timeMorning,
+            timeAfternoon: p.timeAfternoon,
+            timeNight: p.timeNight,
+            foodRelation: p.foodRelation || undefined,
+            quantity: p.quantity || undefined,
+            withHotWater: p.withHotWater,
+            withMilk: p.withMilk,
+            withHoney: p.withHoney,
+            withGhee: p.withGhee,
+            withGingerJuice: p.withGingerJuice,
+            withLemonJuice: p.withLemonJuice,
+          })),
       };
 
       if (isOpDoctorCompleteRoute && consultationIdFromRoute) {
@@ -943,6 +967,8 @@ const ConsultationsPage = () => {
           withMilk?: boolean;
           withHoney?: boolean;
           withGhee?: boolean;
+          withGingerJuice?: boolean;
+          withLemonJuice?: boolean;
         }>) || [];
       const d = data as Record<string, unknown>;
       let ph = defaultPersonalHistory();
@@ -1012,6 +1038,8 @@ const ConsultationsPage = () => {
           withMilk: Boolean(p.withMilk),
           withHoney: Boolean(p.withHoney),
           withGhee: Boolean(p.withGhee),
+          withGingerJuice: Boolean(p.withGingerJuice),
+          withLemonJuice: Boolean(p.withLemonJuice),
         })),
       }));
     }).catch(() => toast({ title: 'Failed to load details', variant: 'destructive' }));
@@ -1873,7 +1901,7 @@ const ConsultationsPage = () => {
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-muted-foreground">Section 1 — Prescription (what doctor prescribes)</Label>
-                <Button size="sm" variant="outline" onClick={addPrescription} disabled={medicinesMaster.length === 0}>
+                <Button size="sm" variant="outline" onClick={addPrescription}>
                   <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
@@ -1885,23 +1913,62 @@ const ConsultationsPage = () => {
                         <div className="flex-1 min-w-0">
                           <Label className="text-xs text-muted-foreground">Medicine</Label>
                           <div className="mt-1">
-                            <Popover open={prescriptionOpen === i} onOpenChange={(o) => setPrescriptionOpen(o ? i : null)}>
+                            <Popover
+                              open={prescriptionOpen === i}
+                              onOpenChange={(o) => {
+                                setPrescriptionOpen(o ? i : null);
+                                if (!o) setPrescriptionSearch('');
+                              }}
+                            >
                               <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" size="sm" className="w-full justify-between font-normal">
-                                  <span className="truncate">{p.medicineName || 'Select medicine'}</span>
+                                  <span className="truncate">
+                                    {p.medicineName?.trim()
+                                      ? p.medicineId
+                                        ? p.medicineName
+                                        : `New: ${p.medicineName}`
+                                      : 'Select or type new medicine'}
+                                  </span>
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-[320px] p-0" align="start">
-                                <Command>
-                                  <CommandInput placeholder="Search medicine..." />
+                                <Command shouldFilter={false}>
+                                  <CommandInput
+                                    placeholder="Search or type new name…"
+                                    value={prescriptionSearch}
+                                    onValueChange={setPrescriptionSearch}
+                                  />
                                   <CommandList>
-                                    <CommandEmpty>No medicine found</CommandEmpty>
+                                    <CommandEmpty>No matches — use “Add new” below</CommandEmpty>
                                     <CommandGroup>
-                                      {medicinesMaster.map((med) => (
-                                        <CommandItem key={med.id} value={med.name} onSelect={() => selectPrescription(i, med)}>
-                                          {med.name}
-                                        </CommandItem>
-                                      ))}
+                                      {medicinesMaster
+                                        .filter((med) =>
+                                          med.name.toLowerCase().includes(prescriptionSearch.trim().toLowerCase()),
+                                        )
+                                        .map((med) => (
+                                          <CommandItem
+                                            key={med.id}
+                                            value={med.name}
+                                            onSelect={() => selectPrescription(i, med)}
+                                          >
+                                            {med.name}
+                                          </CommandItem>
+                                        ))}
+                                      {(() => {
+                                        const q = prescriptionSearch.trim();
+                                        const exact = medicinesMaster.some(
+                                          (m) => m.name.trim().toLowerCase() === q.toLowerCase(),
+                                        );
+                                        if (!q || exact) return null;
+                                        return (
+                                          <CommandItem
+                                            value={`__new__${q}`}
+                                            onSelect={() => selectPrescription(i, { id: '', name: q })}
+                                          >
+                                            Add new medicine &quot;{q}&quot;
+                                          </CommandItem>
+                                        );
+                                      })()}
                                     </CommandGroup>
                                   </CommandList>
                                 </Command>
@@ -2494,6 +2561,8 @@ const ConsultationsPage = () => {
                                         if (p.withMilk) withItems.push('Milk');
                                         if (p.withHoney) withItems.push('Honey');
                                         if (p.withGhee) withItems.push('Ghee');
+                                        if (p.withGingerJuice) withItems.push('Ginger juice');
+                                        if (p.withLemonJuice) withItems.push('Lemon juice');
                                         const food =
                                           p.foodRelation === 'before_food'
                                             ? 'Before food'

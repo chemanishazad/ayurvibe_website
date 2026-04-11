@@ -15,6 +15,7 @@ import {
   UserCog,
   Scale,
   HeartPulse,
+  ContactRound,
 } from 'lucide-react';
 
 /** Single source for admin “Users & access” checkboxes and sidebar filtering. */
@@ -38,6 +39,7 @@ export const ADMIN_NAV_CATALOG: {
   { path: '/admin/direct-sales', label: 'Direct sales', group: 'Commerce', icon: ShoppingCart },
   { path: '/admin/reports', label: 'Reports', group: 'Reports', icon: FileText },
   { path: '/admin/clinics', label: 'Clinics', group: 'Administration', icon: Building2 },
+  { path: '/admin/therapists-rooms', label: 'Therapists & rooms', group: 'Administration', icon: ContactRound },
   { path: '/admin/users', label: 'Users & access', group: 'Administration', icon: UserCog },
   { path: '/admin/uom', label: 'Units (UOM)', group: 'Administration', icon: Scale },
 ];

@@ -390,7 +390,15 @@ export const api = {
       countryCode?: string;
       billData: {
         customerName: string;
-        medicines: Array<{ medicineName: string; quantity: number; unitPrice: string; total: string }>;
+        medicines: Array<{
+          medicineName: string;
+          quantity: number;
+          unitPrice: string;
+          total: string;
+          batchNumber?: string;
+          expiryDate?: string;
+          uom?: string;
+        }>;
         consultationFee?: number;
         treatments?: Array<{ name: string; price: string }>;
         medicineTotal: string;
@@ -399,9 +407,22 @@ export const api = {
         paymentMode?: string;
         date?: string;
         clinicName?: string;
+        patientMobile?: string;
+        billTitle?: string;
+        saleType?: string;
       };
     }) =>
-      fetchApi<{ success: boolean; sent?: boolean; error?: string }>('/api/whatsapp/send-bill', {
+      fetchApi<{
+        success: boolean;
+        sent?: boolean;
+        error?: string;
+        /** Meta wamid — use in WhatsApp Manager / support if delivery fails */
+        messageId?: string;
+        /** Recipient WhatsApp ID when Meta returns it */
+        waId?: string;
+        /** Hint when Meta accepted but delivery is not guaranteed */
+        note?: string;
+      }>('/api/whatsapp/send-bill', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -428,6 +449,7 @@ export const api = {
           planDate: string;
           dayStatus: string;
           dayNotes: string | null;
+          clinicId: string;
           treatmentPlanId: string;
           planName: string;
           preferredSessionStart: string | null;
@@ -440,22 +462,48 @@ export const api = {
           roomId: string | null;
           startTime: string | null;
           endTime: string | null;
+          actualStartTime: string | null;
+          actualEndTime: string | null;
           therapistName: string | null;
           roomNumber: string | null;
         }>;
       }>(`/api/treatment-plans/schedule?${q}`);
     },
-    get: (id: string) => fetchApi<Record<string, unknown>>(`/api/treatment-plans/${id}`),
+    get: (id: string) =>
+      fetchApi<
+        Record<string, unknown> & {
+          sessionMedicineSummary?: {
+            oralLineCount: number;
+            consumableLineCount: number;
+            estimatedRetailTotal: number;
+          };
+          medicineDataNote?: string;
+        }
+      >(`/api/treatment-plans/${id}`),
+    patientHistory: (patientId: string, clinicId: string) =>
+      fetchApi<{
+        patientName: string | null;
+        plans: Array<Record<string, unknown>>;
+      }>(
+        `/api/treatment-plans/patient/${encodeURIComponent(patientId)}/history?${new URLSearchParams({ clinicId }).toString()}`,
+      ),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/treatment-plans', { method: 'POST', body: JSON.stringify(data) }),
+    patchPlanDay: (planDayId: string, data: { planDate: string }) =>
+      fetchApi<{ planDate: string; shiftedAppointment: boolean }>(`/api/treatment-plans/plan-days/${planDayId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     planDaySessionLines: (planDayId: string) =>
       fetchApi<{
         oral: Array<{
           id: string;
           medicineId: string;
           medicineName: string;
+          quantityUsed: string | null;
           dosage: string | null;
           frequency: string | null;
           specialInstructions: string | null;
+          stockUnitsDeducted: number;
         }>;
         consumables: Array<{
           id: string;
@@ -463,6 +511,7 @@ export const api = {
           medicineName: string;
           quantityUsed: string | null;
           notes: string | null;
+          stockUnitsDeducted: number;
         }>;
       }>(`/api/treatment-plans/plan-days/${planDayId}/session-lines`),
     addPlanDayOralMedicine: (planDayId: string, data: Record<string, unknown>) =>
@@ -496,8 +545,11 @@ export const api = {
       fetchApi<Record<string, unknown>>('/api/treatment-masters', { method: 'POST', body: JSON.stringify(data) }),
   },
   clinicManagement: {
-    listTherapists: () =>
-      fetchApi<
+    listTherapists: (params?: { clinicId?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.clinicId) q.set('clinicId', params.clinicId);
+      const qs = q.toString();
+      return fetchApi<
         Array<{
           id: string;
           name: string;
@@ -506,16 +558,57 @@ export const api = {
           shiftStart?: string | null;
           shiftEnd?: string | null;
         }>
-      >('/api/clinic-management/therapists'),
-    listRooms: () =>
-      fetchApi<
+      >(`/api/clinic-management/therapists${qs ? `?${qs}` : ''}`);
+    },
+    getTherapist: (id: string) =>
+      fetchApi<{
+        id: string;
+        name: string;
+        gender?: string | null;
+        phone?: string | null;
+        clinicIds: string[];
+      }>(`/api/clinic-management/therapists/${id}`),
+    createTherapist: (data: { name: string; gender?: string | null; phone?: string | null; clinicIds: string[] }) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/therapists', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateTherapist: (
+      id: string,
+      data: { name?: string; gender?: string | null; phone?: string | null; clinicIds?: string[] },
+    ) =>
+      fetchApi<Record<string, unknown>>(`/api/clinic-management/therapists/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    listRooms: (params?: { clinicId?: string; includeInactive?: boolean }) => {
+      const q = new URLSearchParams();
+      if (params?.clinicId) q.set('clinicId', params.clinicId);
+      if (params?.includeInactive) q.set('includeInactive', '1');
+      const qs = q.toString();
+      return fetchApi<
         Array<{
           id: string;
+          clinicId?: string;
           roomNumber: string;
           name?: string | null;
           isActive: boolean;
         }>
-      >('/api/clinic-management/rooms'),
+      >(`/api/clinic-management/rooms${qs ? `?${qs}` : ''}`);
+    },
+    createRoom: (data: { clinicId: string; roomNumber: string; name?: string | null; isActive?: boolean }) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/rooms', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateRoom: (
+      id: string,
+      data: { roomNumber?: string; name?: string | null; isActive?: boolean },
+    ) =>
+      fetchApi<Record<string, unknown>>(`/api/clinic-management/rooms/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     createPlan: (data: Record<string, unknown>) =>
       fetchApi<Record<string, unknown>>('/api/clinic-management/plans', {
         method: 'POST',
@@ -585,6 +678,11 @@ export const api = {
       treatmentPlanLongCount?: number;
       treatmentPlanMedicineCount?: number;
       treatmentPlanMedicineEstimatedAmount?: number;
+      treatmentPlanSessionOralLineCount?: number;
+      treatmentPlanSessionConsumableLineCount?: number;
+      treatmentPlanSessionLinesEstimatedAmount?: number;
+      legacyPlanMedicineLineCount?: number;
+      legacyPlanMedicineEstimatedAmount?: number;
       treatmentPlanOutstandingCount?: number;
       treatmentPlanOutstandingBalanceDue?: number;
       clinicWisePackageBalance?: Array<{
@@ -625,6 +723,11 @@ export const api = {
       treatmentPlanLongCount?: number;
       treatmentPlanMedicineCount?: number;
       treatmentPlanMedicineEstimatedAmount?: number;
+      treatmentPlanSessionOralLineCount?: number;
+      treatmentPlanSessionConsumableLineCount?: number;
+      treatmentPlanSessionLinesEstimatedAmount?: number;
+      legacyPlanMedicineLineCount?: number;
+      legacyPlanMedicineEstimatedAmount?: number;
       treatmentPlanOutstandingCount?: number;
       treatmentPlanOutstandingBalanceDue?: number;
       prescriptionMedicineSales: number;

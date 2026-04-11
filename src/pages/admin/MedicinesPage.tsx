@@ -21,9 +21,12 @@ interface Medicine { id: string; name: string; uom: string; purchasePrice: strin
 
 const UOM_OPTIONS = ['tablet', 'capsule', 'syrup', 'bottle', 'strip', 'sachet', 'ml', 'gm', 'kg'];
 
+const UOM_EMPTY = '__empty__';
+
 const medicineFormSchema = z.object({
   name: z.string().min(1, 'Medicine name is required').trim(),
-  uom: z.string().min(1, 'Unit of measure is required'),
+  /** Stored as '' when “Not set” (e.g. auto-created from prescription). */
+  uom: z.string().max(50),
   minStockLevel: z.string().regex(/^\d+$/, 'Enter a whole number (e.g. 10)').default('10'),
   description: z.string().optional(),
 });
@@ -68,13 +71,25 @@ const MedicinesPage = () => {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['medicines'] });
 
   const createMutation = useMutation({
-    mutationFn: (data: MedicineForm) => api.medicines.create({ name: data.name.trim(), uom: data.uom, minStockLevel: parseInt(data.minStockLevel, 10) || 10, description: data.description || undefined }),
+    mutationFn: (data: MedicineForm) =>
+      api.medicines.create({
+        name: data.name.trim(),
+        uom: data.uom.trim(),
+        minStockLevel: parseInt(data.minStockLevel, 10) || 10,
+        description: data.description || undefined,
+      }),
     onSuccess: () => { toast({ title: 'Medicine added' }); setShowForm(false); createForm.reset(); invalidate(); },
     onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: MedicineForm) => api.medicines.update(editing!.id, { name: data.name.trim(), uom: data.uom, minStockLevel: parseInt(data.minStockLevel, 10) || 10, description: data.description || undefined }),
+    mutationFn: (data: MedicineForm) =>
+      api.medicines.update(editing!.id, {
+        name: data.name.trim(),
+        uom: data.uom.trim(),
+        minStockLevel: parseInt(data.minStockLevel, 10) || 10,
+        description: data.description || undefined,
+      }),
     onSuccess: () => { toast({ title: 'Medicine updated' }); setEditing(null); invalidate(); },
     onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
   });
@@ -87,7 +102,12 @@ const MedicinesPage = () => {
 
   const openEdit = (m: Medicine) => {
     setEditing(m);
-    editForm.reset({ name: m.name, uom: m.uom, minStockLevel: String(m.minStockLevel), description: m.description || '' });
+    editForm.reset({
+      name: m.name,
+      uom: m.uom?.trim() ? m.uom : '',
+      minStockLevel: String(m.minStockLevel),
+      description: m.description || '',
+    });
   };
 
   const MedicineFormFields = ({ form, isBusy }: { form: ReturnType<typeof makeForm>; isBusy: boolean }) => (
@@ -98,10 +118,22 @@ const MedicinesPage = () => {
         <FieldError message={form.formState.errors.name?.message} />
       </div>
       <div>
-        <Label>Unit of Measure <span className="text-destructive">*</span></Label>
-        <Select value={form.watch('uom')} onValueChange={(v) => form.setValue('uom', v, { shouldValidate: true })}>
-          <SelectTrigger className="mt-1"><SelectValue placeholder="Select UOM" /></SelectTrigger>
-          <SelectContent>{UOM_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+        <Label>Unit of measure</Label>
+        <Select
+          value={form.watch('uom')?.trim() ? form.watch('uom') : UOM_EMPTY}
+          onValueChange={(v) => form.setValue('uom', v === UOM_EMPTY ? '' : v, { shouldValidate: true })}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select UOM" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UOM_EMPTY}>Not set</SelectItem>
+            {UOM_OPTIONS.map((u) => (
+              <SelectItem key={u} value={u}>
+                {u}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
         <FieldError message={form.formState.errors.uom?.message} />
       </div>
@@ -155,7 +187,7 @@ const MedicinesPage = () => {
                   {medicines.map((m) => (
                     <tr key={m.id} className="border-b">
                       <td className="py-2">{m.name}</td>
-                      <td className="py-2">{m.uom}</td>
+                      <td className="py-2 text-muted-foreground">{m.uom?.trim() ? m.uom : '—'}</td>
                       <td className="py-2 text-right">{m.minStockLevel}</td>
                       {isAdmin && (
                         <td className="py-2 text-right">

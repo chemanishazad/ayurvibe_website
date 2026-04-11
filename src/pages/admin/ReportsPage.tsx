@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api';
-import { formatChartDateLabel } from '@/lib/datetime';
+import { formatChartDateLabel, localDateYmd } from '@/lib/datetime';
 import { getAuthUser } from '@/pages/Login';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import {
@@ -23,8 +23,8 @@ const ReportsPage = () => {
   const user = getAuthUser();
   const isAdmin = user?.role === 'admin';
   const { effectiveClinicId } = useAdminClinic();
-  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(() => localDateYmd());
+  const [to, setTo] = useState(() => localDateYmd());
   const [dailyCons, setDailyCons] = useState<{ date: string; count: number; revenue: number }[]>([]);
   const [medicineSales, setMedicineSales] = useState<{ medicineName: string; quantity: number; total: number }[]>([]);
   const [clinicRevenue, setClinicRevenue] = useState<{ clinicId: string; clinicName: string; revenue: number; consultations: number }[]>([]);

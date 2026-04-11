@@ -193,7 +193,7 @@ const TreatmentPlanNewPage = () => {
     <div className="space-y-8">
       <PageHeader
         title="New treatment plan"
-        description="Set package total and advance; balance is calculated. Record medicines and session supplies when you update each day’s session on Treatment plans — not here."
+        description="Set package total and advance here; balance updates live. Further advance or balance payments are recorded under Pharmacy (patient + packages). Session medicines and oils are added per day on Treatment plans after each session is marked Done."
       >
         <Button variant="outline" size="sm" asChild>
           <Link to="/admin/treatment-plans">
@@ -213,7 +213,8 @@ const TreatmentPlanNewPage = () => {
           <CardDescription>
             Patient identifies who receives care; multiple plans per day are allowed. Treatment master fills name and
             description when selected. Enter the agreed package amount and any advance — balance due updates
-            automatically.
+            automatically. Use Pharmacy → “Patient — medicines &amp; packages (no OP visit)” or a consultation bill to
+            post additional payments against this package.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
