@@ -44,6 +44,13 @@ import {
 
 const CHART_COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
+/** Dashboard API may omit or null numeric fields — never call .toLocaleString() on undefined. */
+function formatRupees(value: unknown): string {
+  if (value == null || value === '') return (0).toLocaleString();
+  const n = typeof value === 'number' ? value : Number(value);
+  return (Number.isFinite(n) ? n : 0).toLocaleString();
+}
+
 function getDateRangeForPeriod(period: 'daily' | 'weekly' | 'monthly') {
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
@@ -280,15 +287,15 @@ const DashboardPage = () => {
   }
 
   if (isAdmin && adminData && typeof adminData.totalClinics === 'number') {
-    const clinicChartData = adminData.clinicWiseRevenue.map((r) => ({
-      name: r.clinicName,
-      revenue: r.revenue,
+    const clinicChartData = (adminData.clinicWiseRevenue ?? []).map((r) => ({
+      name: r.clinicName ?? '—',
+      revenue: Number(r.revenue) || 0,
     }));
 
     const revenueBreakdown = [
-      { name: 'Consultation Fees', value: adminData.consultationAmount, color: CHART_COLORS[0] },
-      { name: 'Prescription Medicine', value: adminData.prescriptionMedicineSales, color: CHART_COLORS[1] },
-      { name: 'Direct Medicine Sales', value: adminData.directMedicineSales, color: CHART_COLORS[2] },
+      { name: 'Consultation Fees', value: Number(adminData.consultationAmount) || 0, color: CHART_COLORS[0] },
+      { name: 'Prescription Medicine', value: Number(adminData.prescriptionMedicineSales) || 0, color: CHART_COLORS[1] },
+      { name: 'Direct Medicine Sales', value: Number(adminData.directMedicineSales) || 0, color: CHART_COLORS[2] },
     ].filter((d) => d.value > 0);
 
     return (
@@ -337,7 +344,7 @@ const DashboardPage = () => {
                 <CardContent className="flex flex-col gap-2 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-amber-950 dark:text-amber-100">
                     <span className="font-semibold">Network treatment package balance: </span>
-                    ₹{(adminData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()} across{' '}
+                    ₹{formatRupees(adminData.treatmentPlanOutstandingBalanceDue)} across{' '}
                     {adminData.treatmentPlanOutstandingCount ?? 0} plan(s) with money due — details in Treatment packages
                     below.
                   </p>
@@ -355,9 +362,9 @@ const DashboardPage = () => {
                 <StatCard title="Total Clinics" value={adminData.totalClinics} icon={Building2} />
                 <StatCard title="Total Patients" value={adminData.totalPatients} subtitle="All registered" icon={Users} />
                 <StatCard title="Consultations" value={adminData.dailyConsultations} subtitle={adminData.newPatientRegistrationsToday != null ? `New: ${adminData.newPatientRegistrationsToday}` : undefined} icon={Stethoscope} />
-                <StatCard title="Total Revenue" value={`₹${adminData.totalRevenue.toLocaleString()}`} icon={IndianRupee} accent="success" />
-                <StatCard title="Medicine Sales" value={`₹${adminData.medicineSales.toLocaleString()}`} icon={Pill} />
-                <StatCard title="Total Profit" value={`₹${adminData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
+                <StatCard title="Total Revenue" value={`₹${formatRupees(adminData.totalRevenue)}`} icon={IndianRupee} accent="success" />
+                <StatCard title="Medicine Sales" value={`₹${formatRupees(adminData.medicineSales)}`} icon={Pill} />
+                <StatCard title="Total Profit" value={`₹${formatRupees(adminData.totalProfit)}`} icon={TrendingUp} accent="success" />
               </div>
             </DashboardSection>
 
@@ -379,13 +386,13 @@ const DashboardPage = () => {
                 />
                 <StatCard
                   title="Est. retail (plans)"
-                  value={`₹${(adminData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  value={`₹${formatRupees(adminData.treatmentPlanMedicineEstimatedAmount)}`}
                   subtitle="Session + legacy"
                   icon={IndianRupee}
                 />
                 <StatCard
                   title="Package balance due"
-                  value={`₹${(adminData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()}`}
+                  value={`₹${formatRupees(adminData.treatmentPlanOutstandingBalanceDue)}`}
                   subtitle={`${adminData.treatmentPlanOutstandingCount ?? 0} active plan(s) with balance`}
                   icon={AlertTriangle}
                   accent="warning"
@@ -404,7 +411,7 @@ const DashboardPage = () => {
                           data={(adminData.clinicWisePackageBalance ?? []).map((c) => ({
                             name: c.clinicName.length > 14 ? `${c.clinicName.slice(0, 14)}…` : c.clinicName,
                             fullName: c.clinicName,
-                            balance: c.balanceDue,
+                            balance: Number(c.balanceDue) || 0,
                             plans: c.outstandingCount,
                           }))}
                           layout="vertical"
@@ -419,7 +426,7 @@ const DashboardPage = () => {
                                 <div className="rounded-lg border bg-background p-3 shadow-md text-sm">
                                   <p className="font-medium">{payload[0].payload.fullName}</p>
                                   <p className="text-muted-foreground">
-                                    Balance ₹{payload[0].payload.balance?.toLocaleString()} · {payload[0].payload.plans} plan(s)
+                                    Balance ₹{formatRupees(payload[0].payload.balance)} · {payload[0].payload.plans} plan(s)
                                   </p>
                                 </div>
                               ) : null
@@ -436,10 +443,10 @@ const DashboardPage = () => {
 
             <DashboardSection title="Revenue breakdown" hint="Fees and medicine sales in the selected period (all clinics).">
               <div className="grid gap-3 lg:grid-cols-4">
-                <StatCard title="Consultation Fees" value={`₹${adminData.consultationAmount.toLocaleString()}`} icon={FileText} />
-                <StatCard title="Prescription Medicine" value={`₹${adminData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
-                <StatCard title="Direct Medicine Sales" value={`₹${adminData.directMedicineSales.toLocaleString()}`} icon={ShoppingCart} />
-                <StatCard title="Total Revenue" value={`₹${adminData.dailyRevenue.toLocaleString()}`} icon={Wallet} accent="success" />
+                <StatCard title="Consultation Fees" value={`₹${formatRupees(adminData.consultationAmount)}`} icon={FileText} />
+                <StatCard title="Prescription Medicine" value={`₹${formatRupees(adminData.prescriptionMedicineSales)}`} icon={Pill} />
+                <StatCard title="Direct Medicine Sales" value={`₹${formatRupees(adminData.directMedicineSales)}`} icon={ShoppingCart} />
+                <StatCard title="Total Revenue" value={`₹${formatRupees(adminData.dailyRevenue)}`} icon={Wallet} accent="success" />
               </div>
             </DashboardSection>
 
@@ -457,7 +464,7 @@ const DashboardPage = () => {
                           <Pie data={revenueBreakdown} cx="50%" cy="50%" innerRadius={52} outerRadius={80} paddingAngle={2} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                           {revenueBreakdown.map((_, i) => <Cell key={i} fill={revenueBreakdown[i].color} />)}
                         </Pie>
-                        <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, 'Amount']} />
+                        <Tooltip formatter={(v) => [`₹${formatRupees(v)}`, 'Amount']} />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
@@ -481,7 +488,7 @@ const DashboardPage = () => {
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                           <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                           <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
-                          <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, 'Revenue']} />
+                          <Tooltip formatter={(v) => [`₹${formatRupees(v)}`, 'Revenue']} />
                           <Bar dataKey="revenue" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} name="Revenue" />
                         </BarChart>
                       </ResponsiveContainer>
@@ -522,7 +529,7 @@ const DashboardPage = () => {
                         <XAxis dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => formatChartDateLabel(String(v))} />
                         <YAxis yAxisId="left" tickFormatter={(v) => v.toString()} />
                         <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(value: number, name: string) => (name === 'revenue' ? [`₹${value.toLocaleString()}`, 'Revenue'] : [value, 'Visits'])} labelFormatter={(label) => `Date: ${formatChartDateLabel(label)}`} />
+                        <Tooltip formatter={(value, name: string) => (name === 'revenue' ? [`₹${formatRupees(value)}`, 'Revenue'] : [value ?? 0, 'Visits'])} labelFormatter={(label) => `Date: ${formatChartDateLabel(String(label ?? ''))}`} />
                         <Legend />
                         <Area yAxisId="left" type="monotone" dataKey="visits" stroke={CHART_COLORS[0]} fill="url(#colorVisits)" name="Visits" strokeWidth={2} />
                         <Area yAxisId="right" type="monotone" dataKey="revenue" stroke={CHART_COLORS[1]} fill="url(#colorRevenue)" name="Revenue" strokeWidth={2} />
@@ -542,14 +549,17 @@ const DashboardPage = () => {
                 <CardContent>
                   <div className="h-[min(22rem,55vw)] min-h-[260px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={medicineSalesData.slice(0, 10).map((m) => ({ name: m.medicineName.length > 18 ? m.medicineName.slice(0, 18) + '…' : m.medicineName, fullName: m.medicineName, ...m }))} margin={{ left: 10, right: 10 }}>
+                      <BarChart data={medicineSalesData.slice(0, 10).map((m) => {
+                        const fullName = String(m.medicineName ?? '');
+                        return { name: fullName.length > 18 ? fullName.slice(0, 18) + '…' : fullName, fullName, ...m };
+                      })} margin={{ left: 10, right: 10 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                         <YAxis />
                         <Tooltip content={({ active, payload }) => active && payload?.[0] ? (
                           <div className="rounded-lg border bg-background p-3 shadow-md">
                             <p className="font-medium">{payload[0].payload.fullName}</p>
-                            <p className="text-sm text-muted-foreground">₹{payload[0].payload.total?.toLocaleString()} ({payload[0].payload.quantity} units)</p>
+                            <p className="text-sm text-muted-foreground">₹{formatRupees(payload[0].payload.total)} ({payload[0].payload.quantity ?? 0} units)</p>
                           </div>
                         ) : null} />
                         <Bar dataKey="total" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} name="Sales" />
@@ -567,9 +577,9 @@ const DashboardPage = () => {
 
   if (clinicData && typeof clinicData.consultationsCount === 'number') {
     const revenueBreakdown = [
-      { name: 'Consultation Fees', value: clinicData.consultationAmount, color: CHART_COLORS[0] },
-      { name: 'Prescription Medicine', value: clinicData.prescriptionMedicineSales, color: CHART_COLORS[1] },
-      { name: 'Direct Medicine Sales', value: clinicData.directMedicineSales, color: CHART_COLORS[2] },
+      { name: 'Consultation Fees', value: Number(clinicData.consultationAmount) || 0, color: CHART_COLORS[0] },
+      { name: 'Prescription Medicine', value: Number(clinicData.prescriptionMedicineSales) || 0, color: CHART_COLORS[1] },
+      { name: 'Direct Medicine Sales', value: Number(clinicData.directMedicineSales) || 0, color: CHART_COLORS[2] },
     ].filter((d) => d.value > 0);
 
     return (
@@ -629,7 +639,7 @@ const DashboardPage = () => {
                     <div className="min-w-0">
                       <p className="font-semibold text-amber-950 dark:text-amber-100">Treatment package balance</p>
                       <p className="text-sm text-amber-900/90 dark:text-amber-200/90">
-                        ₹{(clinicData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()} outstanding across{' '}
+                        ₹{formatRupees(clinicData.treatmentPlanOutstandingBalanceDue)} outstanding across{' '}
                         {clinicData.treatmentPlanOutstandingCount ?? 0} active plan(s). Record payments on a pharmacy
                         invoice or update plans under Treatment plans.
                       </p>
@@ -655,20 +665,20 @@ const DashboardPage = () => {
                 <StatCard title="Patients" value={clinicData.patientCount ?? clinicData.todayPatients} icon={Users} />
                 <StatCard title="Consultations" value={clinicData.consultationsCount} icon={Stethoscope} />
                 <StatCard title="Treatments" value={clinicData.treatmentCount ?? 0} icon={FileText} />
-                <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
-                <StatCard title="Total Revenue" value={`₹${clinicData.dailyRevenue.toLocaleString()}`} icon={IndianRupee} accent="success" />
-                <StatCard title="Medicine Sales" value={`₹${(clinicData.medicineSalesAmount ?? clinicData.medicineSales).toLocaleString()}`} icon={Pill} />
-                <StatCard title="Total Profit" value={`₹${clinicData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
+                <StatCard title="Treatment Amount" value={`₹${formatRupees(clinicData.treatmentAmount)}`} icon={Wallet} />
+                <StatCard title="Total Revenue" value={`₹${formatRupees(clinicData.dailyRevenue)}`} icon={IndianRupee} accent="success" />
+                <StatCard title="Medicine Sales" value={`₹${formatRupees(clinicData.medicineSalesAmount ?? clinicData.medicineSales)}`} icon={Pill} />
+                <StatCard title="Total Profit" value={`₹${formatRupees(clinicData.totalProfit)}`} icon={TrendingUp} accent="success" />
               </div>
             </DashboardSection>
 
             <DashboardSection title="Revenue breakdown" hint="Fees billed in the period plus prescription and direct medicine sales.">
               <div className="grid gap-3 lg:grid-cols-5">
-                <StatCard title="Consultation Fees" value={`₹${clinicData.consultationAmount.toLocaleString()}`} icon={FileText} />
-                <StatCard title="Prescription Medicine" value={`₹${clinicData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
-                <StatCard title="Direct Medicine Sales" value={`₹${clinicData.directMedicineSales.toLocaleString()}`} icon={ShoppingCart} />
-                <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
-                <StatCard title="Treatment + Medicine" value={`₹${(clinicData.treatmentMedicineSalesAmount ?? 0).toLocaleString()}`} icon={TrendingUp} />
+                <StatCard title="Consultation Fees" value={`₹${formatRupees(clinicData.consultationAmount)}`} icon={FileText} />
+                <StatCard title="Prescription Medicine" value={`₹${formatRupees(clinicData.prescriptionMedicineSales)}`} icon={Pill} />
+                <StatCard title="Direct Medicine Sales" value={`₹${formatRupees(clinicData.directMedicineSales)}`} icon={ShoppingCart} />
+                <StatCard title="Treatment Amount" value={`₹${formatRupees(clinicData.treatmentAmount)}`} icon={Wallet} />
+                <StatCard title="Treatment + Medicine" value={`₹${formatRupees(clinicData.treatmentMedicineSalesAmount)}`} icon={TrendingUp} />
               </div>
             </DashboardSection>
 
@@ -690,13 +700,13 @@ const DashboardPage = () => {
                 />
                 <StatCard
                   title="Est. retail (plans)"
-                  value={`₹${(clinicData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  value={`₹${formatRupees(clinicData.treatmentPlanMedicineEstimatedAmount)}`}
                   subtitle="Session + legacy"
                   icon={IndianRupee}
                 />
                 <StatCard
                   title="Package balance due"
-                  value={`₹${(clinicData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()}`}
+                  value={`₹${formatRupees(clinicData.treatmentPlanOutstandingBalanceDue)}`}
                   subtitle={`${clinicData.treatmentPlanOutstandingCount ?? 0} active plan(s) with balance`}
                   icon={AlertTriangle}
                   accent="warning"
@@ -718,7 +728,7 @@ const DashboardPage = () => {
                           <Pie data={revenueBreakdown} cx="50%" cy="50%" innerRadius={52} outerRadius={80} paddingAngle={2} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                             {revenueBreakdown.map((_, i) => <Cell key={i} fill={revenueBreakdown[i].color} />)}
                           </Pie>
-                          <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, 'Amount']} />
+                          <Tooltip formatter={(v) => [`₹${formatRupees(v)}`, 'Amount']} />
                           <Legend />
                         </PieChart>
                       </ResponsiveContainer>
@@ -754,7 +764,7 @@ const DashboardPage = () => {
                           <XAxis dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => formatChartDateLabel(String(v))} />
                           <YAxis yAxisId="left" />
                           <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip formatter={(v: number, name: string) => (name === 'revenue' ? [`₹${v.toLocaleString()}`, 'Revenue'] : [v, 'Visits'])} labelFormatter={(label) => `Date: ${formatChartDateLabel(label)}`} />
+                          <Tooltip formatter={(v, name: string) => (name === 'revenue' ? [`₹${formatRupees(v)}`, 'Revenue'] : [v ?? 0, 'Visits'])} labelFormatter={(label) => `Date: ${formatChartDateLabel(String(label ?? ''))}`} />
                           <Legend />
                           <Line yAxisId="left" type="monotone" dataKey="visits" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} name="Visits" />
                           <Line yAxisId="right" type="monotone" dataKey="revenue" stroke={CHART_COLORS[1]} strokeWidth={2} dot={{ r: 4 }} name="Revenue" />
@@ -775,14 +785,17 @@ const DashboardPage = () => {
                 <CardContent>
                   <div className="h-[min(18rem,50vw)] min-h-[220px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={medicineSalesData.slice(0, 8).map((m) => ({ name: m.medicineName.length > 15 ? m.medicineName.slice(0, 15) + '…' : m.medicineName, fullName: m.medicineName, ...m }))}>
+                      <BarChart data={medicineSalesData.slice(0, 8).map((m) => {
+                        const fullName = String(m.medicineName ?? '');
+                        return { name: fullName.length > 15 ? fullName.slice(0, 15) + '…' : fullName, fullName, ...m };
+                      })}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                         <YAxis />
                         <Tooltip content={({ active, payload }) => active && payload?.[0] ? (
                           <div className="rounded-lg border bg-background p-3 shadow-md">
                             <p className="font-medium">{payload[0].payload.fullName}</p>
-                            <p className="text-sm text-muted-foreground">₹{payload[0].payload.total?.toLocaleString()} ({payload[0].payload.quantity} units)</p>
+                            <p className="text-sm text-muted-foreground">₹{formatRupees(payload[0].payload.total)} ({payload[0].payload.quantity ?? 0} units)</p>
                           </div>
                         ) : null} />
                         <Bar dataKey="total" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} name="Sales" />
@@ -793,7 +806,7 @@ const DashboardPage = () => {
               </Card>
             )}
 
-            {clinicData.lowStockAlerts.length > 0 && (
+            {(clinicData.lowStockAlerts ?? []).length > 0 && (
               <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
@@ -804,7 +817,7 @@ const DashboardPage = () => {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    {clinicData.lowStockAlerts.map((a, i) => (
+                    {(clinicData.lowStockAlerts ?? []).map((a, i) => (
                       <li key={i} className="flex items-center justify-between rounded-lg bg-white dark:bg-muted/50 px-4 py-2.5 text-sm">
                         <span>{a.medicineName}</span>
                         <span className="font-medium text-amber-700 dark:text-amber-300">
