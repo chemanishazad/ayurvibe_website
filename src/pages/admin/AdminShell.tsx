@@ -27,7 +27,9 @@ const AdminShell = () => {
   const isAdminFullBleed =
     normalized === '/admin/patients' ||
     normalized === '/admin/pharmacy' ||
-    normalized.startsWith('/admin/pharmacy/');
+    normalized.startsWith('/admin/pharmacy/') ||
+    normalized === '/admin/consultations' ||
+    normalized === '/admin/op';
 
   return (
     <AdminLayout>

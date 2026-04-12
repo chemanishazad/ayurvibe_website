@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,8 +43,10 @@ import {
   Printer,
   RotateCcw,
   CalendarIcon,
+  CalendarDays,
   Search,
   User,
+  UserPlus,
   X,
   Loader2,
   Stethoscope,
@@ -60,6 +62,7 @@ import {
   Pill,
   ClipboardList,
   History,
+  Clock,
   StickyNote,
   UtensilsCrossed,
   Heart,
@@ -110,7 +113,7 @@ type ConsultationRow = Record<string, unknown> & {
 };
 
 type PrescriptionItem = {
-  /** Empty when the row is a new medicine name (created on save). */
+  /** Set when a master medicine is chosen (including after find-or-create). */
   medicineId: string;
   medicineName: string;
   dosage: string;
@@ -161,12 +164,47 @@ const diagnosisDisplay = (d: unknown): string => {
   return String(d);
 };
 
-const patientInitials = (name: string) => {
-  const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
+const OP_LIST_FILTERS_KEY = 'ayurvibe_op_list_filters_v1';
+const CONS_LIST_FILTERS_KEY = 'ayurvibe_consultations_list_filters_v1';
+const OP_LIST_PATIENT_KEY = 'ayurvibe_op_list_patient_v1';
+const CONS_LIST_PATIENT_KEY = 'ayurvibe_consultations_list_patient_v1';
+
+function readStoredListFilters(pathname: string): { search: string; from: string; to: string } {
+  const p = pathname.replace(/\/$/, '') || '/';
+  if (p !== '/admin/op' && p !== '/admin/consultations') {
+    return { search: '', from: '', to: '' };
+  }
+  if (typeof window === 'undefined') return { search: '', from: '', to: '' };
+  const key = p === '/admin/op' ? OP_LIST_FILTERS_KEY : CONS_LIST_FILTERS_KEY;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return { search: '', from: '', to: '' };
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      search: String(o.search ?? ''),
+      from: String(o.from ?? ''),
+      to: String(o.to ?? ''),
+    };
+  } catch {
+    return { search: '', from: '', to: '' };
+  }
+}
+
+/** Sync read so the first list fetch matches stored beneficiary filter (restore effect runs after paint). */
+function readStoredListPatientIdForPath(pathname: string): string {
+  const p = pathname.replace(/\/$/, '') || '/';
+  if (p !== '/admin/op' && p !== '/admin/consultations') return '';
+  if (typeof window === 'undefined') return '';
+  const key = p === '/admin/op' ? OP_LIST_PATIENT_KEY : CONS_LIST_PATIENT_KEY;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return '';
+    const o = JSON.parse(raw) as { patientId?: string };
+    return (o.patientId || '').trim();
+  } catch {
+    return '';
+  }
+}
 
 const ConsultationsPage = () => {
   const user = getAuthUser();
@@ -194,6 +232,15 @@ const ConsultationsPage = () => {
   const patientIdFromState = state?.patientId;
   const parentConsultationIdFromState = state?.parentConsultationId;
   const isReview = state?.isReview;
+
+  const LIST_SEARCH_DEBOUNCE_MS = 350;
+  const initialListFilters = readStoredListFilters(path);
+  const [listFilters, setListFilters] = useState(initialListFilters);
+  const [debouncedListSearch, setDebouncedListSearch] = useState(() => initialListFilters.search.trim());
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedListSearch(listFilters.search.trim()), LIST_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [listFilters.search]);
 
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
   const linkedDoctorId = (user?.linkedDoctorId ?? '').trim();
@@ -258,7 +305,7 @@ const ConsultationsPage = () => {
     aakriti: '' as '' | 'Heena' | 'Madhyama' | 'Sthula',
   });
   const [form, setForm] = useState({
-    patientId: patientIdFromState || '',
+    patientId: patientIdFromState || readStoredListPatientIdForPath(path) || '',
     patientName: '',
     patientMedicalHistory: '',
     patientGender: '',
@@ -287,6 +334,8 @@ const ConsultationsPage = () => {
   });
   const [prescriptionOpen, setPrescriptionOpen] = useState<number | null>(null);
   const [prescriptionSearch, setPrescriptionSearch] = useState('');
+  const [prescriptionMedicineBusyIndex, setPrescriptionMedicineBusyIndex] = useState<number | null>(null);
+  const prescriptionMedicineEnsureInFlight = useRef(false);
 
   useEffect(() => {
     if (prescriptionOpen == null) setPrescriptionSearch('');
@@ -296,6 +345,8 @@ const ConsultationsPage = () => {
   const [consultationErrors, setConsultationErrors] = useState<string[]>([]);
   const [patientHistory, setPatientHistory] = useState<ConsultationRow[]>([]);
   const [patientHistoryLoading, setPatientHistoryLoading] = useState(false);
+  /** Nurse OP vitals: visit date/time captured at intake (shown on doctor complete for review). */
+  const [opNurseIntakeSnapshot, setOpNurseIntakeSnapshot] = useState<{ date: string; time: string | null } | null>(null);
   const { toast } = useToast();
   const clinicSelectionRequired = !!(user?.role === 'admin' && !targetClinicId);
   const { patientSearchResults, patientSearching, searchPatients, loadRecentPatients } =
@@ -326,6 +377,77 @@ const ConsultationsPage = () => {
   useEffect(() => {
     if (patientIdFromState) setForm((f) => ({ ...f, patientId: patientIdFromState }));
   }, [patientIdFromState]);
+
+  /** Restore list filters + beneficiary scope when entering a list route (survives drill-in unmount). */
+  useEffect(() => {
+    if (!isListRoute) return;
+    const next = readStoredListFilters(path);
+    setListFilters(next);
+    setDebouncedListSearch(next.search.trim());
+
+    if (patientIdFromState) return;
+
+    const patientKey = isOpListView ? OP_LIST_PATIENT_KEY : CONS_LIST_PATIENT_KEY;
+    try {
+      const raw = sessionStorage.getItem(patientKey);
+      if (!raw) {
+        setForm((f) => ({
+          ...f,
+          patientId: '',
+          patientName: '',
+          patientMedicalHistory: '',
+          patientGender: '',
+          menstrualHistory: defaultMenstrualHistory(),
+          ayurvedaExamination: defaultAyurvedaExamination(),
+        }));
+        return;
+      }
+      const o = JSON.parse(raw) as { patientId?: string; patientName?: string };
+      const pid = (o.patientId || '').trim();
+      if (!pid) {
+        setForm((f) => ({
+          ...f,
+          patientId: '',
+          patientName: '',
+          patientMedicalHistory: '',
+          patientGender: '',
+          menstrualHistory: defaultMenstrualHistory(),
+          ayurvedaExamination: defaultAyurvedaExamination(),
+        }));
+        return;
+      }
+      setForm((f) => ({ ...f, patientId: pid, patientName: o.patientName ?? f.patientName }));
+    } catch {
+      /* ignore */
+    }
+  }, [path, isListRoute, isOpListView, patientIdFromState]);
+
+  /** Persist list filters while on list (detail routes skip this). */
+  useEffect(() => {
+    if (!isListRoute) return;
+    const key = isOpListView ? OP_LIST_FILTERS_KEY : CONS_LIST_FILTERS_KEY;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(listFilters));
+    } catch {
+      /* ignore */
+    }
+  }, [isListRoute, isOpListView, listFilters]);
+
+  /** Persist beneficiary list filter per OP vs consultations list. */
+  useEffect(() => {
+    if (!isListRoute) return;
+    const key = isOpListView ? OP_LIST_PATIENT_KEY : CONS_LIST_PATIENT_KEY;
+    try {
+      const pid = form.patientId?.trim();
+      if (pid) {
+        sessionStorage.setItem(key, JSON.stringify({ patientId: pid, patientName: form.patientName || '' }));
+      } else {
+        sessionStorage.removeItem(key);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [isListRoute, isOpListView, form.patientId, form.patientName]);
 
   useEffect(() => {
     if (form.patientId) {
@@ -363,10 +485,15 @@ const ConsultationsPage = () => {
       .finally(() => setViewLoading(false));
   }, [consultationIdFromRoute, isConsultationViewRoute]);
 
+  useEffect(() => {
+    if (!isOpDoctorCompleteRoute) setOpNurseIntakeSnapshot(null);
+  }, [isOpDoctorCompleteRoute]);
+
   /** Doctor opens /admin/op/:id — hydrate full consult form; default doctor from profile. */
   useEffect(() => {
     if (!isOpDoctorCompleteRoute || !consultationIdFromRoute) return;
     setOpFormLoading(true);
+    setOpNurseIntakeSnapshot(null);
     api.opVisits
       .get(consultationIdFromRoute)
       .then((raw) => {
@@ -375,6 +502,9 @@ const ConsultationsPage = () => {
           toast({ title: 'Invalid OP visit', variant: 'destructive' });
           return;
         }
+        const intakeDate = String(cons.consultationDate || '').slice(0, 10);
+        const intakeTime = (cons.consultationTime as string | null | undefined) ?? null;
+        setOpNurseIntakeSnapshot({ date: intakeDate, time: intakeTime });
         if (user?.role === 'admin' && cons.clinicId) setSelectedClinicId(cons.clinicId as string);
         const linkedDoc = user?.linkedDoctorId ?? '';
         let ph = defaultPersonalHistory();
@@ -631,7 +761,37 @@ const ConsultationsPage = () => {
     api.medicines.list().then((data) => setMedicinesMaster((data as { id: string; name: string }[]).map((m) => ({ id: m.id, name: m.name })))).catch(() => setMedicinesMaster([]));
   }, []);
 
+  const handleListFromDateChange = (value: string) => {
+    setListFilters((f) => {
+      const nextFrom = value;
+      let nextTo = f.to;
+      if (!nextFrom) return { ...f, from: '', to: f.to };
+      if (!nextTo || nextFrom > nextTo) nextTo = nextFrom;
+      return { ...f, from: nextFrom, to: nextTo };
+    });
+  };
+
+  const handleListToDateChange = (value: string) => {
+    setListFilters((f) => {
+      const nextTo = value;
+      let nextFrom = f.from;
+      if (!nextTo) return { ...f, to: '' };
+      if (!nextFrom || nextTo < nextFrom) nextFrom = nextTo;
+      return { ...f, from: nextFrom, to: nextTo };
+    });
+  };
+
+  const clearListFilters = () => {
+    setListFilters({ search: '', from: '', to: '' });
+    try {
+      sessionStorage.removeItem(isOpListView ? OP_LIST_FILTERS_KEY : CONS_LIST_FILTERS_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const loadConsultations = () => {
+    if (!isListRoute) return;
     if (clinicSelectionRequired && isListRoute) {
       setConsultations([]);
       setListLoading(false);
@@ -641,6 +801,9 @@ const ConsultationsPage = () => {
     const params: Record<string, string> = {};
     if (user?.role === 'admin' && targetClinicId) params.clinicId = targetClinicId;
     if (form.patientId?.trim()) params.patientId = form.patientId.trim();
+    if (debouncedListSearch) params.search = debouncedListSearch;
+    if (listFilters.from.trim()) params.from = listFilters.from.trim();
+    if (listFilters.to.trim()) params.to = listFilters.to.trim();
     const req = isOpListView ? api.opVisits.list(params) : api.consultations.list(params);
     req
       .then((data) => setConsultations(data as ConsultationRow[]))
@@ -650,7 +813,17 @@ const ConsultationsPage = () => {
 
   useEffect(() => {
     loadConsultations();
-  }, [targetClinicId, user?.role, form.patientId, isOpListView, isListRoute, isOpSection]);
+  }, [
+    targetClinicId,
+    user?.role,
+    form.patientId,
+    isOpListView,
+    isListRoute,
+    isOpSection,
+    debouncedListSearch,
+    listFilters.from,
+    listFilters.to,
+  ]);
 
   const addPrescription = () => {
     setForm((f) => ({
@@ -691,6 +864,35 @@ const ConsultationsPage = () => {
     setPrescriptionSearch('');
   };
 
+  const commitPrescriptionMedicineFromSearch = async (idx: number) => {
+    const q = prescriptionSearch.trim();
+    if (!q) return;
+    if (prescriptionMedicineEnsureInFlight.current) return;
+    const exact = medicinesMaster.find((m) => m.name.trim().toLowerCase() === q.toLowerCase());
+    if (exact) {
+      selectPrescription(idx, exact);
+      return;
+    }
+    prescriptionMedicineEnsureInFlight.current = true;
+    setPrescriptionMedicineBusyIndex(idx);
+    try {
+      const row = (await api.medicines.findOrCreateByName(q)) as { id: string; name: string };
+      setMedicinesMaster((prev) => {
+        const next = prev.filter((x) => x.id !== row.id);
+        next.push({ id: row.id, name: row.name });
+        next.sort((a, b) => a.name.localeCompare(b.name));
+        return next;
+      });
+      selectPrescription(idx, { id: row.id, name: row.name });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Try again';
+      toast({ title: 'Could not add medicine', description: msg, variant: 'destructive' });
+    } finally {
+      prescriptionMedicineEnsureInFlight.current = false;
+      setPrescriptionMedicineBusyIndex(null);
+    }
+  };
+
   const removePrescription = (idx: number) => {
     setForm((f) => ({ ...f, prescription: f.prescription.filter((_, i) => i !== idx) }));
   };
@@ -714,8 +916,18 @@ const ConsultationsPage = () => {
     setLoading(true);
     try {
       const now = new Date();
-      const consultationDate = isNurseStaff ? format(now, 'yyyy-MM-dd') : form.consultationDate;
-      const consultationTime = isNurseStaff ? format(now, 'HH:mm') : form.consultationTime;
+      const consultationDate =
+        isNurseStaff && isOpNew
+          ? (form.consultationDate?.trim() || format(now, 'yyyy-MM-dd'))
+          : isNurseStaff
+            ? format(now, 'yyyy-MM-dd')
+            : form.consultationDate;
+      const consultationTime =
+        isNurseStaff && isOpNew
+          ? (String(form.consultationTime ?? '').trim() || format(now, 'HH:mm'))
+          : isNurseStaff
+            ? format(now, 'HH:mm')
+            : form.consultationTime;
 
       const basePayload: Record<string, unknown> = {
         patientId: form.patientId,
@@ -1064,6 +1276,24 @@ const ConsultationsPage = () => {
     navigate('/admin/consultations/new', { state: { parentConsultationId: cons.id, isReview: true } });
   };
 
+  const clearBeneficiaryListFilter = () => {
+    try {
+      sessionStorage.removeItem(isOpListView ? OP_LIST_PATIENT_KEY : CONS_LIST_PATIENT_KEY);
+    } catch {
+      /* ignore */
+    }
+    setForm((f) => ({
+      ...f,
+      patientId: '',
+      patientName: '',
+      patientMedicalHistory: '',
+      patientGender: '',
+      menstrualHistory: defaultMenstrualHistory(),
+      ayurvedaExamination: defaultAyurvedaExamination(),
+    }));
+    navigate(isOpSection ? '/admin/op' : '/admin/consultations', { replace: true });
+  };
+
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   /** Upcoming follow-ups: consultations with followUpRequired and followUpDate >= today. */
@@ -1075,17 +1305,14 @@ const ConsultationsPage = () => {
   }, [consultations, isOpListView, todayStr]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
       {(viewLoading || loading || (opFormLoading && isOpDoctorCompleteRoute)) && (
         <FullScreenLoader label="Loading consultations..." />
       )}
       <ConsultationsTopBar
         isListRoute={isListRoute}
-        isNurseStaff={isNurseStaff}
         isViewRoute={isViewRoute}
         isFormRoute={isFormRoute}
-        isClinicSelected={!!targetClinicId}
-        onOpenNew={() => navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new')}
         onBackToRecords={() => navigate(isOpSection ? '/admin/op' : '/admin/consultations')}
       />
 
@@ -1094,55 +1321,110 @@ const ConsultationsPage = () => {
       )}
 
       {isListRoute && (
-        <Card className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-border/60 shadow-sm ring-1 ring-black/[0.03] transition-[box-shadow,border-color] duration-300 hover:shadow-md dark:ring-white/[0.04]">
-          <CardHeader className="shrink-0 space-y-0 border-b border-border/50 bg-muted/10 pb-3 pt-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/15">
-                  <Stethoscope className="h-5 w-5" />
+        <Card className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/[0.03] transition-[border-color,box-shadow] duration-300 ease-out hover:border-border hover:shadow-md dark:ring-white/[0.04]">
+          <CardContent className="flex h-full min-h-0 flex-1 flex-col gap-0 overflow-hidden p-0">
+            <div className="shrink-0 border-b border-border/50 bg-muted/15 px-3 py-2 transition-colors duration-200 ease-out hover:bg-muted/25 sm:px-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+                <div className="relative min-w-0 flex-1 sm:min-w-[200px] sm:max-w-xl">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="consultation-list-search"
+                    placeholder="Search name or mobile…"
+                    value={listFilters.search}
+                    onChange={(e) => setListFilters((f) => ({ ...f, search: e.target.value }))}
+                    className="h-9 rounded-md border-border/60 bg-background pl-9 text-sm transition-[border-color,box-shadow] duration-200 ease-out hover:border-primary/25 hover:shadow-sm focus-visible:border-primary/40"
+                    aria-label="Search consultations by beneficiary name or mobile"
+                    disabled={clinicSelectionRequired}
+                  />
                 </div>
-                <div className="min-w-0">
-                  <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">
-                    {isOpListView ? 'OP queue (vitals pending doctor)' : 'Consultation records'}
-                  </CardTitle>
-                  <CardDescription className="mt-1 text-xs leading-relaxed sm:text-sm">
-                    {isOpListView
-                      ? 'Nurse-entered vitals stay here until a doctor completes the visit. Open a row to examine.'
-                      : 'Doctor-assigned visits. Open a row for full details. Refresh to reload.'}
-                  </CardDescription>
+                <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  <div className="flex items-center gap-1 rounded-md border border-border/60 bg-background px-1.5 py-0.5 transition-[border-color,background-color] duration-200 ease-out hover:border-primary/25 hover:bg-muted/30">
+                    <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <Input
+                      type="date"
+                      id="consultation-filter-from"
+                      value={listFilters.from}
+                      onChange={(e) => handleListFromDateChange(e.target.value)}
+                      className="h-8 w-[128px] border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0 sm:w-[136px] sm:text-sm"
+                    />
+                    <span className="text-muted-foreground/60">–</span>
+                    <Input
+                      type="date"
+                      id="consultation-filter-to"
+                      value={listFilters.to}
+                      onChange={(e) => handleListToDateChange(e.target.value)}
+                      className="h-8 w-[128px] border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0 sm:w-[136px] sm:text-sm"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearListFilters}
+                    className="h-9 rounded-md transition-all duration-200 ease-out hover:border-primary/30 hover:bg-muted/50 active:scale-[0.98]"
+                    disabled={!listFilters.search && !listFilters.from && !listFilters.to}
+                  >
+                    <X className="mr-1.5 h-3.5 w-3.5" />
+                    Reset
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-9 w-9 shrink-0 rounded-md"
+                    onClick={loadConsultations}
+                    title="Refresh list"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 rounded-md shadow-sm transition-all duration-200 ease-out hover:shadow-md hover:brightness-[1.02] active:scale-[0.98]"
+                    disabled={!targetClinicId}
+                    onClick={() => navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new')}
+                  >
+                    <UserPlus className="mr-1.5 h-4 w-4" />
+                    {isNurseStaff ? 'New OP' : 'New consult'}
+                  </Button>
                 </div>
               </div>
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={loadConsultations}
-                className="shrink-0 rounded-lg transition-all duration-200 hover:border-primary/35 hover:bg-primary/5 hover:shadow-sm active:scale-95"
-                title="Refresh list"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isOpListView
+                  ? 'OP queue — visit date and OP time (nurse intake) are in separate columns. Filter by visit date range and search; scroll wide tables horizontally.'
+                  : 'Initial vs follow-up is shown in the Visit column. Search and visit dates filter the list; use pagination and horizontal scroll for large datasets.'}
+              </p>
             </div>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-            <ConsultationListTable
-              listLoading={listLoading}
-              consultations={consultations}
-              upcomingFollowUps={upcomingFollowUps}
-              todayStr={todayStr}
-              activeConsId={activeConsId}
-              fmtDateWithTime={fmtDateWithTime}
-              formatAppDate={formatAppDate}
-              diagnosisDisplay={diagnosisDisplay}
-              patientInitials={patientInitials}
-              openConsultationRecord={openConsultationRecord}
-              openFollowUp={openFollowUp}
-              handlePrint={handlePrint}
-              onNewConsult={() => navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new')}
-              targetClinicId={targetClinicId}
-              listKind={isOpListView ? 'op' : 'consultations'}
-              newConsultLabel={isNurseStaff ? 'New OP' : 'New consult'}
-              disableRowOpen={Boolean(isOpListView && isNurseStaff)}
-            />
+            {isListRoute && form.patientId?.trim() && (
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 bg-primary/5 px-3 py-2 text-sm sm:px-4">
+                <span className="text-muted-foreground">
+                  Showing visits for <span className="font-medium text-foreground">{form.patientName || 'selected beneficiary'}</span>
+                </span>
+                <Button type="button" variant="outline" size="sm" className="h-8" onClick={clearBeneficiaryListFilter}>
+                  Clear beneficiary filter
+                </Button>
+              </div>
+            )}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 sm:px-4">
+              <ConsultationListTable
+                listLoading={listLoading}
+                consultations={consultations}
+                upcomingFollowUps={upcomingFollowUps}
+                todayStr={todayStr}
+                activeConsId={activeConsId}
+                fmtDateWithTime={fmtDateWithTime}
+                formatAppDate={formatAppDate}
+                diagnosisDisplay={diagnosisDisplay}
+                openConsultationRecord={openConsultationRecord}
+                openFollowUp={openFollowUp}
+                handlePrint={handlePrint}
+                onNewConsult={() => navigate(isNurseStaff ? '/admin/op/new' : '/admin/consultations/new')}
+                targetClinicId={targetClinicId}
+                listKind={isOpListView ? 'op' : 'consultations'}
+                newConsultLabel={isNurseStaff ? 'New OP' : 'New consult'}
+                disableRowOpen={Boolean(isOpListView && isNurseStaff)}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1164,9 +1446,11 @@ const ConsultationsPage = () => {
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {isOpDoctorCompleteRoute
-                  ? 'Vitals and beneficiary are from the nurse. Add examination, diagnosis, prescription, then save — the visit moves to Consultations and print opens.'
+                  ? 'Review nurse OP date & time at the top, then add examination, diagnosis, and prescription. Adjust consultation date/time if needed for the official record — save moves the visit to Consultations and opens print.'
                   : isNurseStaff
-                    ? 'Choose beneficiary and enter vitals. Visit date and time are set when you save. A doctor is not assigned here—they add complaint, examination, diagnosis and prescription when they see the patient.'
+                    ? isOpNew
+                      ? 'Choose beneficiary, review OP visit date & time (defaults to now), enter vitals, then save. A doctor completes examination and prescription from the OP queue.'
+                      : 'Choose beneficiary and enter vitals. A doctor is not assigned here—they add complaint, examination, diagnosis and prescription when they see the patient.'
                     : form.parentConsultationId
                       ? 'Data copied from previous visit. Edit symptoms, vitals, diagnosis and save as follow-up.'
                       : 'Select patient, doctor, date and prescription (medicine, dose, duration).'}
@@ -1186,6 +1470,28 @@ const ConsultationsPage = () => {
                     <li key={i}>{e}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {isOpDoctorCompleteRoute && opNurseIntakeSnapshot && (
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/55 p-4 dark:border-emerald-900/45 dark:bg-emerald-950/25">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600/15 text-emerald-800 dark:text-emerald-300">
+                    <Clock className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <p className="text-sm font-semibold text-emerald-950 dark:text-emerald-50">Nurse OP intake — review</p>
+                    <p className="text-sm text-foreground">
+                      Visit date{' '}
+                      <span className="font-semibold tabular-nums">{formatAppDate(`${opNurseIntakeSnapshot.date}T12:00:00`)}</span>
+                      <span className="text-muted-foreground"> · </span>
+                      OP time{' '}
+                      <span className="font-semibold tabular-nums">{formatHhmmToAmPm(opNurseIntakeSnapshot.time, '—')}</span>
+                    </p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Consultation date and time below are what print on the consultation record and bill. They are prefilled from this OP intake; change only if the clinical visit was actually at a different date or time.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
             <div>
@@ -1246,6 +1552,43 @@ const ConsultationsPage = () => {
               )}
               </div>
             </div>
+            {isNurseStaff && isOpNew && (
+              <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-4 dark:bg-primary/10">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Clock className="h-4 w-4 text-primary" aria-hidden />
+                  OP visit date &amp; time <span className="text-destructive">*</span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  When did the patient attend OP? Review before saving vitals. Defaults to the current date and time; adjust if you are entering a visit that happened earlier.
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Visit date</Label>
+                    <Input
+                      type="date"
+                      className={cn('mt-1.5 h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
+                      value={form.consultationDate}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, consultationDate: e.target.value }));
+                        setConsultationErrors((e) => e.filter((x) => !x.includes('date')));
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Visit time</Label>
+                    <Input
+                      type="time"
+                      className="mt-1.5 h-10"
+                      value={form.consultationTime}
+                      onChange={(e) => setForm((f) => ({ ...f, consultationTime: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs font-medium tabular-nums text-foreground">
+                  Preview: {formatAppDate(`${form.consultationDate}T12:00:00`)} · {formatHhmmToAmPm(String(form.consultationTime || ''), '—')}
+                </p>
+              </div>
+            )}
             {isNurseStaff && isOpNew && form.patientId && (
               <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2">
                 <div className="flex items-center justify-between">
@@ -1329,7 +1672,7 @@ const ConsultationsPage = () => {
                  
                 </div>
                 <div>
-                  <Label>Date <span className="text-destructive">*</span></Label>
+                  <Label>{isOpDoctorCompleteRoute ? 'Consultation date' : 'Date'} <span className="text-destructive">*</span></Label>
                   <Input
                     type="date"
                     className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
@@ -1338,7 +1681,7 @@ const ConsultationsPage = () => {
                   />
                 </div>
                 <div>
-                  <Label>Time</Label>
+                  <Label>{isOpDoctorCompleteRoute ? 'Consultation time' : 'Time'}</Label>
                   <Input
                     type="time"
                     className="h-10"
@@ -1361,7 +1704,7 @@ const ConsultationsPage = () => {
                 </Select>
               </div>
               <div>
-                <Label>Date <span className="text-destructive">*</span></Label>
+                <Label>{isOpDoctorCompleteRoute ? 'Consultation date' : 'Date'} <span className="text-destructive">*</span></Label>
                 <Input
                   type="date"
                   className={cn('h-10', consultationErrors.some((e) => e.includes('date')) && 'border-destructive')}
@@ -1370,7 +1713,7 @@ const ConsultationsPage = () => {
                 />
               </div>
               <div>
-                <Label>Time</Label>
+                <Label>{isOpDoctorCompleteRoute ? 'Consultation time' : 'Time'}</Label>
                 <Input
                   type="time"
                   className="h-10"
@@ -1921,25 +2264,36 @@ const ConsultationsPage = () => {
                               }}
                             >
                               <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" size="sm" className="w-full justify-between font-normal">
-                                  <span className="truncate">
+                                <Button variant="outline" role="combobox" size="sm" className="w-full justify-between gap-2 font-normal">
+                                  <span className="min-w-0 flex-1 truncate text-left">
                                     {p.medicineName?.trim()
-                                      ? p.medicineId
-                                        ? p.medicineName
-                                        : `New: ${p.medicineName}`
+                                      ? p.medicineName
                                       : 'Select or type new medicine'}
                                   </span>
+                                  {prescriptionMedicineBusyIndex === i ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin opacity-70" aria-hidden />
+                                  ) : null}
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-[320px] p-0" align="start">
                                 <Command shouldFilter={false}>
                                   <CommandInput
-                                    placeholder="Search or type new name…"
+                                    placeholder="Search or type name — Enter adds to master if new"
                                     value={prescriptionSearch}
                                     onValueChange={setPrescriptionSearch}
+                                    onKeyDown={(e) => {
+                                      if (e.key !== 'Enter') return;
+                                      const q = prescriptionSearch.trim();
+                                      if (!q) return;
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      void commitPrescriptionMedicineFromSearch(i);
+                                    }}
                                   />
                                   <CommandList>
-                                    <CommandEmpty>No matches — use “Add new” below</CommandEmpty>
+                                    <CommandEmpty>
+                                      Type a medicine name and press Enter to add it to the master list.
+                                    </CommandEmpty>
                                     <CommandGroup>
                                       {medicinesMaster
                                         .filter((med) =>
@@ -1963,9 +2317,12 @@ const ConsultationsPage = () => {
                                         return (
                                           <CommandItem
                                             value={`__new__${q}`}
-                                            onSelect={() => selectPrescription(i, { id: '', name: q })}
+                                            disabled={prescriptionMedicineBusyIndex === i}
+                                            onSelect={() => {
+                                              void commitPrescriptionMedicineFromSearch(i);
+                                            }}
                                           >
-                                            Add new medicine &quot;{q}&quot;
+                                            Add &quot;{q}&quot; to master (same as Enter)
                                           </CommandItem>
                                         );
                                       })()}

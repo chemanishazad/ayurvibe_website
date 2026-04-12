@@ -272,6 +272,12 @@ export const api = {
   },
   medicines: {
     list: () => fetchApi<{ id: string; name: string; uom: string; purchasePrice: string; sellingPrice: string; minStockLevel: number }[]>('/api/medicines'),
+    /** Case-insensitive match on trimmed name, or create master row (same rules as consultation save). */
+    findOrCreateByName: (name: string) =>
+      fetchApi<{ id: string; name: string }>('/api/medicines/find-or-create', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/medicines', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/medicines/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi<{ success: boolean }>(`/api/medicines/${id}`, { method: 'DELETE' }),
@@ -317,7 +323,7 @@ export const api = {
   },
   /** Nurse OP vitals (patient master); doctors complete via `complete`. */
   opVisits: {
-    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
+    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string; search?: string }) => {
       const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/op-visits${q ? `?${q}` : ''}`);
@@ -329,7 +335,7 @@ export const api = {
       fetchApi<Record<string, unknown>>(`/api/op-visits/${id}/complete`, { method: 'POST', body: JSON.stringify(data) }),
   },
   consultations: {
-    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
+    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string; search?: string }) => {
       const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/consultations${q ? `?${q}` : ''}`);

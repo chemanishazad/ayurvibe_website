@@ -59,6 +59,39 @@ import {
 
 const PAGE_SIZES = [10, 20, 50] as const;
 
+const PHARMACY_LIST_FILTERS_KEY = 'ayurvibe_pharmacy_list_filters_v1';
+
+function readStoredPharmacyListFilters(): {
+  recordsDateFrom: string;
+  recordsDateTo: string;
+  recordsSearch: string;
+  recordsSaleKind: 'all' | 'direct' | 'consultation' | 'own';
+  perPage: number;
+} | null {
+  try {
+    const raw = sessionStorage.getItem(PHARMACY_LIST_FILTERS_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    const today = localDateYmd();
+    const from = String(o.recordsDateFrom ?? o.dateFrom ?? today).slice(0, 10);
+    const to = String(o.recordsDateTo ?? o.dateTo ?? today).slice(0, 10);
+    const sk = o.recordsSaleKind ?? o.saleKind;
+    const saleKind: 'all' | 'direct' | 'consultation' | 'own' =
+      sk === 'direct' || sk === 'consultation' || sk === 'own' ? sk : 'all';
+    const pp = Number(o.perPage);
+    const perPage = PAGE_SIZES.includes(pp as (typeof PAGE_SIZES)[number]) ? pp : 10;
+    return {
+      recordsDateFrom: from,
+      recordsDateTo: to,
+      recordsSearch: String(o.recordsSearch ?? ''),
+      recordsSaleKind: saleKind,
+      perPage,
+    };
+  } catch {
+    return null;
+  }
+}
+
 const SALE_KIND_LABELS: Record<'direct' | 'consultation' | 'own', string> = {
   direct: 'Direct',
   consultation: 'Consultation',
@@ -102,13 +135,6 @@ function formatGroupSheetDate(sale: PharmacySaleGroup): string {
   const iso = effectiveSaleDateIso(sale);
   if (!iso) return '—';
   return formatSaleDate(iso);
-}
-
-function customerInitials(name: string): string {
-  const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function displayCustomerName(sale: PharmacySaleGroup): string {
@@ -295,14 +321,19 @@ const responseMapper = {
 
 const PharmacyRecordsPage = () => {
   const { effectiveClinicId, clinics } = useAdminClinic();
+  const persistedPharmacy = readStoredPharmacyListFilters();
   const [pharmacyRecords, setPharmacyRecords] = useState<Record<string, unknown>[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
-  const [recordsDateFrom, setRecordsDateFrom] = useState(() => localDateYmd());
-  const [recordsDateTo, setRecordsDateTo] = useState(() => localDateYmd());
-  const [recordsSearch, setRecordsSearch] = useState('');
-  const [recordsSaleKind, setRecordsSaleKind] = useState<'all' | 'direct' | 'consultation' | 'own'>('all');
+  const [recordsDateFrom, setRecordsDateFrom] = useState(
+    () => persistedPharmacy?.recordsDateFrom ?? localDateYmd(),
+  );
+  const [recordsDateTo, setRecordsDateTo] = useState(() => persistedPharmacy?.recordsDateTo ?? localDateYmd());
+  const [recordsSearch, setRecordsSearch] = useState(() => persistedPharmacy?.recordsSearch ?? '');
+  const [recordsSaleKind, setRecordsSaleKind] = useState<'all' | 'direct' | 'consultation' | 'own'>(
+    () => persistedPharmacy?.recordsSaleKind ?? 'all',
+  );
   const [recordsPage, setRecordsPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [perPage, setPerPage] = useState(() => persistedPharmacy?.perPage ?? 10);
   const [recordsSource, setRecordsSource] = useState<'unified' | 'direct_fallback' | null>(null);
   const [viewSale, setViewSale] = useState<PharmacySaleGroup | null>(null);
   const [viewRowIdx, setViewRowIdx] = useState(0);
@@ -314,6 +345,23 @@ const PharmacyRecordsPage = () => {
   const { toast } = useToast();
 
   const targetClinicId = effectiveClinicId ?? undefined;
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        PHARMACY_LIST_FILTERS_KEY,
+        JSON.stringify({
+          recordsDateFrom,
+          recordsDateTo,
+          recordsSearch,
+          recordsSaleKind,
+          perPage,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [recordsDateFrom, recordsDateTo, recordsSearch, recordsSaleKind, perPage]);
 
   useEffect(() => {
     if (!targetClinicId) {
@@ -797,20 +845,12 @@ const PharmacyRecordsPage = () => {
                                   </span>
                                 </TableCell>
                                 <TableCell className="align-top py-2.5">
-                                  <div className="flex items-center gap-2.5">
-                                    <div
-                                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary"
-                                      aria-hidden
-                                    >
-                                      {customerInitials(nameLabel)}
-                                    </div>
-                                    <span
-                                      className="min-w-0 max-w-[200px] truncate font-medium leading-tight text-foreground transition-colors duration-200 group-hover:text-primary sm:max-w-[240px]"
-                                      title={nameLabel}
-                                    >
-                                      {nameLabel}
-                                    </span>
-                                  </div>
+                                  <span
+                                    className="block min-w-0 max-w-[200px] truncate font-medium leading-tight text-foreground sm:max-w-[280px]"
+                                    title={nameLabel}
+                                  >
+                                    {nameLabel}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="py-2.5 align-top font-mono text-sm tabular-nums tracking-tight text-foreground/85">
                                   {formatMobileDisplay(sale.customerMobile)}

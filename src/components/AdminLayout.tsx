@@ -65,7 +65,11 @@ const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children })
   const location = useLocation();
   const normalizedPath = location.pathname.replace(/\/$/, '') || '/';
   /** List pages use full-height inner scroll; other pages scroll the main column only. */
-  const isPatientsFullBleed = normalizedPath === '/admin/patients' || normalizedPath === '/admin/pharmacy';
+  const isPatientsFullBleed =
+    normalizedPath === '/admin/patients' ||
+    normalizedPath === '/admin/pharmacy' ||
+    normalizedPath === '/admin/consultations' ||
+    normalizedPath === '/admin/op';
   const user = getAuthUser();
   const isAdminUser = user?.role === 'admin';
   const pageTitle = getAdminPageTitle(location.pathname, user);
