@@ -16,9 +16,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { ADMIN_NAV_CATALOG } from '@/lib/nav-access';
-import { Plus, Pencil, Trash2, KeyRound, Link2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, KeyRound, Link2, Loader2, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -26,80 +25,121 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { cn } from '@/lib/utils';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 type UserRow = {
   id: string;
   username: string;
   role: string;
   createdAt: string;
   allowedNavPaths?: string[] | null;
-  staffRole?: string | null;
   linkedDoctorId?: string | null;
+  linkedDoctorName?: string | null;
+  clinicAccessNames?: string[];
 };
+type AccountRole = 'admin' | 'doctor' | 'nurse';
 
+// ─── Zod schemas ─────────────────────────────────────────────────────────────
+const createUserSchema = z.object({
+  username: z.string().min(1, 'Username is required').trim(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+type CreateUserForm = z.infer<typeof createUserSchema>;
+
+const editUserSchema = z.object({
+  username: z.string().min(1, 'Username is required').trim(),
+});
+type EditUserForm = z.infer<typeof editUserSchema>;
+
+const passwordSchema = z.object({
+  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+});
+type PasswordForm = z.infer<typeof passwordSchema>;
+
+// ─── FieldError component ─────────────────────────────────────────────────────
+const FieldError = ({ message }: { message?: string }) =>
+  message ? (
+    <p className="flex items-center gap-1.5 text-xs text-destructive mt-1" role="alert">
+      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+      {message}
+    </p>
+  ) : null;
+
+// ─── Page ───────────────────────────────────────────────────────────────────
 const UsersAdminPage = () => {
   const me = getAuthUser();
-  if (me?.role !== 'admin') {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
-  const [doctors, setDoctors] = useState<{ id: string; name: string; clinicIds?: string[] }[]>([]);
-  const [userClinicNamesByUserId, setUserClinicNamesByUserId] = useState<Record<string, string[]>>({});
-  const [loading, setLoading] = useState(true);
+  // Local UI state (complex non-form state stays in useState)
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    username: '',
-    password: '',
-    role: 'user' as 'admin' | 'user',
-    clinicIds: [] as string[],
-  });
+  const [createAccountRole, setCreateAccountRole] = useState<AccountRole>('doctor');
+  const [createClinicIds, setCreateClinicIds] = useState<string[]>([]);
+  const [createLinkedDoctorId, setCreateLinkedDoctorId] = useState('none');
+
   const [editing, setEditing] = useState<UserRow | null>(null);
-  const [editUsername, setEditUsername] = useState('');
-  const [editRole, setEditRole] = useState<'admin' | 'user'>('user');
+  const [editAccountRole, setEditAccountRole] = useState<AccountRole>('doctor');
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
-  const [editStaffKind, setEditStaffKind] = useState<'full' | 'nurse'>('full');
-  const [editLinkedDoctorId, setEditLinkedDoctorId] = useState<string>('none');
+  const [editLinkedDoctorId, setEditLinkedDoctorId] = useState('none');
   const [editUserClinicIds, setEditUserClinicIds] = useState<string[]>([]);
+
   const [pwdUser, setPwdUser] = useState<UserRow | null>(null);
-  const [newPassword, setNewPassword] = useState('');
   const [mapUser, setMapUser] = useState<UserRow | null>(null);
   const [userClinics, setUserClinics] = useState<{ id: string; name: string; mappingId: string }[]>([]);
   const [mapClinicIdsDraft, setMapClinicIdsDraft] = useState<string[]>([]);
   const [mappingSaving, setMappingSaving] = useState(false);
-  const { toast } = useToast();
 
-  const refreshUsers = async () => {
-    try {
+  // ─── Forms ──────────────────────────────────────────────────────────────
+  const createForm = useForm<CreateUserForm>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: { username: '', password: '' },
+  });
+
+  const editForm = useForm<EditUserForm>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: { username: '' },
+  });
+
+  const pwdForm = useForm<PasswordForm>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { newPassword: '' },
+  });
+
+  // ─── Queries ─────────────────────────────────────────────────────────────
+  const { data: users = [], isLoading: usersLoading } = useQuery<UserRow[]>({
+    queryKey: ['users'],
+    queryFn: async () => {
       const data = (await api.users.list()) as UserRow[];
-      setUsers(data);
-      const staffUsers = data.filter((u) => u.role === 'user');
-      const mappingEntries = await Promise.all(
-        staffUsers.map(async (u) => {
-          try {
-            const mapped = (await api.users.listClinics(u.id)) as { id: string; name: string; mappingId: string }[];
-            return [u.id, mapped.map((c) => c.name)] as const;
-          } catch {
-            return [u.id, []] as const;
-          }
-        }),
-      );
-      setUserClinicNamesByUserId(Object.fromEntries(mappingEntries));
-    } catch {
-      setUsers([]);
-      setUserClinicNamesByUserId({});
-    }
-  };
+      return data;
+    },
+  });
 
-  useEffect(() => {
-    Promise.all([
-      refreshUsers(),
-      api.clinics.list().then(setClinics).catch(() => setClinics([])),
-      api.doctors.list().then((list) => setDoctors(list as { id: string; name: string; clinicIds?: string[] }[])).catch(() => setDoctors([])),
-    ]).finally(() => setLoading(false));
-  }, []);
+  const { data: clinics = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['clinics'],
+    queryFn: () => api.clinics.list() as Promise<{ id: string; name: string }[]>,
+  });
+
+  const { data: doctors = [] } = useQuery<{ id: string; name: string; clinicIds?: string[] }[]>({
+    queryKey: ['doctors'],
+    queryFn: () => api.doctors.list() as Promise<{ id: string; name: string; clinicIds?: string[] }[]>,
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });
+
+  const userClinicNamesByUserId = useMemo(() =>
+    Object.fromEntries(
+      users
+        .filter((u) => u.role !== 'admin')
+        .map((u) => [u.id, u.clinicAccessNames ?? []] as const),
+    ),
+    [users],
+  );
 
   const doctorNameById = useMemo(
     () => Object.fromEntries(doctors.map((d) => [d.id, d.name] as const)),
@@ -107,14 +147,111 @@ const UsersAdminPage = () => {
   );
 
   const editDoctorOptions = useMemo(() => {
-    if (editRole !== 'user') return [];
+    if (editAccountRole === 'admin') return [];
     if (editUserClinicIds.length === 0) return doctors;
     return doctors.filter((d) => {
       const assignedClinics = d.clinicIds || [];
       if (assignedClinics.length === 0) return true;
       return assignedClinics.some((cid) => editUserClinicIds.includes(cid));
     });
-  }, [doctors, editRole, editUserClinicIds]);
+  }, [doctors, editAccountRole, editUserClinicIds]);
+
+  const createDoctorOptions = useMemo(() => {
+    if (createAccountRole === 'admin') return [];
+    if (createClinicIds.length === 0) return doctors;
+    return doctors.filter((d) => {
+      const assignedClinics = d.clinicIds || [];
+      if (assignedClinics.length === 0) return true;
+      return assignedClinics.some((cid) => createClinicIds.includes(cid));
+    });
+  }, [doctors, createAccountRole, createClinicIds]);
+
+  // ─── Mutations ───────────────────────────────────────────────────────────
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateUserForm) => {
+      if (createAccountRole !== 'admin' && createClinicIds.length === 0)
+        throw new Error('Doctor/Nurse users need at least one clinic');
+      if (createAccountRole === 'doctor' && createLinkedDoctorId === 'none')
+        throw new Error('Doctor user must be mapped to a doctor name');
+      return api.users.create({
+        username: data.username.trim(),
+        password: data.password,
+        role: createAccountRole,
+        clinicIds: createAccountRole !== 'admin' ? createClinicIds : undefined,
+        linkedDoctorId:
+          createAccountRole !== 'admin' && createLinkedDoctorId !== 'none'
+            ? createLinkedDoctorId
+            : null,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: 'User created' });
+      setShowCreate(false);
+      createForm.reset();
+      setCreateClinicIds([]);
+      setCreateLinkedDoctorId('none');
+      setCreateAccountRole('doctor');
+      invalidate();
+    },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: EditUserForm) => {
+      if (!editing) return;
+      if (editAccountRole === 'doctor' && editLinkedDoctorId === 'none')
+        throw new Error('Doctor user must be mapped to a doctor name');
+      const allowedNavPaths: string[] | null | undefined =
+        editAccountRole !== 'admin'
+          ? editNavRestricted && editNavPaths.length > 0
+            ? [...new Set(editNavPaths)]
+            : null
+          : undefined;
+      return api.users.update(editing.id, {
+        username: data.username.trim(),
+        role: editAccountRole,
+        ...(editAccountRole !== 'admin' ? { allowedNavPaths } : {}),
+        ...(editAccountRole !== 'admin'
+          ? { linkedDoctorId: editLinkedDoctorId === 'none' ? null : editLinkedDoctorId }
+          : { linkedDoctorId: null }),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: 'User updated' });
+      setEditing(null);
+      invalidate();
+    },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (u: UserRow) => api.users.delete(u.id),
+    onSuccess: () => { toast({ title: 'User deleted' }); invalidate(); },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
+
+  const pwdMutation = useMutation({
+    mutationFn: (data: PasswordForm) => api.users.setPassword(pwdUser!.id, data.newPassword),
+    onSuccess: () => { toast({ title: 'Password updated' }); setPwdUser(null); pwdForm.reset(); },
+    onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
+  });
+
+  // ─── Hydration helpers ───────────────────────────────────────────────────
+  const openEditUser = async (u: UserRow) => {
+    setEditing(u);
+    editForm.reset({ username: u.username });
+    setEditAccountRole(u.role === 'admin' ? 'admin' : u.role === 'nurse' ? 'nurse' : 'doctor');
+    const paths = u.allowedNavPaths;
+    setEditNavRestricted(Boolean(paths && paths.length > 0));
+    setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
+    setEditLinkedDoctorId(u.linkedDoctorId || 'none');
+    if (u.role !== 'admin') {
+      try {
+        const mapped = await api.users.listClinics(u.id);
+        setEditUserClinicIds((mapped as { id: string; name: string; mappingId: string }[]).map((c) => c.id));
+      } catch { setEditUserClinicIds([]); }
+    } else { setEditUserClinicIds([]); }
+  };
 
   const openMappings = async (u: UserRow) => {
     setMapUser(u);
@@ -123,248 +260,107 @@ const UsersAdminPage = () => {
       const mapped = list as { id: string; name: string; mappingId: string }[];
       setUserClinics(mapped);
       setMapClinicIdsDraft(mapped.map((c) => c.id));
-    } catch {
-      setUserClinics([]);
-      setMapClinicIdsDraft([]);
-    }
+    } catch { setUserClinics([]); setMapClinicIdsDraft([]); }
   };
 
-  const openEditUser = async (u: UserRow) => {
-    setEditing(u);
-    setEditUsername(u.username);
-    setEditRole(u.role === 'admin' ? 'admin' : 'user');
-    const paths = u.allowedNavPaths;
-    setEditNavRestricted(Boolean(paths && paths.length > 0));
-    setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
-    setEditStaffKind(u.staffRole === 'nurse' ? 'nurse' : 'full');
-    setEditLinkedDoctorId(u.linkedDoctorId || 'none');
+  const toggleDraftClinic = (clinicId: string, checked: boolean) =>
+    setMapClinicIdsDraft((prev) => checked ? [...new Set([...prev, clinicId])] : prev.filter((id) => id !== clinicId));
 
-    if (u.role === 'user') {
-      try {
-        const mapped = await api.users.listClinics(u.id);
-        setEditUserClinicIds((mapped as { id: string; name: string; mappingId: string }[]).map((c) => c.id));
-      } catch {
-        setEditUserClinicIds([]);
-      }
-    } else {
-      setEditUserClinicIds([]);
-    }
-  };
+  const toggleCreateClinic = (id: string, checked: boolean) =>
+    setCreateClinicIds((prev) => checked ? [...prev, id] : prev.filter((x) => x !== id));
 
-  const toggleDraftClinic = (clinicId: string, checked: boolean) => {
-    setMapClinicIdsDraft((prev) =>
-      checked ? [...new Set([...prev, clinicId])] : prev.filter((id) => id !== clinicId)
-    );
-  };
+  const toggleEditNavPath = (path: string, checked: boolean) =>
+    setEditNavPaths((prev) => (checked ? [...prev, path] : prev.filter((p) => p !== path)));
 
   const handleSaveMappings = async () => {
     if (!mapUser) return;
     if (mapClinicIdsDraft.length === 0) {
-      toast({
-        title: 'At least one clinic required',
-        description: 'Staff user must have at least one clinic access.',
-        variant: 'destructive',
-      });
+      toast({ title: 'At least one clinic required', description: 'Doctor/Nurse user must have at least one clinic access.', variant: 'destructive' });
       return;
     }
     const current = new Set(userClinics.map((c) => c.id));
     const draft = new Set(mapClinicIdsDraft);
     const toAdd = [...draft].filter((id) => !current.has(id));
     const toRemove = [...current].filter((id) => !draft.has(id));
-
-    if (toAdd.length === 0 && toRemove.length === 0) {
-      toast({ title: 'No changes' });
-      return;
-    }
-
+    if (toAdd.length === 0 && toRemove.length === 0) { toast({ title: 'No changes' }); return; }
     setMappingSaving(true);
     try {
-      for (const clinicId of toAdd) {
-        await api.users.addClinic(mapUser.id, clinicId);
-      }
-      for (const clinicId of toRemove) {
-        await api.users.removeClinic(mapUser.id, clinicId);
-      }
+      for (const clinicId of toAdd) await api.users.addClinic(mapUser.id, clinicId);
+      for (const clinicId of toRemove) await api.users.removeClinic(mapUser.id, clinicId);
       toast({ title: 'Clinic access updated' });
       await openMappings(mapUser);
-      await refreshUsers();
+      invalidate();
     } catch (e) {
-      toast({
-        title: 'Error',
-        description: e instanceof Error ? e.message : 'Failed to update clinic mapping',
-        variant: 'destructive',
-      });
-    } finally {
-      setMappingSaving(false);
-    }
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to update clinic mapping', variant: 'destructive' });
+    } finally { setMappingSaving(false); }
   };
 
-  const handleCreate = async () => {
-    if (!createForm.username.trim() || createForm.password.length < 6) {
-      toast({ title: 'Username and password (6+ chars) required', variant: 'destructive' });
-      return;
-    }
-    if (createForm.role === 'user' && createForm.clinicIds.length === 0) {
-      toast({ title: 'Staff users need at least one clinic', variant: 'destructive' });
-      return;
-    }
-    setLoading(true);
-    try {
-      await api.users.create({
-        username: createForm.username.trim(),
-        password: createForm.password,
-        role: createForm.role,
-        clinicIds: createForm.role === 'user' ? createForm.clinicIds : undefined,
-      });
-      toast({ title: 'User created' });
-      setShowCreate(false);
-      setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
-      await refreshUsers();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (me?.role !== 'admin') return <Navigate to="/admin/dashboard" replace />;
 
-  const handleUpdate = async () => {
-    if (!editing || !editUsername.trim()) return;
-    setLoading(true);
-    try {
-      const allowedNavPaths: string[] | null | undefined =
-        editRole === 'user'
-          ? editNavRestricted && editNavPaths.length > 0
-            ? [...new Set(editNavPaths)]
-            : null
-          : undefined;
-      await api.users.update(editing.id, {
-        username: editUsername.trim(),
-        role: editRole,
-        ...(editRole === 'user' ? { allowedNavPaths } : {}),
-        ...(editRole === 'user' ? { staffRole: editStaffKind === 'nurse' ? 'nurse' : null } : {}),
-        ...(editRole === 'user'
-          ? { linkedDoctorId: editLinkedDoctorId === 'none' ? null : editLinkedDoctorId }
-          : {}),
-      });
-      toast({ title: 'User updated' });
-      setEditing(null);
-      await refreshUsers();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleEditNavPath = (path: string, checked: boolean) => {
-    setEditNavPaths((prev) => (checked ? [...prev, path] : prev.filter((p) => p !== path)));
-  };
-
-  const handleDelete = async (u: UserRow) => {
-    if (u.id === me?.id) {
-      toast({ title: 'You cannot delete yourself', variant: 'destructive' });
-      return;
-    }
-    if (!confirm(`Delete user "${u.username}"?`)) return;
-    try {
-      await api.users.delete(u.id);
-      toast({ title: 'User deleted' });
-      await refreshUsers();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    }
-  };
-
-  const handleSetPassword = async () => {
-    if (!pwdUser || newPassword.length < 6) {
-      toast({ title: 'Password at least 6 characters', variant: 'destructive' });
-      return;
-    }
-    try {
-      await api.users.setPassword(pwdUser.id, newPassword);
-      toast({ title: 'Password updated' });
-      setPwdUser(null);
-      setNewPassword('');
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
-    }
-  };
-
-  const toggleCreateClinic = (id: string, checked: boolean) => {
-    setCreateForm((f) => ({
-      ...f,
-      clinicIds: checked ? [...f.clinicIds, id] : f.clinicIds.filter((x) => x !== id),
-    }));
-  };
-
-  if (loading && users.length === 0) {
-    return <FullScreenLoader label="Loading users..." />;
+  if (usersLoading && users.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Users & access" description="Administrator, doctor, and nurse logins." />
+        <Card className="border-border/70 shadow-sm">
+          <CardContent className="pt-6">
+            <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         title="Users & access"
-        description="Administrator and staff logins. Staff must be mapped to one or more clinics to sign in."
+        description="Administrator, doctor, and nurse logins. Doctor/Nurse users must be mapped to one or more clinics to sign in."
       >
-        <Button
-          onClick={() => {
-            setShowCreate(true);
-            setCreateForm({ username: '', password: '', role: 'user', clinicIds: [] });
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add user
+        <Button onClick={() => { setShowCreate(true); createForm.reset(); setCreateClinicIds([]); setCreateLinkedDoctorId('none'); setCreateAccountRole('doctor'); }}>
+          <Plus className="mr-2 h-4 w-4" />Add user
         </Button>
       </PageHeader>
 
-      <Card>
-        <CardHeader>
+      <Card className="border-border/70 shadow-sm">
+        <CardHeader className="pb-3">
           <CardTitle>Accounts</CardTitle>
-          {/* <CardDescription>
-            Roles: <strong>admin</strong> (full access, no clinic mapping) or <strong>staff</strong> (clinic-scoped).
-          </CardDescription> */}
+          <CardDescription>Manage login users, assign roles, and control clinic-level access.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-border/60">
+            <table className="min-w-[860px] w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th className="py-2 text-left">Username</th>
-                  <th className="py-2 text-left">Role</th>
-                  <th className="py-2 text-left">Clinic access</th>
-                  <th className="py-2 text-right">Actions</th>
+                <tr className="border-b bg-muted/40">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Username</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clinic access</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className="border-b">
-                    <td className="py-2 font-medium">{u.username}</td>
-                    <td className="py-2 capitalize">
-                      {u.role}
-                      {u.role === 'user' && u.staffRole === 'nurse' ? (
-                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
-                          vitals only
-                        </span>
-                      ) : null}
-                      {u.role === 'user' && u.linkedDoctorId ? (
-                        <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-normal text-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
-                          {doctorNameById[u.linkedDoctorId] || 'Assigned'}
+                {users.length === 0 ? (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">No users found.</td></tr>
+                ) : users.map((u) => (
+                  <tr key={u.id} className="border-b transition-colors hover:bg-muted/20">
+                    <td className="px-4 py-3 align-top"><div className="font-medium">{u.username}</div></td>
+                    <td className="px-4 py-3 align-top capitalize">
+                      <span className="inline-flex rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-medium">{u.role}</span>
+                      {u.role !== 'admin' && u.linkedDoctorId ? (
+                        <span className="ml-2 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-normal text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                          {u.linkedDoctorName || doctorNameById[u.linkedDoctorId] || 'Assigned'}
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-2">
+                    <td className="px-4 py-3 align-top">
                       {u.role === 'admin' ? (
                         <span className="text-xs text-muted-foreground">All clinics</span>
                       ) : (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {(userClinicNamesByUserId[u.id] || []).slice(0, 2).map((clinicName) => (
-                            <span key={clinicName} className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                              {clinicName}
-                            </span>
+                            <span key={clinicName} className="rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-xs">{clinicName}</span>
                           ))}
                           {(userClinicNamesByUserId[u.id] || []).length > 2 ? (
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            <span className="rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground">
                               +{(userClinicNamesByUserId[u.id] || []).length - 2}
                             </span>
                           ) : null}
@@ -374,29 +370,27 @@ const UsersAdminPage = () => {
                         </div>
                       )}
                     </td>
-                    <td className="py-2 text-right">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        {u.role === 'user' && (
-                          <Button size="sm" variant="outline" onClick={() => openMappings(u)}>
-                            <Link2 className="mr-1 h-3.5 w-3.5" />
-                            Clinics
+                    <td className="px-4 py-3 text-right align-top">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {u.role !== 'admin' && (
+                          <Button size="sm" variant="outline" className="h-8" onClick={() => openMappings(u)}>
+                            <Link2 className="mr-1 h-3.5 w-3.5" />Clinics
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void openEditUser(u)}
-                        >
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title={`Edit ${u.username}`} onClick={() => void openEditUser(u)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setPwdUser(u)}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title={`Reset password for ${u.username}`} onClick={() => { setPwdUser(u); pwdForm.reset(); }}>
                           <KeyRound className="h-4 w-4" />
                         </Button>
                         <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(u)}
+                          size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"
+                          title={`Delete ${u.username}`}
+                          onClick={() => {
+                            if (u.id === me?.id) { toast({ title: 'You cannot delete yourself', variant: 'destructive' }); return; }
+                            if (!confirm(`Delete user "${u.username}"?`)) return;
+                            deleteMutation.mutate(u);
+                          }}
                           disabled={u.id === me?.id}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -411,245 +405,178 @@ const UsersAdminPage = () => {
         </CardContent>
       </Card>
 
+      {/* ── Create user dialog ── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New user</DialogTitle>
-            <DialogDescription>Staff users need clinic access to log in.</DialogDescription>
+            <DialogDescription>Doctor/Nurse users need clinic access to log in.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>Username</Label>
-              <Input
-                value={createForm.username}
-                onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))}
-                autoComplete="off"
-              />
-            </div>
-            <div>
-              <Label>Password</Label>
-              <Input
-                type="password"
-                value={createForm.password}
-                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                autoComplete="new-password"
-              />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <Select
-                value={createForm.role}
-                onValueChange={(v) => setCreateForm((f) => ({ ...f, role: v as 'admin' | 'user' }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Staff (clinic user)</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {createForm.role === 'user' && (
-              <div className="space-y-2 rounded-lg border p-3">
-                <Label>Clinic access</Label>
-                {clinics.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Create clinics first.</p>
-                ) : (
-                  clinics.map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={createForm.clinicIds.includes(c.id)}
-                        onCheckedChange={(ch) => toggleCreateClinic(c.id, ch === true)}
-                      />
-                      {c.name}
-                    </label>
-                  ))
-                )}
+          <form onSubmit={createForm.handleSubmit((d) => createMutation.mutate(d))}>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label>Username <span className="text-destructive">*</span></Label>
+                <Input className={cn('mt-1', createForm.formState.errors.username && 'border-destructive')} autoComplete="off" {...createForm.register('username')} />
+                <FieldError message={createForm.formState.errors.username?.message} />
               </div>
-            )}
-            <Button onClick={handleCreate} disabled={loading} className="w-full">
-              Create user
-            </Button>
-          </div>
+              <div>
+                <Label>Password <span className="text-destructive">*</span></Label>
+                <Input type="password" className={cn('mt-1', createForm.formState.errors.password && 'border-destructive')} autoComplete="new-password" {...createForm.register('password')} />
+                <FieldError message={createForm.formState.errors.password?.message} />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={createAccountRole} onValueChange={(v) => { setCreateAccountRole(v as AccountRole); if (v === 'admin') { setCreateClinicIds([]); setCreateLinkedDoctorId('none'); } }}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                    <SelectItem value="doctor">Doctor</SelectItem>
+                    <SelectItem value="nurse">Nurse</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {createAccountRole !== 'admin' && (
+                <div className="space-y-2 rounded-lg border p-3">
+                  <Label>Clinic access <span className="text-destructive">*</span></Label>
+                  {clinics.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Create clinics first.</p>
+                  ) : (
+                    clinics.map((c) => (
+                      <label key={c.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox checked={createClinicIds.includes(c.id)} onCheckedChange={(ch) => toggleCreateClinic(c.id, ch === true)} />
+                        {c.name}
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
+              {createAccountRole !== 'admin' && (
+                <div>
+                  <Label>{createAccountRole === 'nurse' ? 'Linked doctor (optional)' : 'Mapped doctor (required)'}</Label>
+                  <Select value={createLinkedDoctorId} onValueChange={setCreateLinkedDoctorId}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="No linked doctor" /></SelectTrigger>
+                    <SelectContent>
+                      {createAccountRole === 'nurse' ? <SelectItem value="none">No linked doctor</SelectItem> : null}
+                      {createDoctorOptions.map((doc) => <SelectItem key={doc.id} value={doc.id}>{doc.name}</SelectItem>)}
+                      {createLinkedDoctorId !== 'none' && !createDoctorOptions.some((d) => d.id === createLinkedDoctorId) ? (
+                        <SelectItem value={createLinkedDoctorId}>{doctorNameById[createLinkedDoctorId] || 'Current linked doctor'}</SelectItem>
+                      ) : null}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <Button type="submit" disabled={createMutation.isPending} className="w-full">
+                {createMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</> : 'Create user'}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
+      {/* ── Edit user dialog ── */}
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit user</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>Username</Label>
-              <Input value={editUsername} onChange={(e) => setEditUsername(e.target.value)} />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <Select
-                value={editRole}
-                onValueChange={(v) => {
-                  setEditRole(v as 'admin' | 'user');
-                  if (v === 'admin') {
-                    setEditNavRestricted(false);
-                    setEditNavPaths([]);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Staff</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {editRole === 'user' && (
+          <DialogHeader><DialogTitle>Edit user</DialogTitle></DialogHeader>
+          <form onSubmit={editForm.handleSubmit((d) => updateMutation.mutate(d))}>
+            <div className="space-y-4 py-2">
               <div>
-                <Label>Consultation form</Label>
-                <Select value={editStaffKind} onValueChange={(v) => setEditStaffKind(v as 'full' | 'nurse')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Label>Username <span className="text-destructive">*</span></Label>
+                <Input className={cn('mt-1', editForm.formState.errors.username && 'border-destructive')} {...editForm.register('username')} />
+                <FieldError message={editForm.formState.errors.username?.message} />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={editAccountRole} onValueChange={(v) => {
+                  const nextRole = v as AccountRole;
+                  setEditAccountRole(nextRole);
+                  if (v === 'admin') { setEditNavRestricted(false); setEditNavPaths([]); setEditLinkedDoctorId('none'); }
+                }}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="full">Full (doctor / staff)</SelectItem>
-                    <SelectItem value="nurse">Nurse — vitals only</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                    <SelectItem value="doctor">Doctor</SelectItem>
+                    <SelectItem value="nurse">Nurse</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Nurses only see beneficiary + vitals; visit time is set when saving; doctor is auto-assigned.
-                </p>
               </div>
-            )}
-            {editRole === 'user' && (
-              <div>
-                <Label>Linked doctor (optional)</Label>
-                <Select value={editLinkedDoctorId} onValueChange={setEditLinkedDoctorId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="No linked doctor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No linked doctor</SelectItem>
-                    {editDoctorOptions.map((doc) => (
-                      <SelectItem key={doc.id} value={doc.id}>
-                        {doc.name}
-                      </SelectItem>
-                    ))}
-                    {editLinkedDoctorId !== 'none' && !editDoctorOptions.some((d) => d.id === editLinkedDoctorId) ? (
-                      <SelectItem value={editLinkedDoctorId}>
-                        {doctorNameById[editLinkedDoctorId] || 'Current linked doctor'}
-                      </SelectItem>
-                    ) : null}
-                  </SelectContent>
-                </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Doctors are filtered by this staff user's clinic access.
-                </p>
-              </div>
-            )}
-            {editRole === 'user' && (
-              <div className="space-y-3 rounded-lg border p-3">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <Checkbox
-                    checked={editNavRestricted}
-                    onCheckedChange={(ch) => {
-                      const on = ch === true;
-                      setEditNavRestricted(on);
-                      if (!on) setEditNavPaths([]);
-                    }}
-                  />
-                  Custom sidebar (pick sections)
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Leave off for the default staff menu (clinical + inventory; no masters). Turn on to grant only checked items—e.g. nurses: Patients, Consultations, Pharmacy.
-                </p>
-                {editNavRestricted && (
-                  <div className="max-h-[220px] space-y-2 overflow-y-auto rounded-md border bg-muted/30 p-2">
-                    {ADMIN_NAV_CATALOG.map((item) => (
-                      <label key={item.path} className="flex cursor-pointer items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={editNavPaths.includes(item.path)}
-                          onCheckedChange={(ch) => toggleEditNavPath(item.path, ch === true)}
-                        />
-                        <span>
-                          {item.label}{' '}
-                          <span className="text-muted-foreground">({item.group})</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <Button onClick={handleUpdate} disabled={loading} className="w-full">
-              Save
-            </Button>
-          </div>
+              {editAccountRole !== 'admin' && (
+                <div>
+                  <Label>{editAccountRole === 'nurse' ? 'Linked doctor (optional)' : 'Mapped doctor (required)'}</Label>
+                  <Select value={editLinkedDoctorId} onValueChange={setEditLinkedDoctorId}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="No linked doctor" /></SelectTrigger>
+                    <SelectContent>
+                      {editAccountRole === 'nurse' ? <SelectItem value="none">No linked doctor</SelectItem> : null}
+                      {editDoctorOptions.map((doc) => <SelectItem key={doc.id} value={doc.id}>{doc.name}</SelectItem>)}
+                      {editLinkedDoctorId !== 'none' && !editDoctorOptions.some((d) => d.id === editLinkedDoctorId) ? (
+                        <SelectItem value={editLinkedDoctorId}>{doctorNameById[editLinkedDoctorId] || 'Current linked doctor'}</SelectItem>
+                      ) : null}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">Doctors are filtered by this user&apos;s clinic access.</p>
+                </div>
+              )}
+              {editAccountRole !== 'admin' && (
+                <div className="space-y-3 rounded-lg border p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={editNavRestricted} onCheckedChange={(ch) => { const on = ch === true; setEditNavRestricted(on); if (!on) setEditNavPaths([]); }} />
+                    Custom sidebar (pick sections)
+                  </label>
+                  <p className="text-xs text-muted-foreground">Leave off for the default doctor/nurse menu. Turn on to grant only checked items.</p>
+                  {editNavRestricted && (
+                    <div className="max-h-[220px] space-y-2 overflow-y-auto rounded-md border bg-muted/30 p-2">
+                      {ADMIN_NAV_CATALOG.map((item) => (
+                        <label key={item.path} className="flex cursor-pointer items-center gap-2 text-sm">
+                          <Checkbox checked={editNavPaths.includes(item.path)} onCheckedChange={(ch) => toggleEditNavPath(item.path, ch === true)} />
+                          <span>{item.label} <span className="text-muted-foreground">({item.group})</span></span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <Button type="submit" disabled={updateMutation.isPending} className="w-full">
+                {updateMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : 'Save'}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
+      {/* ── Reset password dialog ── */}
       <Dialog open={!!pwdUser} onOpenChange={(o) => !o && setPwdUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reset password</DialogTitle>
             <DialogDescription>User: {pwdUser?.username}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>New password</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-              />
+          <form onSubmit={pwdForm.handleSubmit((d) => pwdMutation.mutate(d))}>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label>New password <span className="text-destructive">*</span></Label>
+                <Input type="password" className={cn('mt-1', pwdForm.formState.errors.newPassword && 'border-destructive')} autoComplete="new-password" {...pwdForm.register('newPassword')} />
+                <FieldError message={pwdForm.formState.errors.newPassword?.message} />
+              </div>
+              <Button type="submit" disabled={pwdMutation.isPending} className="w-full">
+                {pwdMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating…</> : 'Update password'}
+              </Button>
             </div>
-            <Button onClick={handleSetPassword} className="w-full">
-              Update password
-            </Button>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={!!mapUser}
-        onOpenChange={(o) => {
-          if (!o) {
-            setMapUser(null);
-            setMapClinicIdsDraft([]);
-            setUserClinics([]);
-          }
-        }}
-      >
+      {/* ── Clinic mapping dialog ── */}
+      <Dialog open={!!mapUser} onOpenChange={(o) => { if (!o) { setMapUser(null); setMapClinicIdsDraft([]); setUserClinics([]); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Clinic mapping</DialogTitle>
-            <DialogDescription>Staff: {mapUser?.username}</DialogDescription>
+            <DialogDescription>User: {mapUser?.username}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                Selected: <strong>{mapClinicIdsDraft.length}</strong> / {clinics.length}
-              </span>
+              <span>Selected: <strong>{mapClinicIdsDraft.length}</strong> / {clinics.length}</span>
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMapClinicIdsDraft(clinics.map((c) => c.id))}
-                  disabled={clinics.length === 0}
-                >
-                  Select all
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMapClinicIdsDraft([])}
-                  disabled={clinics.length === 0}
-                >
-                  Clear
-                </Button>
+                <Button size="sm" variant="outline" onClick={() => setMapClinicIdsDraft(clinics.map((c) => c.id))} disabled={clinics.length === 0}>Select all</Button>
+                <Button size="sm" variant="outline" onClick={() => setMapClinicIdsDraft([])} disabled={clinics.length === 0}>Clear</Button>
               </div>
             </div>
             <div className="max-h-[280px] space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-2">
@@ -658,24 +585,14 @@ const UsersAdminPage = () => {
               ) : (
                 clinics.map((c) => (
                   <label key={c.id} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40">
-                    <Checkbox
-                      checked={mapClinicIdsDraft.includes(c.id)}
-                      onCheckedChange={(ch) => toggleDraftClinic(c.id, ch === true)}
-                    />
+                    <Checkbox checked={mapClinicIdsDraft.includes(c.id)} onCheckedChange={(ch) => toggleDraftClinic(c.id, ch === true)} />
                     {c.name}
                   </label>
                 ))
               )}
             </div>
             <Button onClick={handleSaveMappings} disabled={!mapUser || mappingSaving} className="w-full">
-              {mappingSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving clinic access...
-                </>
-              ) : (
-                'Save clinic access'
-              )}
+              {mappingSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving clinic access...</> : 'Save clinic access'}
             </Button>
           </div>
         </DialogContent>

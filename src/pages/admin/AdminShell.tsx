@@ -16,7 +16,7 @@ const AdminShell = () => {
       staffRole: user.staffRole ?? null,
     };
     if (!userMayAccessRoute(session, normalized)) {
-      if (user.role === 'user' && user.staffRole === 'nurse' && normalized.startsWith('/admin/consultations')) {
+      if ((user.role === 'nurse' || (user.role === 'user' && user.staffRole === 'nurse')) && normalized.startsWith('/admin/consultations')) {
         return <Navigate to="/admin/op" replace />;
       }
       const fallback = (user.allowedNavPaths && user.allowedNavPaths[0]) || '/admin/dashboard';
@@ -27,7 +27,9 @@ const AdminShell = () => {
   const isAdminFullBleed =
     normalized === '/admin/patients' ||
     normalized === '/admin/pharmacy' ||
-    normalized.startsWith('/admin/pharmacy/');
+    normalized.startsWith('/admin/pharmacy/') ||
+    normalized === '/admin/consultations' ||
+    normalized === '/admin/op';
 
   return (
     <AdminLayout>

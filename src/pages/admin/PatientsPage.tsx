@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { formatPatientAgeDisplay } from '@/lib/patient-age';
 import { Search, UserPlus, Eye, Pencil, X, CalendarDays, Users, Loader2 } from 'lucide-react';
 import { formatAppDateTime } from '@/lib/datetime';
+import { useQuery } from '@tanstack/react-query';
 import {
   Select,
   SelectContent,
@@ -30,26 +31,92 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { useAdminClinic } from '@/contexts/AdminClinicContext';
+import { ADMIN_ALL_CLINICS_VALUE, useAdminClinic } from '@/contexts/AdminClinicContext';
 import { getAuthUser } from '@/pages/Login';
 
 type PatientRow = Record<string, unknown> & { consultationCount?: number; lastConsultationId?: string };
 
-const PAGE_SIZES = [10, 20, 50];
 const SEARCH_DEBOUNCE_MS = 350;
+const PATIENTS_BRANCH_KEY = 'ayurvibe_patients_clinic_scope';
+const PATIENTS_LIST_FILTERS_KEY = 'ayurvibe_patients_list_filters_v1';
+
+function readStoredPatientsFilters(): { search: string; from: string; to: string } {
+  try {
+    const raw = sessionStorage.getItem(PATIENTS_LIST_FILTERS_KEY);
+    if (!raw) return { search: '', from: '', to: '' };
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      search: String(o.search ?? ''),
+      from: String(o.from ?? ''),
+      to: String(o.to ?? ''),
+    };
+  } catch {
+    return { search: '', from: '', to: '' };
+  }
+}
 
 const PatientsPage = () => {
   const navigate = useNavigate();
-  const { effectiveClinicId, isAdmin } = useAdminClinic();
-  const [rawPatients, setRawPatients] = useState<PatientRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [filters, setFilters] = useState({ search: '', from: '', to: '' });
+  const { effectiveClinicId, isAdmin, clinics } = useAdminClinic();
+  const [patientsBranch, setPatientsBranch] = useState(() => {
+    try {
+      return sessionStorage.getItem(PATIENTS_BRANCH_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const setPatientsBranchPersist = (v: string) => {
+    setPatientsBranch(v);
+    try {
+      if (v) sessionStorage.setItem(PATIENTS_BRANCH_KEY, v);
+      else sessionStorage.removeItem(PATIENTS_BRANCH_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+  const initialPatientFilters = readStoredPatientsFilters();
+  const [filters, setFilters] = useState(initialPatientFilters);
+  const [debouncedSearch, setDebouncedSearch] = useState(() => initialPatientFilters.search.trim());
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const initializedRef = useRef(false);
-  const requestIdRef = useRef(0);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(filters.search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(PATIENTS_LIST_FILTERS_KEY, JSON.stringify(filters));
+    } catch {
+      /* ignore */
+    }
+  }, [filters]);
+
+  const clinicIdForList = isAdmin ? patientsBranch || undefined : effectiveClinicId ?? undefined;
+
+  const queryParams = {
+    search: debouncedSearch.trim(),
+    from: filters.from.trim(),
+    to: filters.to.trim(),
+    ...(clinicIdForList ? { clinicId: clinicIdForList } : {}),
+  };
+
+  const { data: rawPatients = [], isLoading, isFetching } = useQuery<PatientRow[]>({
+    queryKey: ['patients', queryParams],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (queryParams.search) params.search = queryParams.search;
+      if (queryParams.from) params.from = queryParams.from;
+      if (queryParams.to) params.to = queryParams.to;
+      if (queryParams.clinicId) params.clinicId = queryParams.clinicId as string;
+      return api.patients.list(params) as Promise<PatientRow[]>;
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  const isRefreshing = isFetching && !isLoading;
 
   const totalPatients = rawPatients.length;
   const totalPages = Math.max(1, Math.ceil(totalPatients / perPage));
@@ -62,50 +129,11 @@ const PatientsPage = () => {
     return page - 2 + i;
   });
 
-  const loadPatients = (nextFilters: typeof filters, opts?: { fullScreen?: boolean }) => {
-    const requestId = ++requestIdRef.current;
-    const fullScreen = opts?.fullScreen ?? false;
-    if (fullScreen) setLoading(true);
-    else setIsRefreshing(true);
+  // Reset to page 1 when data changes
+  useEffect(() => {
     setPage(1);
-    const params: Record<string, string> = {};
-    if (nextFilters.search?.trim()) params.search = nextFilters.search.trim();
-    if (nextFilters.from?.trim()) params.from = nextFilters.from.trim();
-    if (nextFilters.to?.trim()) params.to = nextFilters.to.trim();
-    if (isAdmin && effectiveClinicId) params.clinicId = effectiveClinicId;
-    api.patients
-      .list(params)
-      .then((data) => {
-        if (requestId === requestIdRef.current) setRawPatients(data as PatientRow[]);
-      })
-      .catch(() => {
-        if (requestId === requestIdRef.current) setRawPatients([]);
-      })
-      .finally(() => {
-        if (requestId === requestIdRef.current) {
-          setLoading(false);
-          setIsRefreshing(false);
-        }
-      });
-  };
-
-  useEffect(() => {
-    loadPatients(filters, { fullScreen: true });
-    initializedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (page > totalPages && totalPages > 0) setPage(totalPages);
-  }, [perPage, totalPages]);
-
-  useEffect(() => {
-    if (!initializedRef.current) return;
-    const timeoutMs = filters.search.trim() ? SEARCH_DEBOUNCE_MS : 0;
-    const timer = setTimeout(() => {
-      loadPatients(filters);
-    }, timeoutMs);
-    return () => clearTimeout(timer);
-  }, [filters.search, filters.from, filters.to, isAdmin, effectiveClinicId]);
+  }, [debouncedSearch, filters.from, filters.to, effectiveClinicId, patientsBranch]);
+  useEffect(() => { if (page > totalPages && totalPages > 0) setPage(totalPages); }, [perPage, totalPages]);
 
   const handleFromDateChange = (value: string) => {
     setFilters((f) => {
@@ -129,31 +157,34 @@ const PatientsPage = () => {
 
   const handleClearFilters = () => {
     setFilters({ search: '', from: '', to: '' });
+    try {
+      sessionStorage.removeItem(PATIENTS_LIST_FILTERS_KEY);
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleView = (patientId: string) => {
     const u = getAuthUser();
-    const isNurse = u?.role === 'user' && u?.staffRole === 'nurse';
-    if (isNurse) {
-      navigate('/admin/op', { state: { patientId } });
-    } else {
-      navigate('/admin/consultations', { state: { patientId } });
-    }
+    const isNurse = u?.role === 'nurse' || (u?.role === 'user' && u?.staffRole === 'nurse');
+    if (isNurse) navigate('/admin/op', { state: { patientId } });
+    else navigate('/admin/consultations', { state: { patientId } });
   };
 
-  const handleEdit = (patientId: string) => {
-    navigate(`/admin/patients/${patientId}/edit`);
-  };
+  const handleEdit = (patientId: string) => navigate(`/admin/patients/${patientId}/edit`);
 
-  const patientInitials = (name: string) => {
-    const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
+  const PAGE_SIZES = [10, 20, 50];
 
-  if (loading) {
-    return <FullScreenLoader label="Loading patients..." />;
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+        <Card className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+          <CardContent className="p-4">
+            <div className="space-y-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-muted" />)}</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -175,6 +206,27 @@ const PatientsPage = () => {
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                {isAdmin && clinics.length > 0 && (
+                  <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background px-2 py-0.5">
+                    <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Branch</span>
+                    <Select
+                      value={patientsBranch || ADMIN_ALL_CLINICS_VALUE}
+                      onValueChange={(v) => setPatientsBranchPersist(v === ADMIN_ALL_CLINICS_VALUE ? '' : v)}
+                    >
+                      <SelectTrigger className="h-8 w-[min(56vw,200px)] border-0 bg-transparent text-xs shadow-none">
+                        <SelectValue placeholder="All branches" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ADMIN_ALL_CLINICS_VALUE}>All branches</SelectItem>
+                        {clinics.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {isRefreshing && (
                   <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -228,16 +280,16 @@ const PatientsPage = () => {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm transition-[border-color,box-shadow] duration-300 ease-out hover:border-border/80 hover:shadow-md">
               <div className="min-h-0 flex-1 overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 z-10 border-b border-border/60 bg-muted/50 backdrop-blur-md transition-shadow duration-200">
+                  <TableHeader className="sticky top-0 z-10 border-b border-border/60 bg-muted/40 backdrop-blur-sm">
                     <TableRow className="border-0 hover:bg-transparent">
-                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Patient</TableHead>
-                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mobile</TableHead>
-                      <TableHead className="h-9 w-[76px] py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Age</TableHead>
-                      <TableHead className="h-9 w-[128px] py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="h-10 py-2 pl-4 text-left text-xs font-semibold text-muted-foreground">Patient</TableHead>
+                      <TableHead className="h-10 py-2 text-left text-xs font-semibold text-muted-foreground">Mobile</TableHead>
+                      <TableHead className="h-10 w-[76px] py-2 text-left text-xs font-semibold text-muted-foreground">Age</TableHead>
+                      <TableHead className="h-10 w-[120px] py-2 text-center text-xs font-semibold text-muted-foreground">
                         Consultations
                       </TableHead>
-                      <TableHead className="h-9 min-w-[148px] py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Registered</TableHead>
-                      <TableHead className="h-9 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</TableHead>
+                      <TableHead className="h-10 min-w-[148px] py-2 text-left text-xs font-semibold text-muted-foreground">Registered</TableHead>
+                      <TableHead className="h-10 py-2 pr-4 text-right text-xs font-semibold text-muted-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -273,53 +325,47 @@ const PatientsPage = () => {
                           key={p.id as string}
                           className={
                             rowIdx % 2 === 0
-                              ? 'group border-border/30 transition-[background-color,box-shadow] duration-200 ease-out hover:bg-primary/[0.04] hover:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.08)] dark:hover:bg-primary/10'
-                              : 'group border-border/30 bg-muted/[0.35] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-muted/50 hover:shadow-[inset_0_0_0_1px_hsl(var(--border)/0.5)] dark:hover:bg-muted/40'
+                              ? 'border-border/40 transition-colors hover:bg-muted/30'
+                              : 'border-border/40 bg-muted/20 transition-colors hover:bg-muted/40'
                           }
                         >
-                          <TableCell className="py-2">
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-primary/5 text-[11px] font-bold text-primary ring-1 ring-primary/15 transition-[transform,box-shadow] duration-200 ease-out group-hover:scale-105 group-hover:ring-2 group-hover:ring-primary/25"
-                                aria-hidden
-                              >
-                                {patientInitials(name)}
-                              </div>
-                              <span className="font-medium leading-tight text-foreground transition-colors duration-200 group-hover:text-primary">{name}</span>
-                            </div>
+                          <TableCell className="max-w-[min(40vw,14rem)] py-2.5 pl-4 sm:max-w-xs">
+                            <span className="block truncate font-medium text-foreground" title={name}>
+                              {name}
+                            </span>
                           </TableCell>
-                          <TableCell className="py-2 font-mono text-sm tabular-nums tracking-tight text-foreground/85">
+                          <TableCell className="py-2.5 font-mono text-sm tabular-nums text-foreground/90">
                             {p.mobile as string}
                           </TableCell>
-                          <TableCell className="py-2 tabular-nums text-muted-foreground">
+                          <TableCell className="py-2.5 tabular-nums text-muted-foreground">
                             {formatPatientAgeDisplay(p.age, p.ageUnit)}
                           </TableCell>
-                          <TableCell className="py-2 text-center">
+                          <TableCell className="py-2.5 text-center">
                             {visits === 0 ? (
                               <span
-                                className="inline-flex min-w-[2rem] items-center justify-center rounded-md bg-muted/45 px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground transition-colors duration-200 group-hover:bg-muted/60"
+                                className="inline-flex min-w-[2rem] items-center justify-center rounded-md border border-transparent bg-muted/50 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground"
                                 title="No consultations yet"
                               >
                                 0
                               </span>
                             ) : (
                               <span
-                                className="inline-flex min-w-[2.5rem] items-center justify-center rounded-lg bg-primary/15 px-2.5 py-1 text-sm font-bold tabular-nums text-primary shadow-sm ring-1 ring-primary/10 transition-[transform,background-color] duration-200 ease-out group-hover:bg-primary/20 group-hover:ring-primary/25"
+                                className="inline-flex min-w-[2.25rem] items-center justify-center rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary"
                                 title={`${visits} consultation${visits === 1 ? '' : 's'}`}
                               >
                                 {visits}
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap py-2 text-sm tabular-nums text-muted-foreground">
+                          <TableCell className="whitespace-nowrap py-2.5 text-sm tabular-nums text-muted-foreground">
                             {p.createdAt ? formatAppDateTime(p.createdAt as string) : '—'}
                           </TableCell>
-                          <TableCell className="py-2 text-right">
-                            <div className="flex flex-wrap items-center justify-end gap-2">
+                          <TableCell className="py-2.5 pr-4 text-right">
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 rounded-lg border-border/70 transition-all duration-200 ease-out hover:border-primary/40 hover:bg-primary/5 hover:shadow-sm active:scale-[0.97]"
+                                className="h-8 rounded-md border-border/60"
                                 onClick={() => handleEdit(p.id as string)}
                               >
                                 <Pencil className="h-3.5 w-3.5 sm:mr-1.5" />
@@ -327,7 +373,7 @@ const PatientsPage = () => {
                               </Button>
                               <Button
                                 size="sm"
-                                className="h-8 rounded-lg shadow-sm transition-all duration-200 ease-out hover:shadow-md hover:brightness-[1.06] active:scale-[0.97]"
+                                className="h-8 rounded-md"
                                 onClick={() => handleView(p.id as string)}
                               >
                                 <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
@@ -345,7 +391,7 @@ const PatientsPage = () => {
             </div>
           </div>
 
-          {!loading && rawPatients.length > 0 && (
+          {!isLoading && rawPatients.length > 0 && (
             <div className="z-20 shrink-0 border-t border-border/60 bg-muted/20 px-3 py-2 transition-colors duration-200 hover:bg-muted/30 sm:px-4">
               <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

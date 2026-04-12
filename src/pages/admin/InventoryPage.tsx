@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
+import { localDateYmd } from '@/lib/datetime';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { AlertTriangle, Plus, Truck } from 'lucide-react';
 import {
@@ -40,7 +41,7 @@ const InventoryPage = () => {
     quantity: '',
     unitPurchasePrice: '',
     sellingPrice: '',
-    purchaseDate: new Date().toISOString().slice(0, 10),
+    purchaseDate: localDateYmd(),
     expiryDate: '',
     batchNumber: '',
     uomCode: '',
@@ -137,7 +138,7 @@ const InventoryPage = () => {
         quantity: '',
         unitPurchasePrice: '',
         sellingPrice: '',
-        purchaseDate: new Date().toISOString().slice(0, 10),
+        purchaseDate: localDateYmd(),
         expiryDate: '',
         batchNumber: '',
         uomCode: '',

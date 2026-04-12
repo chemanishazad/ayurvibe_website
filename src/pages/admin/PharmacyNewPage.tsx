@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/PageHeader';
@@ -26,13 +26,14 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/lib/api';
-import { formatAppDate, formatBillDisplayDateTime, formatNowAppTime } from '@/lib/datetime';
+import { api, ApiError } from '@/lib/api';
+import { formatWhatsAppBillText, openWhatsAppWithText, type WhatsAppBillLine } from '@/lib/whatsapp-bill-text';
+import { formatAppDate, formatBillDisplayDateTime, formatNowAppTime, localDateYmd } from '@/lib/datetime';
 import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
 import { openPharmacyPrint, savePharmacyPrintPayload } from '@/lib/print-handoff';
 import { COUNTRY_CODES } from '@/lib/country-codes';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus } from 'lucide-react';
+import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus, Package } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -84,6 +85,20 @@ type SaleLine = {
   unitPrice: number;
 };
 
+type ActiveTreatmentPlanRow = {
+  id: string;
+  name: string;
+  totalCost: string | number | null;
+  advancePaid: string | number | null;
+  balanceDue: string | number | null;
+  endDate: string;
+};
+
+function parseMoney(v: unknown): number {
+  const n = parseFloat(String(v ?? 0));
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Hide browser steppers on numeric inputs (consultation fee, treatment price, etc.) */
 const INPUT_NO_SPIN =
   '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
@@ -99,14 +114,17 @@ const PharmacyNewPage = () => {
   const [medicineOpen, setMedicineOpen] = useState<number | null>(null);
   const [discountPopoverOpen, setDiscountPopoverOpen] = useState(false);
   const [discountDraft, setDiscountDraft] = useState<{ type: 'percent' | 'fixed'; value: number }>({ type: 'percent', value: 10 });
+  const [activeTreatmentPlans, setActiveTreatmentPlans] = useState<ActiveTreatmentPlanRow[]>([]);
+  const [activePlansLoading, setActivePlansLoading] = useState(false);
   const PAYMENT_MODES = ['Cash', 'Card', 'UPI', 'Bank Transfer', 'Other'] as const;
   const [form, setForm] = useState({
     /** direct = walk-in; consultation = bill linked to a visit; own = internal / clinic use */
-    saleMode: 'direct' as 'direct' | 'consultation' | 'own',
+    saleMode: 'direct' as 'direct' | 'consultation' | 'own' | 'patient_packages',
     consultationId: null as string | null,
+    patientId: null as string | null,
     consultationLabel: 'Direct sale',
     consultationFee: 0,
-    treatments: [] as { name: string; price: number }[],
+    treatments: [] as { name: string; price: number; treatmentPlanId?: string }[],
     items: [] as SaleLine[],
     medicineDiscount: null as { type: 'percent' | 'fixed'; value: number } | null,
     paymentMode: 'Cash' as (typeof PAYMENT_MODES)[number] | 'Split',
@@ -120,6 +138,16 @@ const PharmacyNewPage = () => {
   const targetClinicId = effectiveClinicId ?? undefined;
   const clinicSelectionRequired = !!(isAdmin && !targetClinicId);
 
+  const refreshInventory = useCallback(() => {
+    if (!targetClinicId) {
+      setInventory([]);
+      setStockBatches([]);
+      return;
+    }
+    api.inventory.list(targetClinicId).then(setInventory).catch(() => setInventory([]));
+    api.inventory.batches(targetClinicId).then(setStockBatches).catch(() => setStockBatches([]));
+  }, [targetClinicId]);
+
   useEffect(() => {
     if (!targetClinicId) {
       setPatientMaster([]);
@@ -132,14 +160,29 @@ const PharmacyNewPage = () => {
   }, [targetClinicId]);
 
   useEffect(() => {
-    if (targetClinicId) {
-      api.inventory.list(targetClinicId).then(setInventory).catch(() => setInventory([]));
-      api.inventory.batches(targetClinicId).then(setStockBatches).catch(() => setStockBatches([]));
-    } else {
-      setInventory([]);
-      setStockBatches([]);
+    if ((form.saleMode !== 'consultation' && form.saleMode !== 'patient_packages') || !form.patientId || !targetClinicId) {
+      setActiveTreatmentPlans([]);
+      return;
     }
-  }, [targetClinicId]);
+    setActivePlansLoading(true);
+    api.treatmentPlans
+      .list({ patientId: form.patientId, clinicId: targetClinicId, activeOnly: true })
+      .then((rows) => setActiveTreatmentPlans((rows as ActiveTreatmentPlanRow[]) || []))
+      .catch(() => setActiveTreatmentPlans([]))
+      .finally(() => setActivePlansLoading(false));
+  }, [form.saleMode, form.patientId, targetClinicId]);
+
+  useEffect(() => {
+    if (form.saleMode !== 'patient_packages' || !form.patientId) return;
+    const p = patientMaster.find((x) => x.id === form.patientId);
+    if (p) {
+      setForm((f) => ({ ...f, customerName: p.name, customerMobile: (p.mobile || '').replace(/\D/g, '').slice(0, 10) }));
+    }
+  }, [form.saleMode, form.patientId, patientMaster]);
+
+  useEffect(() => {
+    refreshInventory();
+  }, [refreshInventory]);
 
   const invList = inventory as { id: string; medicineId: string; medicineName: string; sellingPrice: string; currentStock?: number }[];
 
@@ -253,6 +296,22 @@ const PharmacyNewPage = () => {
     }));
   };
 
+  const appendTreatmentLineFromPlan = (plan: ActiveTreatmentPlanRow) => {
+    const bal = parseMoney(plan.balanceDue);
+    setForm((f) => ({
+      ...f,
+      treatments: [...f.treatments, { name: `${plan.name} (balance)`, price: bal, treatmentPlanId: plan.id }],
+    }));
+  };
+
+  const appendAllPlanBalanceLines = () => {
+    const lines = activeTreatmentPlans
+      .filter((p) => parseMoney(p.balanceDue) > 0)
+      .map((p) => ({ name: `${p.name} (balance)`, price: parseMoney(p.balanceDue), treatmentPlanId: p.id }));
+    if (lines.length === 0) return;
+    setForm((f) => ({ ...f, treatments: [...f.treatments, ...lines] }));
+  };
+
   const updateItem = (idx: number, field: string, value: number | string) => {
     setForm((f) => ({
       ...f,
@@ -279,26 +338,53 @@ const PharmacyNewPage = () => {
   const medicineTotal = Math.max(0, medicineSubtotal - discountAmount);
   const treatmentTotal = form.treatments.reduce((s, t) => s + (Number(t.price) || 0), 0);
   const isConsultationBill = form.saleMode === 'consultation' && !!form.consultationId;
-  const grandTotal = medicineTotal + (isConsultationBill ? form.consultationFee + treatmentTotal : 0);
+  const isPatientPackageBill = form.saleMode === 'patient_packages' && !!form.patientId;
+  const grandTotal =
+    medicineTotal +
+    (isConsultationBill ? form.consultationFee + treatmentTotal : 0) +
+    (isPatientPackageBill ? treatmentTotal : 0);
 
   const handleSubmit = async () => {
-    if (form.items.length === 0 && !isConsultationBill) {
+    if (form.items.length === 0 && !isConsultationBill && !isPatientPackageBill) {
       toast({ title: 'Missing data', description: 'Add at least one medicine for direct sale', variant: 'destructive' });
       return;
     }
-    if (!isConsultationBill && !form.customerName.trim()) {
+    if (!isConsultationBill && !isPatientPackageBill && !form.customerName.trim()) {
       toast({ title: 'Customer name required', description: 'Enter customer name for direct sale', variant: 'destructive' });
       return;
     }
-    if (!isConsultationBill && form.customerMobile.trim()) {
+    if (!isConsultationBill && !isPatientPackageBill && form.customerMobile.trim()) {
       const mobile = form.customerMobile.replace(/\D/g, '');
       if (mobile.length !== 10) {
         toast({ title: 'Invalid mobile', description: 'Mobile must be exactly 10 digits', variant: 'destructive' });
         return;
       }
     }
+    if (isPatientPackageBill && form.customerMobile.trim()) {
+      const mobile = form.customerMobile.replace(/\D/g, '');
+      if (mobile.length !== 10) {
+        toast({ title: 'Invalid mobile', description: 'Mobile must be exactly 10 digits', variant: 'destructive' });
+        return;
+      }
+    }
+    if (isPatientPackageBill && form.items.length === 0 && form.treatments.every((t) => !t.name || !Number(t.price))) {
+      toast({
+        title: 'Missing data',
+        description: 'Add medicines and/or treatment package lines (advance or balance).',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (isConsultationBill && form.items.length === 0 && form.consultationFee === 0 && form.treatments.every((t) => !t.name || t.price === 0)) {
       toast({ title: 'Missing data', description: 'Add consultation fee, treatments, or medicines', variant: 'destructive' });
+      return;
+    }
+    if (isPatientPackageBill && form.paymentMode === 'Split') {
+      toast({
+        title: 'Single payment mode required',
+        description: 'For patient + package billing, choose one mode (or run package payments on a separate receipt).',
+        variant: 'destructive',
+      });
       return;
     }
     if (form.paymentMode === 'Split') {
@@ -327,6 +413,7 @@ const PharmacyNewPage = () => {
           consultationFee: form.consultationFee || undefined,
           treatments: treatmentsWithDiscount.length > 0 ? treatmentsWithDiscount.map((t) => ({ name: t.name, price: Number(t.price) || 0 })) : undefined,
         });
+        refreshInventory();
         toast({ title: 'Invoice saved', description: `Total: ₹${grandTotal}` });
         setForm((f) => ({
           ...f,
@@ -336,13 +423,14 @@ const PharmacyNewPage = () => {
           medicineDiscount: null,
           saleMode: 'direct',
           consultationId: null,
+          patientId: null,
           consultationLabel: 'Direct sale',
         }));
         const consId = form.consultationId!;
         const paymentMode = getPaymentDisplay();
         api.consultations.get(consId).then((data) => {
           const now = new Date();
-          const billDate = now.toISOString().slice(0, 10);
+          const billDate = localDateYmd(now);
           const billTime = formatNowAppTime();
           const billDateLabel = formatBillDisplayDateTime(billDate, billTime);
           try {
@@ -361,40 +449,134 @@ const PharmacyNewPage = () => {
           const rawMobile = (data.patientMobile as string) || '';
           const digits = rawMobile.replace(/\D/g, '');
           if (digits.length >= 10) {
-            const meds = ((data.medicines as Array<{ medicineName: string; quantity: number; unitPrice: string; total?: string }>) || []).map((m) => ({
+            const meds = (
+              (data.medicines as Array<{
+                medicineName: string;
+                quantity: number;
+                unitPrice: string;
+                total?: string;
+                batchNumber?: string | null;
+                expiryDate?: string | null;
+                uom?: string | null;
+              }>) || []
+            ).map((m) => ({
               medicineName: m.medicineName,
               quantity: m.quantity,
               unitPrice: String(m.unitPrice ?? 0),
               total: String(m.total ?? m.quantity * parseFloat(m.unitPrice || '0')),
+              batchNumber: m.batchNumber ?? undefined,
+              expiryDate: m.expiryDate ?? undefined,
+              uom: m.uom ?? undefined,
             }));
             const trts = ((data.treatments as Array<{ name: string; price: string }>) || []).map((t) => ({ name: t.name, price: String(t.price ?? 0) }));
             const medTotal = String(data.medicineTotal ?? meds.reduce((s, m) => s + parseFloat(m.total || '0'), 0));
             const trtTotal = String(data.treatmentTotal ?? trts.reduce((s, t) => s + parseFloat(t.price || '0'), 0));
             const grand = parseFloat(medTotal) + parseFloat(trtTotal);
-            api.whatsapp.sendBill({
-              mobile: digits,
-              countryCode: digits.length === 10 ? '91' : undefined,
-              billData: {
-                customerName: String(data.patientName || ''),
-                medicines: meds,
-                consultationFee: parseFloat(String(data.consultationFee ?? 0)),
-                treatments: trts,
-                medicineTotal: medTotal,
-                treatmentTotal: trtTotal,
-                grandTotal: grand.toFixed(2),
-                paymentMode,
-                date: formatBillDisplayDateTime(billDate, billTime),
-                clinicName: data.clinicName as string,
-              },
-            }).then((r) => {
-              if (r.sent) toast({ title: 'Bill sent via WhatsApp', description: 'Invoice delivered to customer' });
-              else if (r.error) toast({ title: 'WhatsApp not sent', description: r.error, variant: 'destructive' });
-            }).catch(() => {});
+            const rawMob = (data.patientMobile as string) || '';
+            const mobDigits = rawMob.replace(/\D/g, '');
+            const patientMobileDisplay =
+              mobDigits.length === 10 && !rawMob.includes('+') ? `+91 ${mobDigits}` : rawMob;
+            const billPayload: WhatsAppBillLine = {
+              customerName: String(data.patientName || ''),
+              medicines: meds,
+              consultationFee: parseFloat(String(data.consultationFee ?? 0)),
+              treatments: trts,
+              medicineTotal: medTotal,
+              treatmentTotal: trtTotal,
+              grandTotal: grand.toFixed(2),
+              paymentMode,
+              date: formatBillDisplayDateTime(billDate, billTime),
+              clinicName: data.clinicName as string,
+              patientMobile: patientMobileDisplay || undefined,
+              billTitle: 'Pharmacy sale',
+              saleType: 'Consultation pharmacy',
+            };
+            const cc = digits.length === 10 ? '91' : undefined;
+            api.whatsapp
+              .sendBill({ mobile: digits, countryCode: cc, billData: billPayload })
+              .then((r) => {
+                toast({
+                  title: 'WhatsApp: invoice sent',
+                  description:
+                    r.note ??
+                    'Meta accepted the message. If the phone shows nothing within a minute, check Meta Business Suite → WhatsApp → Message history.',
+                });
+              })
+              .catch((e) => {
+                openWhatsAppWithText(digits, formatWhatsAppBillText(billPayload), cc);
+                toast({
+                  title: 'WhatsApp API error',
+                  description:
+                    e instanceof ApiError
+                      ? e.message
+                      : 'Could not send via Cloud API. WhatsApp Web opened with the bill text as fallback.',
+                  variant: 'destructive',
+                });
+              });
           }
         }).catch(() => {
           openPharmacyPrint(consId);
           navigate('/admin/pharmacy');
         });
+      } else if (isPatientPackageBill) {
+        if (!targetClinicId) {
+          toast({ title: 'Missing clinic', variant: 'destructive' });
+          return;
+        }
+        const modeMap: Record<string, 'CASH' | 'UPI' | 'CARD' | 'BANK'> = {
+          Cash: 'CASH',
+          Card: 'CARD',
+          UPI: 'UPI',
+          'Bank Transfer': 'BANK',
+          Other: 'CASH',
+        };
+        const pm = modeMap[form.paymentMode] ?? 'CASH';
+        const pd = localDateYmd();
+        if (form.items.length > 0) {
+          await api.directSales.create({
+            clinicId: targetClinicId,
+            saleDate: pd,
+            salePurpose: 'direct',
+            customerName: form.customerName.trim(),
+            customerMobile: form.customerMobile.trim() || undefined,
+            items: form.items.map((m) => ({
+              inventoryId: m.inventoryId,
+              medicineId: m.medicineId,
+              quantity: m.quantity,
+              unitPrice: m.unitPrice,
+              inventoryBatchId: m.inventoryBatchId,
+            })),
+            ...(discountAmount > 0 && { discount: discountAmount }),
+          });
+        }
+        for (const t of form.treatments) {
+          if (!t.treatmentPlanId || !Number(t.price)) continue;
+          await api.clinicManagement.recordPayment({
+            treatmentPlanId: t.treatmentPlanId,
+            patientId: form.patientId!,
+            amount: Number(t.price),
+            paymentType: 'PARTIAL',
+            paymentMode: pm,
+            paymentDate: pd,
+            notes: t.name,
+          });
+        }
+        toast({
+          title: 'Invoice saved',
+          description: `Medicines and package payment recorded. Total ₹${grandTotal.toFixed(2)}`,
+        });
+        refreshInventory();
+        setForm((f) => ({
+          ...f,
+          items: [],
+          treatments: [],
+          medicineDiscount: null,
+          saleMode: 'direct',
+          patientId: null,
+          consultationLabel: 'Direct sale',
+          consultationFee: 0,
+        }));
+        navigate('/admin/pharmacy');
       } else {
         if (!targetClinicId) {
           toast({ title: 'Missing clinic', variant: 'destructive' });
@@ -402,7 +584,7 @@ const PharmacyNewPage = () => {
         }
         await api.directSales.create({
           clinicId: targetClinicId,
-          saleDate: new Date().toISOString().slice(0, 10),
+          saleDate: localDateYmd(),
           salePurpose: form.saleMode === 'own' ? 'own' : 'direct',
           customerName: form.saleMode === 'own' ? (form.customerName.trim() || 'Internal use') : form.customerName.trim(),
           customerMobile: form.customerMobile.trim() || undefined,
@@ -415,6 +597,7 @@ const PharmacyNewPage = () => {
           })),
           ...(discountAmount > 0 && { discount: discountAmount }),
         });
+        refreshInventory();
         toast({ title: 'Direct sale recorded', description: `Total: ₹${medicineTotal}` });
         const customerMobile = form.customerMobile.trim();
         const customerCountryCode = form.customerCountryCode;
@@ -423,7 +606,7 @@ const PharmacyNewPage = () => {
             ? form.customerName.trim() || 'Internal use'
             : form.customerName.trim() || 'Direct Sale';
         const skipWhatsApp = form.saleMode === 'own';
-        const saleDate = new Date().toISOString().slice(0, 10);
+        const saleDate = localDateYmd();
         const clinicName = clinics.find((c) => c.id === targetClinicId)?.name || 'Clinic';
         const billMedicines = form.items.map((m) => ({
           medicineName: m.medicineName,
@@ -461,24 +644,44 @@ const PharmacyNewPage = () => {
         savePharmacyPrintPayload(printId, printData);
         openPharmacyPrint(printId);
         if (customerMobile && !skipWhatsApp) {
-          api.whatsapp.sendBill({
-            mobile: customerMobile,
-            countryCode: customerCountryCode || '91',
-            billData: {
-              customerName,
-              medicines: billMedicines,
-              treatments: billTreatments,
-              medicineTotal: billMedicineTotal,
-              treatmentTotal: billTreatmentTotal,
-              grandTotal: billGrandTotal,
-              paymentMode: getPaymentDisplay(),
-              date: formatBillDisplayDateTime(saleDate, formatNowAppTime()),
-              clinicName,
-            },
-          }).then((r) => {
-            if (r.sent) toast({ title: 'Bill sent via WhatsApp', description: 'Invoice delivered to customer' });
-            else if (r.error) toast({ title: 'WhatsApp not sent', description: r.error, variant: 'destructive' });
-          }).catch(() => {});
+          const dial = COUNTRY_CODES.find((c) => c.code === customerCountryCode)?.dial || '+91';
+          const mobDigits = customerMobile.replace(/\D/g, '').slice(-10);
+          const billPayload: WhatsAppBillLine = {
+            customerName,
+            medicines: billMedicines,
+            treatments: billTreatments,
+            medicineTotal: billMedicineTotal,
+            treatmentTotal: billTreatmentTotal,
+            grandTotal: billGrandTotal,
+            paymentMode: getPaymentDisplay(),
+            date: formatBillDisplayDateTime(saleDate, formatNowAppTime()),
+            clinicName,
+            patientMobile: mobDigits.length === 10 ? `${dial} ${mobDigits}` : undefined,
+            billTitle: 'Pharmacy sale',
+            saleType: 'Direct sale',
+          };
+          const cc = customerCountryCode || '91';
+          api.whatsapp
+            .sendBill({ mobile: customerMobile, countryCode: cc, billData: billPayload })
+            .then((r) => {
+              toast({
+                title: 'WhatsApp: invoice sent',
+                description:
+                  r.note ??
+                  'Meta accepted the message. If the phone shows nothing within a minute, check Meta Business Suite → WhatsApp → Message history.',
+              });
+            })
+            .catch((e) => {
+              openWhatsAppWithText(customerMobile, formatWhatsAppBillText(billPayload), cc);
+              toast({
+                title: 'WhatsApp API error',
+                description:
+                  e instanceof ApiError
+                    ? e.message
+                    : 'Could not send via Cloud API. WhatsApp Web opened with the bill text as fallback.',
+                variant: 'destructive',
+              });
+            });
         }
         navigate('/admin/pharmacy');
       }
@@ -513,7 +716,7 @@ const PharmacyNewPage = () => {
   const handlePrint = (id: string, options?: { paymentMode?: string }) => {
     api.consultations.get(id).then((data) => {
       const now = new Date();
-      const billDate = now.toISOString().slice(0, 10);
+      const billDate = localDateYmd(now);
       const billTime = formatNowAppTime();
       try {
         const paymentMode = options?.paymentMode ?? '—';
@@ -572,7 +775,7 @@ const PharmacyNewPage = () => {
           <CardContent className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 pt-0 space-y-5">
             <div
               className={
-                !isConsultationBill
+                !isConsultationBill && !isPatientPackageBill
                   ? 'grid gap-6 xl:grid-cols-2 xl:items-start'
                   : 'space-y-0'
               }
@@ -599,6 +802,7 @@ const PharmacyNewPage = () => {
                               ...f,
                               saleMode: 'direct' as const,
                               consultationId: null,
+                              patientId: null,
                               consultationLabel: 'Direct sale',
                               consultationFee: 0,
                               treatments: [],
@@ -616,6 +820,7 @@ const PharmacyNewPage = () => {
                               ...f,
                               saleMode: 'own' as const,
                               consultationId: null,
+                              patientId: null,
                               consultationLabel: 'Own use (internal)',
                               consultationFee: 0,
                               treatments: [],
@@ -651,6 +856,7 @@ const PharmacyNewPage = () => {
                                   ...f,
                                   saleMode: 'consultation' as const,
                                   consultationId: p.lastConsultationId,
+                                  patientId: p.id,
                                   consultationLabel: `${p.name}${datePart} (latest visit)`,
                                   consultationFee: 0,
                                 }));
@@ -672,13 +878,40 @@ const PharmacyNewPage = () => {
                           );
                         })}
                       </CommandGroup>
+                      <CommandGroup heading="Patient — medicines &amp; packages (no OP visit)">
+                        {patientMaster.map((p) => (
+                          <CommandItem
+                            key={`pkg-${p.id}`}
+                            value={`package ${p.name} ${p.mobile}`}
+                            onSelect={() => {
+                              setForm((f) => ({
+                                ...f,
+                                saleMode: 'patient_packages' as const,
+                                consultationId: null,
+                                patientId: p.id,
+                                consultationLabel: `${p.name} · medicines + packages`,
+                                consultationFee: 0,
+                                treatments: [],
+                              }));
+                              setConsultationOpen(false);
+                            }}
+                          >
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">{p.name}</span>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {p.mobile} · Bill stock + treatment package payments without a consultation visit
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
                     </CommandList>
                   </Command>
                 </PopoverContent>
               </Popover>
               </div>
 
-            {!isConsultationBill && (
+            {!isConsultationBill && !isPatientPackageBill && (
               <div className="space-y-4 pt-4 border-t xl:pt-0 xl:border-t-0 xl:border-l xl:border-border/80 xl:pl-6 min-w-0">
                 <p className="text-sm font-medium text-muted-foreground">
                   {form.saleMode === 'own' ? 'Internal (optional label)' : 'Customer details'}
@@ -729,9 +962,12 @@ const PharmacyNewPage = () => {
             </div>
 
             <div className="pt-4 border-t min-w-0 space-y-5">
-              {isConsultationBill && (
+              {(isConsultationBill || isPatientPackageBill) && (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium text-muted-foreground">Consultation billing</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {isPatientPackageBill ? 'Patient billing (no OP visit)' : 'Consultation billing'}
+                  </p>
+                  {isConsultationBill && (
                   <div>
                     <Label className="text-sm">Consultation fee (₹)</Label>
                     <p className="text-xs text-muted-foreground mt-1">Enter amount manually (first visit / follow-up may differ)</p>
@@ -744,6 +980,80 @@ const PharmacyNewPage = () => {
                       placeholder="0"
                     />
                   </div>
+                  )}
+                  {isPatientPackageBill && (
+                    <p className="text-xs text-muted-foreground rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                      Record stock medicines below and package advance/balance here. Payments update the treatment plan;
+                      use the same payment mode for package lines in this receipt (split is not combined with package
+                      lines).
+                    </p>
+                  )}
+
+                  {form.patientId && (
+                    <div className="rounded-lg border border-border/80 bg-muted/25 p-3 space-y-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Package className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">Active treatment packages</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Package total, advance paid, and balance. Add a line to bill advance or balance on this invoice; adjust the amount if partial.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="shrink-0"
+                          disabled={activePlansLoading || activeTreatmentPlans.every((p) => parseMoney(p.balanceDue) <= 0)}
+                          onClick={appendAllPlanBalanceLines}
+                        >
+                          Add all balances
+                        </Button>
+                      </div>
+                      {activePlansLoading ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading plans…
+                        </p>
+                      ) : activeTreatmentPlans.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No active treatment plan for this patient at this clinic.</p>
+                      ) : (
+                        <ul className="space-y-2 text-sm">
+                          {activeTreatmentPlans.map((plan) => {
+                            const total = parseMoney(plan.totalCost);
+                            const adv = parseMoney(plan.advancePaid);
+                            const bal = parseMoney(plan.balanceDue);
+                            return (
+                              <li
+                                key={plan.id}
+                                className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-background/80 p-2 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-medium">{plan.name}</span>
+                                  <span className="text-xs text-muted-foreground block mt-0.5">
+                                    Total ₹{total.toLocaleString()} · Advance ₹{adv.toLocaleString()} · Balance ₹{bal.toLocaleString()}
+                                    {plan.endDate ? ` · ends ${formatAppDate(String(plan.endDate).slice(0, 10) + 'T12:00:00')}` : ''}
+                                  </span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="shrink-0 w-full sm:w-auto"
+                                  disabled={bal <= 0}
+                                  onClick={() => appendTreatmentLineFromPlan(plan)}
+                                >
+                                  Add balance line
+                                </Button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <div>
@@ -788,7 +1098,7 @@ const PharmacyNewPage = () => {
                 <div>
                   <p className="text-sm font-semibold text-foreground">Medicines</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {isConsultationBill
+                    {isConsultationBill || isPatientPackageBill
                       ? 'Stock from inventory — batch, expiry, qty and price. Use + on a row to add another line below.'
                       : 'Choose batch, qty and price. Use + on a row to add another line below it.'}
                   </p>
@@ -1131,7 +1441,9 @@ const PharmacyNewPage = () => {
               )}
               <div className="text-sm text-muted-foreground mt-2 space-y-0.5">
                 {isConsultationBill && form.consultationFee > 0 && <p>Consultation: ₹{form.consultationFee}</p>}
-                {isConsultationBill && treatmentTotal > 0 && <p>Treatments: ₹{treatmentTotal}</p>}
+                {(isConsultationBill || isPatientPackageBill) && treatmentTotal > 0 && (
+                  <p>{isPatientPackageBill ? 'Treatment packages' : 'Treatments'}: ₹{treatmentTotal}</p>
+                )}
                 {form.items.length > 0 && (
                   <p>
                     Medicines: ₹{medicineSubtotal}
@@ -1153,6 +1465,10 @@ const PharmacyNewPage = () => {
                     loading ||
                     (form.saleMode === 'direct' && (form.items.length === 0 || !form.customerName.trim())) ||
                     (form.saleMode === 'own' && form.items.length === 0) ||
+                    (isPatientPackageBill &&
+                      (!form.customerName.trim() ||
+                        (form.items.length === 0 &&
+                          !form.treatments.some((t) => t.name.trim() && (Number(t.price) || 0) > 0)))) ||
                     (isConsultationBill &&
                       form.items.length === 0 &&
                       !form.consultationFee &&

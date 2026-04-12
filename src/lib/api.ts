@@ -1,4 +1,13 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+const GET_REQUEST_TTL_MS = 4000;
+
+type RequestCacheEntry = {
+  expiresAt: number;
+  data: unknown;
+};
+
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+const recentGetResponses = new Map<string, RequestCacheEntry>();
 
 function getToken(): string | null {
   return sessionStorage.getItem('auth_token');
@@ -28,7 +37,30 @@ export class ApiError extends Error {
   }
 }
 
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+function cloneResponseData<T>(data: T): T {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(data);
+  }
+  return JSON.parse(JSON.stringify(data)) as T;
+}
+
+function makeRequestKey(path: string, method: string, token: string | null, body?: BodyInit | null): string {
+  let bodyKey = '';
+  if (typeof body === 'string') bodyKey = body;
+  return `${method}|${path}|${token ?? ''}|${bodyKey}`;
+}
+
+function clearStaleGetCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of recentGetResponses.entries()) {
+    if (entry.expiresAt <= now) {
+      recentGetResponses.delete(key);
+    }
+  }
+}
+
+async function runRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method || 'GET').toUpperCase();
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -41,7 +73,12 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = (data?.error as string | undefined) || res.statusText || 'Request failed';
+    const d = data as Record<string, unknown> | null | undefined;
+    const message =
+      (typeof d?.error === 'string' ? d.error : undefined) ||
+      (typeof d?.message === 'string' ? d.message : undefined) ||
+      res.statusText ||
+      'Request failed';
     const code = (data?.code as string | undefined) || undefined;
 
     // Only 401 means the session token is invalid. Do not logout on generic 403
@@ -52,7 +89,50 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 
     throw new ApiError(message, res.status, code);
   }
+  // Any successful mutation should invalidate recent GET snapshots.
+  if (method !== 'GET') {
+    recentGetResponses.clear();
+  }
   return data as T;
+}
+
+async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method || 'GET').toUpperCase();
+  const token = getToken();
+  const requestKey = makeRequestKey(path, method, token, options?.body ?? null);
+
+  if (method !== 'GET') {
+    return runRequest<T>(path, options);
+  }
+
+  clearStaleGetCache();
+
+  const cached = recentGetResponses.get(requestKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneResponseData(cached.data as T);
+  }
+
+  const pending = inFlightGetRequests.get(requestKey);
+  if (pending) {
+    const shared = await pending;
+    return cloneResponseData(shared as T);
+  }
+
+  const requestPromise = runRequest<T>(path, options)
+    .then((data) => {
+      recentGetResponses.set(requestKey, {
+        expiresAt: Date.now() + GET_REQUEST_TTL_MS,
+        data,
+      });
+      return data;
+    })
+    .finally(() => {
+      inFlightGetRequests.delete(requestKey);
+    });
+
+  inFlightGetRequests.set(requestKey, requestPromise as Promise<unknown>);
+  const result = await requestPromise;
+  return cloneResponseData(result);
 }
 
 export const api = {
@@ -66,7 +146,6 @@ export const api = {
           role: string;
           clinicId: string;
           allowedNavPaths?: string[] | null;
-          staffRole?: string | null;
           linkedDoctorId?: string | null;
         };
       }>('/api/auth/switch-clinic', {
@@ -93,16 +172,18 @@ export const api = {
           role: string;
           createdAt: string;
           allowedNavPaths?: string[] | null;
-          staffRole?: string | null;
           linkedDoctorId?: string | null;
+          linkedDoctorName?: string | null;
+          clinicAccessNames?: string[];
         }[]
       >('/api/users'),
     create: (data: {
       username: string;
       password: string;
-      role: 'admin' | 'user';
+      role: 'admin' | 'doctor' | 'nurse';
       clinicIds?: string[];
       allowedNavPaths?: string[] | null;
+      linkedDoctorId?: string | null;
     }) => fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>('/api/users', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -111,13 +192,12 @@ export const api = {
       id: string,
       data: Partial<{
         username: string;
-        role: 'admin' | 'user';
+        role: 'admin' | 'doctor' | 'nurse';
         allowedNavPaths: string[] | null;
-        staffRole: 'nurse' | null;
         linkedDoctorId: string | null;
       }>,
     ) =>
-      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null; staffRole?: string | null }>(
+      fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>(
         `/api/users/${id}`,
         {
           method: 'PATCH',
@@ -192,6 +272,12 @@ export const api = {
   },
   medicines: {
     list: () => fetchApi<{ id: string; name: string; uom: string; purchasePrice: string; sellingPrice: string; minStockLevel: number }[]>('/api/medicines'),
+    /** Case-insensitive match on trimmed name, or create master row (same rules as consultation save). */
+    findOrCreateByName: (name: string) =>
+      fetchApi<{ id: string; name: string }>('/api/medicines/find-or-create', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/medicines', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/medicines/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id: string) => fetchApi<{ success: boolean }>(`/api/medicines/${id}`, { method: 'DELETE' }),
@@ -237,7 +323,7 @@ export const api = {
   },
   /** Nurse OP vitals (patient master); doctors complete via `complete`. */
   opVisits: {
-    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
+    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string; search?: string }) => {
       const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/op-visits${q ? `?${q}` : ''}`);
@@ -249,7 +335,7 @@ export const api = {
       fetchApi<Record<string, unknown>>(`/api/op-visits/${id}/complete`, { method: 'POST', body: JSON.stringify(data) }),
   },
   consultations: {
-    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string }) => {
+    list: (params?: { clinicId?: string; patientId?: string; from?: string; to?: string; search?: string }) => {
       const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
       const q = new URLSearchParams(p as Record<string, string>).toString();
       return fetchApi<Record<string, unknown>[]>(`/api/consultations${q ? `?${q}` : ''}`);
@@ -310,7 +396,15 @@ export const api = {
       countryCode?: string;
       billData: {
         customerName: string;
-        medicines: Array<{ medicineName: string; quantity: number; unitPrice: string; total: string }>;
+        medicines: Array<{
+          medicineName: string;
+          quantity: number;
+          unitPrice: string;
+          total: string;
+          batchNumber?: string;
+          expiryDate?: string;
+          uom?: string;
+        }>;
         consultationFee?: number;
         treatments?: Array<{ name: string; price: string }>;
         medicineTotal: string;
@@ -319,17 +413,249 @@ export const api = {
         paymentMode?: string;
         date?: string;
         clinicName?: string;
+        patientMobile?: string;
+        billTitle?: string;
+        saleType?: string;
       };
     }) =>
-      fetchApi<{ success: boolean; sent?: boolean; error?: string }>('/api/whatsapp/send-bill', {
+      fetchApi<{
+        success: boolean;
+        sent?: boolean;
+        error?: string;
+        /** Meta wamid — use in WhatsApp Manager / support if delivery fails */
+        messageId?: string;
+        /** Recipient WhatsApp ID when Meta returns it */
+        waId?: string;
+        /** Hint when Meta accepted but delivery is not guaranteed */
+        note?: string;
+      }>('/api/whatsapp/send-bill', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
   },
   treatmentPlans: {
-    list: (consultationId?: string) => fetchApi<Record<string, unknown>[]>(`/api/treatment-plans${consultationId ? `?consultationId=${consultationId}` : ''}`),
-    get: (id: string) => fetchApi<Record<string, unknown>>(`/api/treatment-plans/${id}`),
+    list: (params?: { consultationId?: string; patientId?: string; clinicId?: string; activeOnly?: boolean }) => {
+      const p: Record<string, string> = {};
+      if (params?.consultationId) p.consultationId = params.consultationId;
+      if (params?.patientId) p.patientId = params.patientId;
+      if (params?.clinicId) p.clinicId = params.clinicId;
+      if (params?.activeOnly) p.activeOnly = '1';
+      const q = new URLSearchParams(p).toString();
+      return fetchApi<Record<string, unknown>[]>(`/api/treatment-plans${q ? `?${q}` : ''}`);
+    },
+    schedule: (params: { clinicId: string; date?: string }) => {
+      const p: Record<string, string> = { clinicId: params.clinicId };
+      if (params.date) p.date = params.date;
+      const q = new URLSearchParams(p).toString();
+      return fetchApi<{
+        date: string;
+        rows: Array<{
+          planDayId: string;
+          dayNumber: number;
+          planDate: string;
+          dayStatus: string;
+          dayNotes: string | null;
+          clinicId: string;
+          treatmentPlanId: string;
+          planName: string;
+          preferredSessionStart: string | null;
+          preferredSessionEnd: string | null;
+          patientId: string;
+          patientName: string;
+          patientMobile: string;
+          appointmentId: string | null;
+          therapistId: string | null;
+          roomId: string | null;
+          startTime: string | null;
+          endTime: string | null;
+          actualStartTime: string | null;
+          actualEndTime: string | null;
+          therapistName: string | null;
+          roomNumber: string | null;
+        }>;
+      }>(`/api/treatment-plans/schedule?${q}`);
+    },
+    get: (id: string) =>
+      fetchApi<
+        Record<string, unknown> & {
+          sessionMedicineSummary?: {
+            oralLineCount: number;
+            consumableLineCount: number;
+            estimatedRetailTotal: number;
+          };
+          medicineDataNote?: string;
+        }
+      >(`/api/treatment-plans/${id}`),
+    patientHistory: (patientId: string, clinicId: string) =>
+      fetchApi<{
+        patientName: string | null;
+        plans: Array<Record<string, unknown>>;
+      }>(
+        `/api/treatment-plans/patient/${encodeURIComponent(patientId)}/history?${new URLSearchParams({ clinicId }).toString()}`,
+      ),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/treatment-plans', { method: 'POST', body: JSON.stringify(data) }),
+    patchPlanDay: (planDayId: string, data: { planDate: string }) =>
+      fetchApi<{ planDate: string; shiftedAppointment: boolean }>(`/api/treatment-plans/plan-days/${planDayId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    planDaySessionLines: (planDayId: string) =>
+      fetchApi<{
+        oral: Array<{
+          id: string;
+          medicineId: string;
+          medicineName: string;
+          quantityUsed: string | null;
+          dosage: string | null;
+          frequency: string | null;
+          specialInstructions: string | null;
+          stockUnitsDeducted: number;
+        }>;
+        consumables: Array<{
+          id: string;
+          medicineId: string;
+          medicineName: string;
+          quantityUsed: string | null;
+          notes: string | null;
+          stockUnitsDeducted: number;
+        }>;
+      }>(`/api/treatment-plans/plan-days/${planDayId}/session-lines`),
+    addPlanDayOralMedicine: (planDayId: string, data: Record<string, unknown>) =>
+      fetchApi<{ id: string }>(`/api/treatment-plans/plan-days/${planDayId}/oral-medicines`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deletePlanDayOralMedicine: (planDayId: string, lineId: string) =>
+      fetchApi<{ success: boolean; id: string }>(
+        `/api/treatment-plans/plan-days/${planDayId}/oral-medicines/${lineId}`,
+        { method: 'DELETE' },
+      ),
+    addPlanDayConsumable: (planDayId: string, data: Record<string, unknown>) =>
+      fetchApi<{ id: string }>(`/api/treatment-plans/plan-days/${planDayId}/consumables`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deletePlanDayConsumable: (planDayId: string, lineId: string) =>
+      fetchApi<{ success: boolean; id: string }>(
+        `/api/treatment-plans/plan-days/${planDayId}/consumables/${lineId}`,
+        { method: 'DELETE' },
+      ),
+  },
+  treatmentMasters: {
+    list: (params?: { clinicId?: string }) => {
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
+      return fetchApi<Record<string, unknown>[]>(`/api/treatment-masters${q ? `?${q}` : ''}`);
+    },
+    create: (data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>('/api/treatment-masters', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  clinicManagement: {
+    listTherapists: (params?: { clinicId?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.clinicId) q.set('clinicId', params.clinicId);
+      const qs = q.toString();
+      return fetchApi<
+        Array<{
+          id: string;
+          name: string;
+          gender?: string | null;
+          phone?: string | null;
+          shiftStart?: string | null;
+          shiftEnd?: string | null;
+        }>
+      >(`/api/clinic-management/therapists${qs ? `?${qs}` : ''}`);
+    },
+    getTherapist: (id: string) =>
+      fetchApi<{
+        id: string;
+        name: string;
+        gender?: string | null;
+        phone?: string | null;
+        clinicIds: string[];
+      }>(`/api/clinic-management/therapists/${id}`),
+    createTherapist: (data: { name: string; gender?: string | null; phone?: string | null; clinicIds: string[] }) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/therapists', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateTherapist: (
+      id: string,
+      data: { name?: string; gender?: string | null; phone?: string | null; clinicIds?: string[] },
+    ) =>
+      fetchApi<Record<string, unknown>>(`/api/clinic-management/therapists/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    listRooms: (params?: { clinicId?: string; includeInactive?: boolean }) => {
+      const q = new URLSearchParams();
+      if (params?.clinicId) q.set('clinicId', params.clinicId);
+      if (params?.includeInactive) q.set('includeInactive', '1');
+      const qs = q.toString();
+      return fetchApi<
+        Array<{
+          id: string;
+          clinicId?: string;
+          roomNumber: string;
+          name?: string | null;
+          isActive: boolean;
+        }>
+      >(`/api/clinic-management/rooms${qs ? `?${qs}` : ''}`);
+    },
+    createRoom: (data: { clinicId: string; roomNumber: string; name?: string | null; isActive?: boolean }) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/rooms', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateRoom: (
+      id: string,
+      data: { roomNumber?: string; name?: string | null; isActive?: boolean },
+    ) =>
+      fetchApi<Record<string, unknown>>(`/api/clinic-management/rooms/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    createPlan: (data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/plans', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    listActivePlans: () => fetchApi<Record<string, unknown>[]>('/api/clinic-management/plans/active'),
+    updateDayStatus: (id: string, data: { status: 'PENDING' | 'COMPLETED' | 'NO_SHOW'; notes?: string }) =>
+      fetchApi<Record<string, unknown>>(`/api/clinic-management/plan-days/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    createAppointment: (data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/appointments', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateAppointment: (id: string, data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>(`/api/clinic-management/appointments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    therapistAvailability: (params: { from: string; to: string; clinicId?: string }) => {
+      const q = new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) as Record<string, string>,
+      ).toString();
+      return fetchApi<Record<string, unknown>[]>(`/api/clinic-management/therapist-availability?${q}`);
+    },
+    recordPayment: (data: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>('/api/clinic-management/payments', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getDueAmount: (planId: string) =>
+      fetchApi<{
+        treatmentPlanId: string;
+        patientId: string;
+        totalCost: number;
+        paidAmount: number;
+        balanceDue: number;
+        isFinalPaymentPending: boolean;
+      }>(`/api/clinic-management/plans/${planId}/due`),
   },
   dashboard: {
     admin: (params?: { from?: string; to?: string }) => {
@@ -351,6 +677,26 @@ export const api = {
       dailyPrescriptionMedicine: number;
       dailyDirectMedicine: number;
       clinicWiseRevenue: { clinicId: string; clinicName: string; revenue: number }[];
+      activeTreatmentPlans?: number;
+      treatmentPlanDayCount?: number;
+      treatmentPlanWeekCount?: number;
+      treatmentPlanMonthCount?: number;
+      treatmentPlanLongCount?: number;
+      treatmentPlanMedicineCount?: number;
+      treatmentPlanMedicineEstimatedAmount?: number;
+      treatmentPlanSessionOralLineCount?: number;
+      treatmentPlanSessionConsumableLineCount?: number;
+      treatmentPlanSessionLinesEstimatedAmount?: number;
+      legacyPlanMedicineLineCount?: number;
+      legacyPlanMedicineEstimatedAmount?: number;
+      treatmentPlanOutstandingCount?: number;
+      treatmentPlanOutstandingBalanceDue?: number;
+      clinicWisePackageBalance?: Array<{
+        clinicId: string;
+        clinicName: string;
+        outstandingCount: number;
+        balanceDue: number;
+      }>;
     }>(`/api/dashboard/admin${q ? `?${q}` : ''}`);
     },
     analytics: (params?: { clinicId?: string; period?: string; from?: string; to?: string }) => {
@@ -366,10 +712,30 @@ export const api = {
       const q = new URLSearchParams(p).toString();
       return fetchApi<{
       todayPatients: number;
+      patientCount?: number;
       consultationsCount: number;
       medicineSales: number;
+      medicineSalesAmount?: number;
       dailyRevenue: number;
+      totalProfit: number;
       consultationAmount: number;
+      treatmentCount?: number;
+      treatmentAmount?: number;
+      treatmentMedicineSalesAmount?: number;
+      activeTreatmentPlans?: number;
+      treatmentPlanDayCount?: number;
+      treatmentPlanWeekCount?: number;
+      treatmentPlanMonthCount?: number;
+      treatmentPlanLongCount?: number;
+      treatmentPlanMedicineCount?: number;
+      treatmentPlanMedicineEstimatedAmount?: number;
+      treatmentPlanSessionOralLineCount?: number;
+      treatmentPlanSessionConsumableLineCount?: number;
+      treatmentPlanSessionLinesEstimatedAmount?: number;
+      legacyPlanMedicineLineCount?: number;
+      legacyPlanMedicineEstimatedAmount?: number;
+      treatmentPlanOutstandingCount?: number;
+      treatmentPlanOutstandingBalanceDue?: number;
       prescriptionMedicineSales: number;
       directMedicineSales: number;
       lowStockAlerts: { medicineName: string; currentStock: number; minStockLevel: number; message: string }[];

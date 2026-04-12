@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
+import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
   Users,
@@ -15,6 +17,7 @@ import {
   Wallet,
   RefreshCw,
   CalendarRange,
+  Package,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { formatChartDateLabel, formatIsoDateToApp } from '@/lib/datetime';
@@ -80,6 +83,18 @@ const StatCard = ({
 
 const dateInputClass =
   'h-9 rounded-md border border-input bg-background px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
+
+function DashboardSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="scroll-mt-4 space-y-3">
+      <div className="border-b border-border/60 pb-2">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {hint ? <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 const FilterBar = ({
   chartPeriod,
@@ -179,74 +194,47 @@ const DashboardPage = () => {
   const isAdmin = user?.role === 'admin';
   const { effectiveClinicId, clinics } = useAdminClinic();
   const adminFilterClinicName = effectiveClinicId ? clinics.find((c) => c.id === effectiveClinicId)?.name : null;
-  const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const initialRange = getDateRangeForPeriod('daily');
+  const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const initialRange = getDateRangeForPeriod('weekly');
   const [dateFrom, setDateFrom] = useState(initialRange.from);
   const [dateTo, setDateTo] = useState(initialRange.to);
   const [appliedFrom, setAppliedFrom] = useState(initialRange.from);
   const [appliedTo, setAppliedTo] = useState(initialRange.to);
-  const [adminData, setAdminData] = useState<Awaited<ReturnType<typeof api.dashboard.admin>> | null>(null);
-  const [clinicData, setClinicData] = useState<Awaited<ReturnType<typeof api.dashboard.clinic>> | null>(null);
-  const [analyticsData, setAnalyticsData] = useState<Awaited<ReturnType<typeof api.dashboard.analytics>> | null>(null);
-  const [medicineSalesData, setMedicineSalesData] = useState<{ medicineName: string; quantity: number; total: number }[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  // Determine clinic scope for the current user / admin filter
+  const clinicScope = isAdmin ? (effectiveClinicId || undefined) : (user?.clinicId ?? undefined);
+  const showClinicView = isAdmin ? !!effectiveClinicId : true;
+
+  const { data: dashData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['dashboard', isAdmin, clinicScope, showClinicView, chartPeriod, appliedFrom, appliedTo],
+    queryFn: async () => {
       const dateParams = { from: appliedFrom, to: appliedTo };
-      if (isAdmin) {
-        const clinicOpt = effectiveClinicId || undefined;
-        if (effectiveClinicId) {
-          const [clinic, analytics, medicineSales] = await Promise.all([
-            api.dashboard.clinic(effectiveClinicId, dateParams),
-            api.dashboard.analytics({
-              clinicId: clinicOpt,
-              period: chartPeriod,
-              from: appliedFrom,
-              to: appliedTo,
-            }),
-            api.reports.medicineSales({ clinicId: clinicOpt, from: appliedFrom, to: appliedTo }),
-          ]);
-          setAdminData(null);
-          setClinicData(clinic);
-          setAnalyticsData(analytics);
-          setMedicineSalesData(medicineSales);
-        } else {
-          const [admin, analytics, medicineSales] = await Promise.all([
-            api.dashboard.admin(dateParams),
-            api.dashboard.analytics({
-              clinicId: undefined,
-              period: chartPeriod,
-              from: appliedFrom,
-              to: appliedTo,
-            }),
-            api.reports.medicineSales({ clinicId: undefined, from: appliedFrom, to: appliedTo }),
-          ]);
-          setAdminData(admin);
-          setClinicData(null);
-          setAnalyticsData(analytics);
-          setMedicineSalesData(medicineSales);
-        }
-      } else {
-        const clinicId = user?.clinicId;
+      const analyticsParams = { clinicId: clinicScope, period: chartPeriod, from: appliedFrom, to: appliedTo };
+      if (showClinicView) {
         const [clinic, analytics, medicineSales] = await Promise.all([
-          api.dashboard.clinic(clinicId, dateParams),
-          api.dashboard.analytics({ clinicId, period: chartPeriod, from: appliedFrom, to: appliedTo }),
-          api.reports.medicineSales({ clinicId, from: appliedFrom, to: appliedTo }),
+          api.dashboard.clinic(clinicScope, dateParams),
+          api.dashboard.analytics(analyticsParams),
+          api.reports.medicineSales({ clinicId: clinicScope, from: appliedFrom, to: appliedTo }),
         ]);
-        setClinicData(clinic);
-        setAnalyticsData(analytics);
-        setMedicineSalesData(medicineSales);
+        return { kind: 'clinic' as const, clinic, analytics, medicineSales };
+      } else {
+        const [admin, analytics, medicineSales] = await Promise.all([
+          api.dashboard.admin(dateParams),
+          api.dashboard.analytics(analyticsParams),
+          api.reports.medicineSales({ clinicId: undefined, from: appliedFrom, to: appliedTo }),
+        ]);
+        return { kind: 'admin' as const, admin, analytics, medicineSales };
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, user?.clinicId, effectiveClinicId, chartPeriod, appliedFrom, appliedTo]);
+    },
+    staleTime: 60_000, // 1 min cache
+    retry: 1,
+  });
+
+  const adminData = dashData?.kind === 'admin' ? dashData.admin : null;
+  const clinicData = dashData?.kind === 'clinic' ? dashData.clinic : null;
+  const analyticsData = dashData?.analytics ?? null;
+  const medicineSalesData = dashData?.medicineSales ?? null;
+  const error = queryError instanceof Error ? queryError.message : queryError ? 'Failed to load dashboard' : null;
 
   const handlePeriodChange = useCallback((period: 'daily' | 'weekly' | 'monthly') => {
     setChartPeriod(period);
@@ -261,10 +249,6 @@ const DashboardPage = () => {
     setAppliedFrom(dateFrom);
     setAppliedTo(dateTo);
   }, [dateFrom, dateTo]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const dateRangeLabel =
     appliedFrom === appliedTo
@@ -288,7 +272,7 @@ const DashboardPage = () => {
         <Card className="border-destructive/50">
           <CardContent className="pt-6">
             <p className="text-destructive">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={fetchData}>Retry</Button>
+            <Button variant="outline" className="mt-4" onClick={() => refetch()}>Retry</Button>
           </CardContent>
         </Card>
       </div>
@@ -311,8 +295,20 @@ const DashboardPage = () => {
       <div className="space-y-6 pb-6">
         <PageHeader
           title="Admin dashboard"
-          description="All clinics combined. Use the header clinic filter to see one location only."
-        />
+          description="All branches for the selected dates. Treatment package balances are included in the network view. Use the header clinic selector to switch to a single branch (same metrics as clinic staff)."
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/treatment-plans" className="gap-1.5">
+                <Package className="h-4 w-4" />
+                Treatment plans
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/pharmacy">Pharmacy</Link>
+            </Button>
+          </div>
+        </PageHeader>
 
         <FilterBar
           chartPeriod={chartPeriod}
@@ -336,10 +332,25 @@ const DashboardPage = () => {
           </div>
         ) : (
           <>
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">
-                Overview — <span className="text-muted-foreground font-normal">{dateRangeLabel}</span>
-              </h2>
+            {(adminData.treatmentPlanOutstandingBalanceDue ?? 0) > 0 && (
+              <Card className="border-amber-300/80 bg-amber-50/90 dark:border-amber-800 dark:bg-amber-950/40">
+                <CardContent className="flex flex-col gap-2 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-amber-950 dark:text-amber-100">
+                    <span className="font-semibold">Network treatment package balance: </span>
+                    ₹{(adminData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()} across{' '}
+                    {adminData.treatmentPlanOutstandingCount ?? 0} plan(s) with money due — details in Treatment packages
+                    below.
+                  </p>
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link to="/admin/treatment-plans">Open plans</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            <DashboardSection
+              title="Overview"
+              hint={`${dateRangeLabel} · All clinics — registrations, visits, and sales in the selected range.`}
+            >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <StatCard title="Total Clinics" value={adminData.totalClinics} icon={Building2} />
                 <StatCard title="Total Patients" value={adminData.totalPatients} subtitle="All registered" icon={Users} />
@@ -348,17 +359,89 @@ const DashboardPage = () => {
                 <StatCard title="Medicine Sales" value={`₹${adminData.medicineSales.toLocaleString()}`} icon={Pill} />
                 <StatCard title="Total Profit" value={`₹${adminData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
               </div>
-            </div>
+            </DashboardSection>
 
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Revenue breakdown</h2>
+            <DashboardSection
+              title="Treatment packages (network)"
+              hint="Active plans overlap the selected date range. Line counts include daily session oral lines and supplies (Treatment plans) plus any legacy plan-level prescriptions. Retail estimate uses selling price (one unit per session line; legacy × duration days). Package balance = plans not ended with balance due."
+            >
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+                <StatCard title="Active plans" value={adminData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
+                <StatCard title="1 day plans" value={adminData.treatmentPlanDayCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Week plans" value={adminData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Month plans" value={adminData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Long plans" value={adminData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
+                <StatCard
+                  title="Plan medicine lines"
+                  value={adminData.treatmentPlanMedicineCount ?? 0}
+                  subtitle={`${adminData.treatmentPlanSessionOralLineCount ?? 0} oral · ${adminData.treatmentPlanSessionConsumableLineCount ?? 0} supplies${(adminData.legacyPlanMedicineLineCount ?? 0) > 0 ? ` · ${adminData.legacyPlanMedicineLineCount} legacy` : ''}`}
+                  icon={Pill}
+                />
+                <StatCard
+                  title="Est. retail (plans)"
+                  value={`₹${(adminData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  subtitle="Session + legacy"
+                  icon={IndianRupee}
+                />
+                <StatCard
+                  title="Package balance due"
+                  value={`₹${(adminData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()}`}
+                  subtitle={`${adminData.treatmentPlanOutstandingCount ?? 0} active plan(s) with balance`}
+                  icon={AlertTriangle}
+                  accent="warning"
+                />
+              </div>
+              {(adminData.clinicWisePackageBalance ?? []).length > 0 && (
+                <Card className="overflow-hidden border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Package balance by clinic</CardTitle>
+                    <CardDescription>Outstanding treatment package money where end date has not passed</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[min(18rem,50vw)] min-h-[220px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={(adminData.clinicWisePackageBalance ?? []).map((c) => ({
+                            name: c.clinicName.length > 14 ? `${c.clinicName.slice(0, 14)}…` : c.clinicName,
+                            fullName: c.clinicName,
+                            balance: c.balanceDue,
+                            plans: c.outstandingCount,
+                          }))}
+                          layout="vertical"
+                          margin={{ left: 8, right: 24 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                          <XAxis type="number" tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                          <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                          <Tooltip
+                            content={({ active, payload }) =>
+                              active && payload?.[0] ? (
+                                <div className="rounded-lg border bg-background p-3 shadow-md text-sm">
+                                  <p className="font-medium">{payload[0].payload.fullName}</p>
+                                  <p className="text-muted-foreground">
+                                    Balance ₹{payload[0].payload.balance?.toLocaleString()} · {payload[0].payload.plans} plan(s)
+                                  </p>
+                                </div>
+                              ) : null
+                            }
+                          />
+                          <Bar dataKey="balance" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Balance due" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </DashboardSection>
+
+            <DashboardSection title="Revenue breakdown" hint="Fees and medicine sales in the selected period (all clinics).">
               <div className="grid gap-3 lg:grid-cols-4">
                 <StatCard title="Consultation Fees" value={`₹${adminData.consultationAmount.toLocaleString()}`} icon={FileText} />
                 <StatCard title="Prescription Medicine" value={`₹${adminData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
                 <StatCard title="Direct Medicine Sales" value={`₹${adminData.directMedicineSales.toLocaleString()}`} icon={ShoppingCart} />
                 <StatCard title="Total Revenue" value={`₹${adminData.dailyRevenue.toLocaleString()}`} icon={Wallet} accent="success" />
               </div>
-            </div>
+            </DashboardSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="overflow-hidden border-border/60 shadow-sm">
@@ -495,10 +578,24 @@ const DashboardPage = () => {
           title={isAdmin && adminFilterClinicName ? `Clinic · ${adminFilterClinicName}` : 'Clinic dashboard'}
           description={
             isAdmin && adminFilterClinicName
-              ? 'Filtered to this clinic only. Choose “All clinics” in the header for a full-network view.'
-              : 'Overview by date range'
+              ? 'This branch only. Choose “All clinics” in the header for network-wide totals (including package balance across branches).'
+              : 'Your clinic for the selected dates. Package balance reflects treatment plans with money still owed.'
           }
-        />
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/treatment-plans" className="gap-1.5">
+                <Package className="h-4 w-4" />
+                Plans
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/pharmacy/new" className="gap-1.5">
+                New invoice
+              </Link>
+            </Button>
+          </div>
+        </PageHeader>
 
         <FilterBar
           chartPeriod={chartPeriod}
@@ -512,8 +609,8 @@ const DashboardPage = () => {
         />
 
         {loading ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {[...Array(5)].map((_, i) => (
               <Card key={i} className="overflow-hidden border-border/60">
                 <CardHeader className="pb-2"><div className="h-4 w-24 bg-muted animate-pulse rounded" /></CardHeader>
                 <CardContent><div className="h-8 w-32 bg-muted animate-pulse rounded" /></CardContent>
@@ -522,26 +619,90 @@ const DashboardPage = () => {
           </div>
         ) : (
           <>
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">
-                Summary — <span className="text-muted-foreground font-normal">{dateRangeLabel}</span>
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Patients" value={clinicData.todayPatients} icon={Users} />
-                <StatCard title="Consultations" value={clinicData.consultationsCount} icon={Stethoscope} />
-                <StatCard title="Total Revenue" value={`₹${clinicData.dailyRevenue.toLocaleString()}`} icon={IndianRupee} accent="success" />
-                <StatCard title="Medicine Sales" value={`₹${clinicData.medicineSales.toLocaleString()}`} icon={Pill} />
-              </div>
-            </div>
+            {(clinicData.treatmentPlanOutstandingBalanceDue ?? 0) > 0 && (
+              <Card className="border-amber-300/80 bg-amber-50/90 dark:border-amber-800 dark:bg-amber-950/40">
+                <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-300">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-amber-950 dark:text-amber-100">Treatment package balance</p>
+                      <p className="text-sm text-amber-900/90 dark:text-amber-200/90">
+                        ₹{(clinicData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()} outstanding across{' '}
+                        {clinicData.treatmentPlanOutstandingCount ?? 0} active plan(s). Record payments on a pharmacy
+                        invoice or update plans under Treatment plans.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link to="/admin/pharmacy/new">New invoice</Link>
+                    </Button>
+                    <Button size="sm" variant="outline" className="border-amber-800/30 bg-background/80 dark:bg-background/20" asChild>
+                      <Link to="/admin/treatment-plans">View plans</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-            <div className="scroll-mt-4">
-              <h2 className="mb-3 border-b border-border/60 pb-2 text-base font-semibold tracking-tight">Revenue breakdown</h2>
-              <div className="grid gap-3 lg:grid-cols-3">
+            <DashboardSection
+              title="Summary"
+              hint={`${dateRangeLabel} · Patients seen, OP activity, sales, and profit for this clinic workspace.`}
+            >
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                <StatCard title="Patients" value={clinicData.patientCount ?? clinicData.todayPatients} icon={Users} />
+                <StatCard title="Consultations" value={clinicData.consultationsCount} icon={Stethoscope} />
+                <StatCard title="Treatments" value={clinicData.treatmentCount ?? 0} icon={FileText} />
+                <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
+                <StatCard title="Total Revenue" value={`₹${clinicData.dailyRevenue.toLocaleString()}`} icon={IndianRupee} accent="success" />
+                <StatCard title="Medicine Sales" value={`₹${(clinicData.medicineSalesAmount ?? clinicData.medicineSales).toLocaleString()}`} icon={Pill} />
+                <StatCard title="Total Profit" value={`₹${clinicData.totalProfit.toLocaleString()}`} icon={TrendingUp} accent="success" />
+              </div>
+            </DashboardSection>
+
+            <DashboardSection title="Revenue breakdown" hint="Fees billed in the period plus prescription and direct medicine sales.">
+              <div className="grid gap-3 lg:grid-cols-5">
                 <StatCard title="Consultation Fees" value={`₹${clinicData.consultationAmount.toLocaleString()}`} icon={FileText} />
                 <StatCard title="Prescription Medicine" value={`₹${clinicData.prescriptionMedicineSales.toLocaleString()}`} icon={Pill} />
                 <StatCard title="Direct Medicine Sales" value={`₹${clinicData.directMedicineSales.toLocaleString()}`} icon={ShoppingCart} />
+                <StatCard title="Treatment Amount" value={`₹${(clinicData.treatmentAmount ?? 0).toLocaleString()}`} icon={Wallet} />
+                <StatCard title="Treatment + Medicine" value={`₹${(clinicData.treatmentMedicineSalesAmount ?? 0).toLocaleString()}`} icon={TrendingUp} />
               </div>
-            </div>
+            </DashboardSection>
+
+            <DashboardSection
+              title="Treatment plans & packages"
+              hint="Line counts include daily session oral + supplies plus any legacy plan prescriptions. Est. retail combines session lines (×1 selling price) and legacy (× duration). Package balance matches Treatment plans and pharmacy banners."
+            >
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+                <StatCard title="Active plans" value={clinicData.activeTreatmentPlans ?? 0} icon={CalendarRange} />
+                <StatCard title="1 day plans" value={clinicData.treatmentPlanDayCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Week plans" value={clinicData.treatmentPlanWeekCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Month plans" value={clinicData.treatmentPlanMonthCount ?? 0} icon={CalendarRange} />
+                <StatCard title="Long plans" value={clinicData.treatmentPlanLongCount ?? 0} icon={CalendarRange} />
+                <StatCard
+                  title="Plan medicine lines"
+                  value={clinicData.treatmentPlanMedicineCount ?? 0}
+                  subtitle={`${clinicData.treatmentPlanSessionOralLineCount ?? 0} oral · ${clinicData.treatmentPlanSessionConsumableLineCount ?? 0} supplies${(clinicData.legacyPlanMedicineLineCount ?? 0) > 0 ? ` · ${clinicData.legacyPlanMedicineLineCount} legacy` : ''}`}
+                  icon={Pill}
+                />
+                <StatCard
+                  title="Est. retail (plans)"
+                  value={`₹${(clinicData.treatmentPlanMedicineEstimatedAmount ?? 0).toLocaleString()}`}
+                  subtitle="Session + legacy"
+                  icon={IndianRupee}
+                />
+                <StatCard
+                  title="Package balance due"
+                  value={`₹${(clinicData.treatmentPlanOutstandingBalanceDue ?? 0).toLocaleString()}`}
+                  subtitle={`${clinicData.treatmentPlanOutstandingCount ?? 0} active plan(s) with balance`}
+                  icon={AlertTriangle}
+                  accent="warning"
+                />
+              </div>
+            </DashboardSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="overflow-hidden border-border/60 shadow-sm">

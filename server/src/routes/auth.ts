@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db, clinics } from '../db/index.js';
-import { authenticateUser } from '../auth.js';
+import { authenticateUser, verifyToken } from '../auth.js';
 
 const router = Router();
 
@@ -18,16 +18,23 @@ router.get('/clinics', async (_req, res) => {
 // POST /api/auth/login - { username, password, clinicId? }
 router.post('/login', async (req, res) => {
   const { username, password, clinicId } = req.body ?? {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+  if (!username || typeof username !== 'string' || !username.trim()) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Password is required' });
   }
 
-  const result = await authenticateUser(username, password, clinicId || null);
-  if (!result) {
-    return res.status(401).json({ error: 'Invalid credentials or clinic' });
+  try {
+    const result = await authenticateUser(username.trim(), password, clinicId || null);
+    if (!result) {
+      return res.status(401).json({ error: 'Invalid credentials or clinic' });
+    }
+    res.json({ token: result.token, user: result.user });
+  } catch (err) {
+    console.error('[auth/login]', err);
+    res.status(500).json({ error: 'Authentication failed' });
   }
-
-  res.json({ token: result.token, user: result.user });
 });
 
 // GET /api/auth/me - validate token, return current user
@@ -37,7 +44,6 @@ router.get('/me', (req, res) => {
   if (!token) {
     return res.status(401).json({ error: 'No token' });
   }
-  const { verifyToken } = require('../auth.js');
   const payload = verifyToken(token);
   if (!payload) {
     return res.status(401).json({ error: 'Invalid token' });

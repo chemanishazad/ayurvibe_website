@@ -34,9 +34,12 @@ const ConsultationPrintPage = () => {
     contentRef: printRef,
     documentTitle: `Consultation-${id || 'bill'}`,
     pageStyle: `
-      @page { size: A5; margin: 0; }
+      @page { size: A5 portrait; margin: 5mm; }
       @media print {
-        html, body { margin: 0 !important; padding: 0 !important; }
+        html, body { margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        table { page-break-inside: auto; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
       }
     `,
   });
@@ -126,34 +129,17 @@ const ConsultationPrintPage = () => {
   const bmiCategory = bmiVal > 0 ? getBmiCategory(bmiVal).label : '';
 
   return (
-    <div className="min-h-screen bg-white p-4 print:p-0">
+    <div className="min-h-screen bg-white p-2 print:p-0">
       <div
         ref={printRef}
         id="print-consultation"
-        className="bg-white text-black relative mx-auto flex flex-col"
+        className="bg-white text-black relative mx-auto flex flex-col print:max-w-none"
         style={{
           width: '148mm',
-          minHeight: '210mm',
           maxWidth: '100%',
         }}
       >
-      <div className="absolute left-0 top-0 bottom-0 w-[8%] overflow-hidden pointer-events-none print:w-[4mm]">
-        <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 1200">
-          <path d="M0,0 Q30,100 0,200 T0,400 Q30,500 0,600 T0,800 Q30,900 0,1000 T0,1200" fill="none" stroke="#22c55e" strokeWidth="28" opacity="0.2" />
-          <path d="M0,100 Q40,200 0,300 T0,500 Q40,600 0,700 T0,900 Q40,1000 0,1100" fill="none" stroke="#16a34a" strokeWidth="24" opacity="0.25" />
-        </svg>
-      </div>
-      <div className="absolute right-0 top-0 bottom-0 w-[8%] overflow-hidden pointer-events-none print:w-[4mm]">
-        <svg className="absolute inset-0 w-full h-full scale-x-[-1]" preserveAspectRatio="none" viewBox="0 0 100 1200">
-          <path d="M0,0 Q30,100 0,200 T0,400 Q30,500 0,600 T0,800 Q30,900 0,1000 T0,1200" fill="none" stroke="#22c55e" strokeWidth="28" opacity="0.2" />
-          <path d="M0,100 Q40,200 0,300 T0,500 Q40,600 0,700 T0,900 Q40,1000 0,1100" fill="none" stroke="#16a34a" strokeWidth="24" opacity="0.25" />
-        </svg>
-      </div>
-
-      <div
-        className="relative pl-[12%] pr-[12%] py-3 print:py-2 flex flex-col min-h-[210mm] flex-1"
-        style={{ paddingLeft: '12%', paddingRight: '12%' }}
-      >
+      <div className="relative px-3 py-2 print:px-2 print:py-1.5 flex flex-col flex-1">
         {/* Header: left = name + location + doctor + contact; right = logo */}
         <div className="grid grid-cols-[1fr_auto] items-start gap-3 mb-3 border-b border-emerald-100/80 pb-2.5">
           <div className="min-w-0">
@@ -310,8 +296,7 @@ const ConsultationPrintPage = () => {
           </div>
         )}
 
-        {/* Signature — pinned to bottom of page (A5) when content is short */}
-        <div className="mt-auto pt-6 flex justify-end print:pt-8">
+        <div className="mt-4 pt-6 flex justify-end print:mt-6 print:pt-8">
           <div className="text-right">
             <div className="border-t-2 border-gray-800 w-20" />
             <p className="text-[9px] text-gray-600 mt-0.5">Doctor&apos;s Signature</p>
@@ -337,7 +322,7 @@ const ConsultationPrintPage = () => {
         >
           Print Invoice
         </Link>
-        <p className="text-xs text-gray-500 w-full mt-2">Uses A5 paper. Set Margins to &quot;None&quot; for full page.</p>
+        <p className="text-xs text-gray-500 w-full mt-2">A5 portrait. Long visits and prescriptions may span multiple pages.</p>
       </div>
     </div>
   );

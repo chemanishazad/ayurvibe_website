@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { parseISO } from 'date-fns';
-import { formatAppDate } from '@/lib/datetime';
+import { formatAppDate, localDateYmd } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -34,16 +34,16 @@ const UpcomingFollowUpsPage: React.FC = () => {
       setError(null);
       try {
         const today = new Date();
-        let fromDate = today.toISOString().slice(0, 10);
+        let fromDate = localDateYmd(today);
         let toDate: string | undefined;
         if (dateRange === '7d') {
           const d = new Date(today);
           d.setDate(d.getDate() + 7);
-          toDate = d.toISOString().slice(0, 10);
+          toDate = localDateYmd(d);
         } else if (dateRange === '30d') {
           const d = new Date(today);
           d.setDate(d.getDate() + 30);
-          toDate = d.toISOString().slice(0, 10);
+          toDate = localDateYmd(d);
         }
 
         const data = await api.followUps.upcoming({

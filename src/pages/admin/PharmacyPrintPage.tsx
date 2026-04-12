@@ -27,9 +27,12 @@ const PharmacyPrintPage = () => {
     contentRef: printRef,
     documentTitle: `Pharmacy-${id || 'invoice'}`,
     pageStyle: `
-      @page { size: A5; margin: 0; }
+      @page { size: A5 portrait; margin: 5mm; }
       @media print {
-        html, body { margin: 0 !important; padding: 0 !important; }
+        html, body { margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        table { page-break-inside: auto; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
       }
     `,
   });
@@ -97,29 +100,18 @@ const PharmacyPrintPage = () => {
   const paymentMode = (cons.paymentMode as string) || 'Cash';
 
   return (
-    <div className="min-h-screen bg-white p-4 print:p-0">
+    <div className="min-h-screen bg-white p-2 print:p-0">
       <div
         ref={printRef}
         id="print-pharmacy"
-        className="bg-white text-black relative mx-auto"
-        style={{ width: '148mm', minHeight: '210mm', maxWidth: '100%' }}
+        className="bg-white text-black relative mx-auto print:max-w-none"
+        style={{ width: '148mm', maxWidth: '100%' }}
       >
-      <div className="absolute left-0 top-0 bottom-0 w-[6%] overflow-hidden pointer-events-none print:w-[4mm]">
-        <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 1200">
-          <path d="M0,0 Q30,100 0,200 T0,400 Q30,500 0,600" fill="none" stroke="#16a34a" strokeWidth="20" opacity="0.2" />
-        </svg>
-      </div>
-      <div className="absolute right-0 top-0 bottom-0 w-[6%] overflow-hidden pointer-events-none print:w-[4mm]">
-        <svg className="absolute inset-0 w-full h-full scale-x-[-1]" preserveAspectRatio="none" viewBox="0 0 100 1200">
-          <path d="M0,0 Q30,100 0,200 T0,400 Q30,500 0,600" fill="none" stroke="#16a34a" strokeWidth="20" opacity="0.2" />
-        </svg>
-      </div>
-
-      <div className="relative pl-[10%] pr-[10%] py-3">
+      <div className="relative px-3 py-2 print:px-2 print:py-1.5">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div>
-            <h1 className="text-lg font-bold tracking-wide" style={{ color: '#15803d' }}>
+        <div className="flex items-start justify-between gap-3 mb-2 print:mb-1.5">
+          <div className="min-w-0">
+            <h1 className="text-base font-bold tracking-wide leading-tight" style={{ color: '#15803d' }}>
               {clinicTitle}
             </h1>
             {subtitle ? (
@@ -134,7 +126,7 @@ const PharmacyPrintPage = () => {
             ) : null}
             <p className="text-[9px] text-gray-600 mt-0.5">{contactLine}</p>
           </div>
-          <img src={logo} alt="Logo" className="h-20 w-auto shrink-0 object-contain drop-shadow-sm" />
+          <img src={logo} alt="" className="h-14 w-auto shrink-0 object-contain print:h-16" />
         </div>
 
         {/* Beneficiary + bill date (right) */}
@@ -161,8 +153,8 @@ const PharmacyPrintPage = () => {
 
         {/* Invoice: Consultation + Treatments + Medicines */}
         <div>
-          <p className="text-xs font-bold mb-1.5 uppercase" style={{ color: '#15803d' }}>Invoice</p>
-          <table className="w-full text-[10px] border border-gray-300 table-fixed">
+          <p className="text-[11px] font-bold mb-1 uppercase" style={{ color: '#15803d' }}>Invoice</p>
+          <table className="w-full text-[9px] border border-gray-300 table-fixed leading-tight">
             <thead>
               <tr className="bg-gray-100">
                 <th className="text-left py-1.5 px-2 font-semibold border-b border-r border-gray-300 w-[28%]">Description</th>
@@ -248,7 +240,7 @@ const PharmacyPrintPage = () => {
         >
             Print Invoice
         </button>
-          <p className="text-xs text-gray-500 mt-2">Uses A5 paper. Set Margins to &quot;None&quot; for full page.</p>
+          <p className="text-xs text-gray-500 mt-2">A5 portrait. Use default or minimum margins; long invoices continue on extra pages.</p>
       </div>
     </div>
   );

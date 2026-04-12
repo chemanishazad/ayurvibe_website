@@ -15,6 +15,7 @@ import {
   UserCog,
   Scale,
   HeartPulse,
+  ContactRound,
 } from 'lucide-react';
 
 /** Single source for admin “Users & access” checkboxes and sidebar filtering. */
@@ -38,6 +39,7 @@ export const ADMIN_NAV_CATALOG: {
   { path: '/admin/direct-sales', label: 'Direct sales', group: 'Commerce', icon: ShoppingCart },
   { path: '/admin/reports', label: 'Reports', group: 'Reports', icon: FileText },
   { path: '/admin/clinics', label: 'Clinics', group: 'Administration', icon: Building2 },
+  { path: '/admin/therapists-rooms', label: 'Therapists & rooms', group: 'Administration', icon: ContactRound },
   { path: '/admin/users', label: 'Users & access', group: 'Administration', icon: UserCog },
   { path: '/admin/uom', label: 'Units (UOM)', group: 'Administration', icon: Scale },
 ];
@@ -70,7 +72,7 @@ export const STAFF_HIDDEN_NAV_PATHS = new Set([
 export type AuthUserSession = {
   role: string;
   allowedNavPaths?: string[] | null;
-  /** When `nurse`, OP vitals only — no full Consultations module. */
+  /** Legacy compatibility (older token format). */
   staffRole?: string | null;
 };
 
@@ -86,7 +88,8 @@ export function userMayAccessRoute(user: AuthUserSession | null, pathname: strin
   if (user.role === 'admin') return true;
   const p = pathname.replace(/\/$/, '') || '/';
   /** Nurses record vitals under OP only; consultation charts are for doctors. */
-  if (user.role === 'user' && user.staffRole === 'nurse' && pathMatchesAllowed(p, '/admin/consultations')) {
+  const isNurse = user.role === 'nurse' || (user.role === 'user' && user.staffRole === 'nurse');
+  if (isNurse && pathMatchesAllowed(p, '/admin/consultations')) {
     return false;
   }
   const allowed = user.allowedNavPaths;
@@ -110,7 +113,7 @@ function stripConsultationsForNurse(items: NavGroup['items'], isNurse: boolean):
 export function getNavGroupsForSession(user: AuthUserSession | null): NavGroup[] {
   const full = getFullNavGroups();
   if (!user || user.role === 'admin') return full;
-  const isNurse = user.role === 'user' && user.staffRole === 'nurse';
+  const isNurse = user.role === 'nurse' || (user.role === 'user' && user.staffRole === 'nurse');
   const allowed = user.allowedNavPaths;
   if (allowed && allowed.length > 0) {
     return full
