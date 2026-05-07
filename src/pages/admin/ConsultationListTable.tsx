@@ -36,6 +36,9 @@ export type OutpatientRow = {
   patientAgeUnit?: string | null;
   patientGender?: string | null;
   parentConsultationId?: string | null;
+  parentConsultationDate?: string | null;
+  parentConsultationTime?: string | null;
+  parentDiagnosis?: string | null;
   consultationDate: string;
   consultationTime?: string | null;
   followUpRequired?: number;
@@ -360,6 +363,14 @@ export const ConsultationListTable: React.FC<Props> = ({
                             )}
                           </span>
                         </div>
+                        {!isInitial && c.parentConsultationDate && (
+                          <p
+                            className="mt-1 text-[10px] font-medium leading-tight text-amber-800/90 dark:text-amber-300/80"
+                            title={c.parentDiagnosis ? `Parent diagnosis: ${diagnosisDisplay(c.parentDiagnosis)}` : undefined}
+                          >
+                            of {formatAppDate(String(c.parentConsultationDate).slice(0, 10) + 'T12:00:00')}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell className={cn('align-top font-medium', indentChild && 'pl-2 text-muted-foreground')}>
                         <span className="min-w-0 max-w-[220px] break-words sm:max-w-[280px]" title={c.patientName}>

@@ -37,8 +37,11 @@ import {
 import { LogOut, Menu, ChevronDown, Stethoscope } from 'lucide-react';
 import { getAuthUser, setAdminAuthenticated } from '@/pages/Login';
 import { ADMIN_ALL_CLINICS_VALUE, AdminClinicProvider, useAdminClinic } from '@/contexts/AdminClinicContext';
+import { RoleProvider } from '@/contexts/RoleContext';
 import { getNavGroupsForSession } from '@/lib/nav-access';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 
 /** Longest nav path match so e.g. /admin/patients/new still shows "Patients". */
 function getAdminPageTitle(pathname: string, user: ReturnType<typeof getAuthUser>): string | null {
@@ -78,6 +81,16 @@ const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children })
       ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
       : null,
   );
+
+  /** Admin-only: count of medicines awaiting completion — shown as a sidebar badge on the Medicines item. */
+  const { data: pendingMedicines = [] } = useQuery({
+    queryKey: ['medicines', 'pending', 'count'],
+    queryFn: () => api.medicines.listPending(),
+    enabled: isAdminUser,
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
+  });
+  const pendingMedicinesCount = pendingMedicines.length;
   const {
     clinics,
     selectedClinicId,
@@ -146,6 +159,14 @@ const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children })
                           <Link to={item.path} className="group/link flex items-center gap-2.5">
                             <Icon className="h-4 w-4 shrink-0 transition-transform duration-200 ease-out group-hover/link:scale-110" />
                             <span className="truncate">{item.label}</span>
+                            {item.path === '/admin/medicines' && pendingMedicinesCount > 0 && (
+                              <span
+                                className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white"
+                                title={`${pendingMedicinesCount} medicine${pendingMedicinesCount === 1 ? '' : 's'} awaiting completion`}
+                              >
+                                {pendingMedicinesCount}
+                              </span>
+                            )}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -346,9 +367,11 @@ const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children })
 
 /** Provider must wrap this layout so useAdminClinic() is always valid for shell + Outlet pages. */
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <AdminClinicProvider>
-    <AdminLayoutInner>{children}</AdminLayoutInner>
-  </AdminClinicProvider>
+  <RoleProvider>
+    <AdminClinicProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </AdminClinicProvider>
+  </RoleProvider>
 );
 
 export default AdminLayout;

@@ -135,6 +135,43 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   return cloneResponseData(result);
 }
 
+export type MedicineStatus = 'active' | 'pending' | 'archived';
+export type MedicineCreatedVia = 'admin' | 'doctor_quick_add' | 'import';
+
+export interface MedicineRow {
+  id: string;
+  name: string;
+  category?: string | null;
+  uom: string;
+  purchasePrice: string;
+  sellingPrice: string;
+  minStockLevel: number;
+  expiryDate?: string | null;
+  description?: string | null;
+  status: MedicineStatus;
+  createdVia: MedicineCreatedVia;
+  createdByUserId?: string | null;
+  completedAt?: string | null;
+  completedByUserId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PendingMedicineRow extends MedicineRow {
+  /** How many places (prescriptions + treatment plans) currently reference this row. */
+  usageCount: number;
+}
+
+export interface CompleteMedicinePayload {
+  uom: string;
+  purchasePrice: number | string;
+  sellingPrice: number | string;
+  category?: string;
+  minStockLevel?: number | string;
+  expiryDate?: string;
+  description?: string;
+}
+
 export const api = {
   auth: {
     switchClinic: (clinicId: string) =>
@@ -271,15 +308,23 @@ export const api = {
       fetchApi<{ success: boolean }>(`/api/doctors/${doctorId}/clinics/${clinicId}`, { method: 'DELETE' }),
   },
   medicines: {
-    list: () => fetchApi<{ id: string; name: string; uom: string; purchasePrice: string; sellingPrice: string; minStockLevel: number }[]>('/api/medicines'),
+    list: () => fetchApi<MedicineRow[]>('/api/medicines'),
+    /** Admin inbox: rows still awaiting UOM/prices (created on the fly by a doctor). */
+    listPending: () => fetchApi<PendingMedicineRow[]>('/api/medicines/pending'),
     /** Case-insensitive match on trimmed name, or create master row (same rules as consultation save). */
     findOrCreateByName: (name: string) =>
-      fetchApi<{ id: string; name: string }>('/api/medicines/find-or-create', {
+      fetchApi<MedicineRow>('/api/medicines/find-or-create', {
         method: 'POST',
         body: JSON.stringify({ name }),
       }),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/medicines', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/medicines/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    /** Admin completes a pending master row — UOM + prices required, flips status to 'active'. */
+    complete: (id: string, data: CompleteMedicinePayload) =>
+      fetchApi<MedicineRow>(`/api/medicines/${id}/complete`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     delete: (id: string) => fetchApi<{ success: boolean }>(`/api/medicines/${id}`, { method: 'DELETE' }),
   },
   suppliers: {

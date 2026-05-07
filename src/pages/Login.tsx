@@ -27,6 +27,11 @@ export type AuthUser = {
   id: string;
   username: string;
   role: string;
+  /**
+   * 3-role frontend model emitted by the backend (admin/doctor/reception).
+   * Older sessions may not include this — RoleContext derives it from `role` as a fallback.
+   */
+  roleV2?: 'admin' | 'doctor' | 'reception';
   clinicId: string | null;
   /** Staff: explicit sidebar routes from admin; omitted or null = default staff menu. */
   allowedNavPaths?: string[] | null;

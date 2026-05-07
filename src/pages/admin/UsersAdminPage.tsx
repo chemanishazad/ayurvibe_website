@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
-import { ADMIN_NAV_CATALOG } from '@/lib/nav-access';
+import { ADMIN_NAV_CATALOG, NAV_PRESETS, type AllowedNavPreset } from '@/lib/nav-access';
 import { Plus, Pencil, Trash2, KeyRound, Link2, Loader2, AlertCircle } from 'lucide-react';
 import {
   Dialog,
@@ -517,6 +517,30 @@ const UsersAdminPage = () => {
               )}
               {editAccountRole !== 'admin' && (
                 <div className="space-y-3 rounded-lg border p-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick role presets</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {(Object.keys(NAV_PRESETS) as AllowedNavPreset[]).map((key) => {
+                        const preset = NAV_PRESETS[key];
+                        return (
+                          <Button
+                            key={key}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            title={preset.description}
+                            onClick={() => {
+                              setEditNavRestricted(true);
+                              setEditNavPaths([...preset.paths]);
+                            }}
+                          >
+                            {preset.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Click a preset to fill the sidebar checklist below; you can still tweak individual items.</p>
+                  </div>
                   <label className="flex items-center gap-2 text-sm font-medium">
                     <Checkbox checked={editNavRestricted} onCheckedChange={(ch) => { const on = ch === true; setEditNavRestricted(on); if (!on) setEditNavPaths([]); }} />
                     Custom sidebar (pick sections)
