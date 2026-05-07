@@ -1745,7 +1745,7 @@ const ConsultationsPage = () => {
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Temperature</Label>
+                <Label className="text-xs">Temperature (°F)</Label>
                 <Input type="text" inputMode="decimal" className="h-9" placeholder="—" value={form.temperature} onChange={(e) => setForm((f) => ({ ...f, temperature: restrictVital(e.target.value, 3, 2) }))} />
               </div>
               <div>
@@ -2738,7 +2738,7 @@ const ConsultationsPage = () => {
                                 value={`${viewConsultation.bpSystolic != null ? String(viewConsultation.bpSystolic) : '—'}/${viewConsultation.bpDiastolic != null ? String(viewConsultation.bpDiastolic) : '—'}`}
                                 icon={<HeartPulse className="h-4 w-4" />}
                               />
-                              <InfoItem label="Temperature" value={viewConsultation.temperature != null ? String(viewConsultation.temperature) : '—'} icon={<Thermometer className="h-4 w-4" />} />
+                              <InfoItem label="Temperature" value={viewConsultation.temperature != null ? `${String(viewConsultation.temperature)}°F` : '—'} icon={<Thermometer className="h-4 w-4" />} />
                               <InfoItem label="Pulse" value={viewConsultation.pulse != null ? `${String(viewConsultation.pulse)} bpm` : '—'} icon={<Heart className="h-4 w-4" />} />
                               <InfoItem label="SpO2" value={viewConsultation.spo2 != null ? `${String(viewConsultation.spo2)}%` : '—'} icon={<Wind className="h-4 w-4" />} />
                               <InfoItem label="CBG" value={viewConsultation.cbg != null ? `${String(viewConsultation.cbg)} mg/dL` : '—'} icon={<Droplets className="h-4 w-4" />} />
