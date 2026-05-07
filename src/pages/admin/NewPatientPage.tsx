@@ -25,6 +25,7 @@ import { patientSchema, type PatientFormValues } from '@/schema/patients';
 
 type AgeUnit = 'years' | 'months';
 const GENDERS = ['Male', 'Female', 'Other'] as const;
+const TITLES = ['Mr', 'Mrs', 'Miss', 'Master', 'Dr', 'Baby'] as const;
 
 const choiceActive =
   'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-600/20 dark:bg-emerald-950/50 dark:text-emerald-50 dark:ring-emerald-500/30';
@@ -55,6 +56,7 @@ const NewPatientPage = () => {
     defaultValues: {
       countryCode: '91',
       mobile: '',
+      title: '',
       name: '',
       age: '',
       ageUnit: 'years',
@@ -87,6 +89,7 @@ const NewPatientPage = () => {
       const countryCode = values.countryCode.replace(/\D/g, '');
       const mobile = `${countryCode}${values.mobile}`;
       await api.patients.create({
+        title: values.title ? String(values.title).trim() : undefined,
         name: values.name.trim(),
         mobile,
         age: Number(values.age),
@@ -137,16 +140,33 @@ const NewPatientPage = () => {
                 description="Legal name, contact, age, and gender used across consultations and records."
               >
                 <div className="w-full space-y-5">
-                  {/* Name */}
+                  {/* Title + Name */}
                   <div className="w-full min-w-0">
                     <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Patient name / Beneficiary <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      placeholder="Full name as on records"
-                      className={cn(fieldClass, errors.name && 'border-destructive')}
-                      {...register('name')}
-                    />
+                    <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={watch('title') || ''}
+                        onValueChange={(v) => setValue('title', v as PatientFormValues['title'], { shouldValidate: true })}
+                      >
+                        <SelectTrigger className="h-10 w-full sm:w-[140px] sm:shrink-0">
+                          <SelectValue placeholder="Title" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TITLES.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        placeholder="Full name as on records"
+                        className={cn('h-10 min-w-0 flex-1', errors.name && 'border-destructive')}
+                        {...register('name')}
+                      />
+                    </div>
                     <FieldError message={errors.name?.message} />
                   </div>
 

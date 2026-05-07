@@ -25,6 +25,7 @@ import { patientSchema, type PatientFormValues } from '@/schema/patients';
 
 type AgeUnit = 'years' | 'months';
 const GENDERS = ['Male', 'Female', 'Other'] as const;
+const TITLES = ['Mr', 'Mrs', 'Miss', 'Master', 'Dr', 'Baby'] as const;
 
 const choiceActive =
   'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-600/20 dark:bg-emerald-950/50 dark:text-emerald-50 dark:ring-emerald-500/30';
@@ -69,6 +70,7 @@ const EditPatientPage = () => {
     defaultValues: {
       countryCode: '91',
       mobile: '',
+      title: '',
       name: '',
       age: '',
       ageUnit: 'years',
@@ -101,9 +103,12 @@ const EditPatientPage = () => {
       .then((p) => {
         const { countryCode, mobile } = parseMobile((p.mobile as string) || '');
         const unit: AgeUnit = String(p.ageUnit ?? '').toLowerCase() === 'months' ? 'months' : 'years';
+        const rawTitle = String((p as Record<string, unknown>).title ?? '');
+        const safeTitle = (TITLES as readonly string[]).includes(rawTitle) ? (rawTitle as PatientFormValues['title']) : '';
         reset({
           countryCode,
           mobile,
+          title: safeTitle,
           name: String(p.name ?? ''),
           age: p.age != null ? String(p.age) : '',
           ageUnit: unit,
@@ -126,6 +131,7 @@ const EditPatientPage = () => {
       const countryCode = values.countryCode.replace(/\D/g, '');
       const mobile = `${countryCode}${values.mobile}`;
       await api.patients.update(id, {
+        title: values.title ? String(values.title).trim() : undefined,
         name: values.name.trim(),
         mobile,
         age: Number(values.age),
@@ -179,7 +185,20 @@ const EditPatientPage = () => {
                 <div className="w-full space-y-5">
                   <div className="w-full min-w-0">
                     <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Patient name / Beneficiary <span className="text-destructive">*</span></Label>
-                    <Input placeholder="Full name as on records" className={cn(fieldClass, errors.name && 'border-destructive')} {...register('name')} />
+                    <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={watch('title') || ''}
+                        onValueChange={(v) => setValue('title', v as PatientFormValues['title'], { shouldValidate: true })}
+                      >
+                        <SelectTrigger className="h-10 w-full sm:w-[140px] sm:shrink-0"><SelectValue placeholder="Title" /></SelectTrigger>
+                        <SelectContent>
+                          {TITLES.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input placeholder="Full name as on records" className={cn('h-10 min-w-0 flex-1', errors.name && 'border-destructive')} {...register('name')} />
+                    </div>
                     <FieldError message={errors.name?.message} />
                   </div>
 
@@ -273,7 +292,7 @@ const EditPatientPage = () => {
                   <Link to="/admin/patients">Cancel</Link>
                 </Button>
                 <Button type="submit" disabled={isSubmitting} className="h-11 w-full bg-emerald-600 font-semibold shadow-md hover:bg-emerald-700 sm:min-w-[180px]">
-                  {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>) : 'Save changes'}
+                  {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>) : 'Update patient'}
                 </Button>
               </div>
             </div>

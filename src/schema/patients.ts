@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 const ageUnitSchema = z.enum(['years', 'months']);
+const titleSchema = z.enum(['Mr', 'Mrs', 'Miss', 'Master', 'Dr', 'Baby']);
 
 export const patientSchema = z.object({
+  title: titleSchema.optional().or(z.literal('')),
   name: z
     .string({ required_error: 'Name is required' })
     .min(1, 'Name is required')
