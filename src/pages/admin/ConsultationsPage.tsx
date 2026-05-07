@@ -121,7 +121,7 @@ type PrescriptionItem = {
   timeMorning: boolean;
   timeAfternoon: boolean;
   timeNight: boolean;
-  foodRelation: '' | 'before_food' | 'after_food';
+  foodRelation: '' | 'before_food' | 'after_food' | 'along_with_food';
   quantity: string;
   withHotWater: boolean;
   withMilk: boolean;
@@ -1022,13 +1022,15 @@ const ConsultationsPage = () => {
         });
         loadConsultations();
         const cid = updated?.id || consultationIdFromRoute;
-        navigate(`/admin/consultations/${cid}`);
-        api.consultations.get(cid).then((data) => {
-          saveConsultationPrintPayload(cid, data);
-          openConsultationPrint(cid);
-        }).catch(() => {
-          openConsultationPrint(cid);
-        });
+        // Important: open the print tab directly (avoid popup blockers).
+        openConsultationPrint(cid);
+        // Best-effort payload handoff (print page can live-fetch if storage fails).
+        api.consultations
+          .get(cid)
+          .then((data) => saveConsultationPrintPayload(cid, data))
+          .catch(() => {});
+        // After saving OP completion, return to Consultations list.
+        navigate('/admin/consultations', { replace: true });
         setLoading(false);
         return;
       }
@@ -1131,12 +1133,15 @@ const ConsultationsPage = () => {
       });
       loadConsultations();
       if (created?.id) {
-        api.consultations.get(created.id).then((data) => {
-          saveConsultationPrintPayload(created.id, data);
-          openConsultationPrint(created.id);
-        }).catch(() => {
-          openConsultationPrint(created.id);
-        });
+        // Important: open the print tab directly (avoid popup blockers).
+        openConsultationPrint(created.id);
+        // Best-effort payload handoff (print page can live-fetch if storage fails).
+        api.consultations
+          .get(created.id)
+          .then((data) => saveConsultationPrintPayload(created.id, data))
+          .catch(() => {});
+        // After saving, return to the main Consultations list.
+        navigate('/admin/consultations', { replace: true });
       }
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -2391,7 +2396,7 @@ const ConsultationsPage = () => {
                         </div>
 
                         <div className="rounded-lg border bg-white/60 p-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Food / Route</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Route of administration</p>
                           <RadioGroup
                             value={p.foodRelation || 'none'}
                             onValueChange={(v) => updatePrescription(i, 'foodRelation', v === 'none' ? '' : v)}
@@ -2405,6 +2410,11 @@ const ConsultationsPage = () => {
                               <RadioGroupItem value="after_food" />
                               After food
                             </label>
+                            <label className="flex items-center gap-2 text-sm">
+                              <RadioGroupItem value="along_with_food" />
+                              Along with food
+                            </label>
+
                             <label className="flex items-center gap-2 text-sm text-muted-foreground">
                               <RadioGroupItem value="none" />
                               External use
@@ -2945,7 +2955,10 @@ const ConsultationsPage = () => {
                                             ? 'Before food'
                                             : p.foodRelation === 'after_food'
                                               ? 'After food'
-                                              : '—';
+                                              : p.foodRelation === 'along_with_food'
+                                                ? 'Along with food'
+                                                : 'External / Not specified';
+                                              
                                         const durVal = p.durationDays;
                                         const duration =
                                           durVal != null && String(durVal).trim() !== ''

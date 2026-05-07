@@ -80,12 +80,16 @@ const UsersAdminPage = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [createAccountRole, setCreateAccountRole] = useState<AccountRole>('doctor');
   const [createClinicIds, setCreateClinicIds] = useState<string[]>([]);
+  /** Doctor role: free-text display name; backend auto-creates the doctor profile. */
+  const [createDoctorDisplayName, setCreateDoctorDisplayName] = useState('');
+  /** Nurse role only: optional doctor profile (existing) this nurse is paired with. */
   const [createLinkedDoctorId, setCreateLinkedDoctorId] = useState('none');
 
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [editAccountRole, setEditAccountRole] = useState<AccountRole>('doctor');
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
+  const [editDoctorDisplayName, setEditDoctorDisplayName] = useState('');
   const [editLinkedDoctorId, setEditLinkedDoctorId] = useState('none');
   const [editUserClinicIds, setEditUserClinicIds] = useState<string[]>([]);
 
@@ -171,15 +175,20 @@ const UsersAdminPage = () => {
     mutationFn: async (data: CreateUserForm) => {
       if (createAccountRole !== 'admin' && createClinicIds.length === 0)
         throw new Error('Doctor/Nurse users need at least one clinic');
-      if (createAccountRole === 'doctor' && createLinkedDoctorId === 'none')
-        throw new Error('Doctor user must be mapped to a doctor name');
+      if (createAccountRole === 'doctor' && !createDoctorDisplayName.trim())
+        throw new Error('Doctor display name is required');
       return api.users.create({
         username: data.username.trim(),
         password: data.password,
         role: createAccountRole,
         clinicIds: createAccountRole !== 'admin' ? createClinicIds : undefined,
+        // Doctor: backend auto-creates the linked doctor profile from displayName.
+        ...(createAccountRole === 'doctor'
+          ? { doctorDisplayName: createDoctorDisplayName.trim() }
+          : {}),
+        // Nurse only: optional pairing with an existing doctor profile.
         linkedDoctorId:
-          createAccountRole !== 'admin' && createLinkedDoctorId !== 'none'
+          createAccountRole === 'nurse' && createLinkedDoctorId !== 'none'
             ? createLinkedDoctorId
             : null,
       });
@@ -189,6 +198,7 @@ const UsersAdminPage = () => {
       setShowCreate(false);
       createForm.reset();
       setCreateClinicIds([]);
+      setCreateDoctorDisplayName('');
       setCreateLinkedDoctorId('none');
       setCreateAccountRole('doctor');
       invalidate();
@@ -199,8 +209,8 @@ const UsersAdminPage = () => {
   const updateMutation = useMutation({
     mutationFn: async (data: EditUserForm) => {
       if (!editing) return;
-      if (editAccountRole === 'doctor' && editLinkedDoctorId === 'none')
-        throw new Error('Doctor user must be mapped to a doctor name');
+      if (editAccountRole === 'doctor' && !editDoctorDisplayName.trim())
+        throw new Error('Doctor display name is required');
       const allowedNavPaths: string[] | null | undefined =
         editAccountRole !== 'admin'
           ? editNavRestricted && editNavPaths.length > 0
@@ -211,9 +221,16 @@ const UsersAdminPage = () => {
         username: data.username.trim(),
         role: editAccountRole,
         ...(editAccountRole !== 'admin' ? { allowedNavPaths } : {}),
-        ...(editAccountRole !== 'admin'
+        // Doctor: send display name; backend renames or creates the linked doctor profile.
+        ...(editAccountRole === 'doctor'
+          ? { doctorDisplayName: editDoctorDisplayName.trim() }
+          : {}),
+        // linkedDoctorId is only meaningful for nurse pairing now.
+        ...(editAccountRole === 'nurse'
           ? { linkedDoctorId: editLinkedDoctorId === 'none' ? null : editLinkedDoctorId }
-          : { linkedDoctorId: null }),
+          : editAccountRole === 'admin'
+            ? { linkedDoctorId: null }
+            : {}),
       });
     },
     onSuccess: () => {
@@ -245,6 +262,8 @@ const UsersAdminPage = () => {
     setEditNavRestricted(Boolean(paths && paths.length > 0));
     setEditNavPaths(paths && paths.length > 0 ? [...paths] : []);
     setEditLinkedDoctorId(u.linkedDoctorId || 'none');
+    // Doctor display name: prefer the existing linked doctor profile, fall back to username.
+    setEditDoctorDisplayName(u.role === 'doctor' ? (u.linkedDoctorName || u.username) : '');
     if (u.role !== 'admin') {
       try {
         const mapped = await api.users.listClinics(u.id);
@@ -316,9 +335,28 @@ const UsersAdminPage = () => {
         title="Users & access"
         description="Administrator, doctor, and nurse logins. Doctor/Nurse users must be mapped to one or more clinics to sign in."
       >
-        <Button onClick={() => { setShowCreate(true); createForm.reset(); setCreateClinicIds([]); setCreateLinkedDoctorId('none'); setCreateAccountRole('doctor'); }}>
-          <Plus className="mr-2 h-4 w-4" />Add user
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            title="Create missing doctor profiles for existing doctor users and re-sync clinic mappings."
+            onClick={async () => {
+              try {
+                const res = await api.users.backfillDoctorProfiles();
+                toast({ title: 'Doctor profiles repaired', description: `Created ${res.created}, synced ${res.synced}.` });
+                qc.invalidateQueries({ queryKey: ['users'] });
+                qc.invalidateQueries({ queryKey: ['doctors'] });
+              } catch (e) {
+                toast({ title: 'Repair failed', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
+              }
+            }}
+          >
+            Repair doctor profiles
+          </Button>
+          <Button onClick={() => { setShowCreate(true); createForm.reset(); setCreateClinicIds([]); setCreateLinkedDoctorId('none'); setCreateDoctorDisplayName(''); setCreateAccountRole('doctor'); }}>
+            <Plus className="mr-2 h-4 w-4" />Add user
+          </Button>
+        </div>
       </PageHeader>
 
       <Card className="border-border/70 shadow-sm">
@@ -426,7 +464,7 @@ const UsersAdminPage = () => {
               </div>
               <div>
                 <Label>Role</Label>
-                <Select value={createAccountRole} onValueChange={(v) => { setCreateAccountRole(v as AccountRole); if (v === 'admin') { setCreateClinicIds([]); setCreateLinkedDoctorId('none'); } }}>
+                <Select value={createAccountRole} onValueChange={(v) => { setCreateAccountRole(v as AccountRole); if (v === 'admin') { setCreateClinicIds([]); setCreateLinkedDoctorId('none'); setCreateDoctorDisplayName(''); } }}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Administrator</SelectItem>
@@ -435,6 +473,18 @@ const UsersAdminPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {createAccountRole === 'doctor' && (
+                <div>
+                  <Label>Doctor display name <span className="text-destructive">*</span></Label>
+                  <Input
+                    className="mt-1"
+                    placeholder="Dr. …"
+                    value={createDoctorDisplayName}
+                    onChange={(e) => setCreateDoctorDisplayName(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Shown on consultations and prescriptions. A linked doctor profile is created automatically.</p>
+                </div>
+              )}
               {createAccountRole !== 'admin' && (
                 <div className="space-y-2 rounded-lg border p-3">
                   <Label>Clinic access <span className="text-destructive">*</span></Label>
@@ -450,19 +500,20 @@ const UsersAdminPage = () => {
                   )}
                 </div>
               )}
-              {createAccountRole !== 'admin' && (
+              {createAccountRole === 'nurse' && (
                 <div>
-                  <Label>{createAccountRole === 'nurse' ? 'Linked doctor (optional)' : 'Mapped doctor (required)'}</Label>
+                  <Label>Linked doctor (optional)</Label>
                   <Select value={createLinkedDoctorId} onValueChange={setCreateLinkedDoctorId}>
                     <SelectTrigger className="mt-1"><SelectValue placeholder="No linked doctor" /></SelectTrigger>
                     <SelectContent>
-                      {createAccountRole === 'nurse' ? <SelectItem value="none">No linked doctor</SelectItem> : null}
+                      <SelectItem value="none">No linked doctor</SelectItem>
                       {createDoctorOptions.map((doc) => <SelectItem key={doc.id} value={doc.id}>{doc.name}</SelectItem>)}
                       {createLinkedDoctorId !== 'none' && !createDoctorOptions.some((d) => d.id === createLinkedDoctorId) ? (
                         <SelectItem value={createLinkedDoctorId}>{doctorNameById[createLinkedDoctorId] || 'Current linked doctor'}</SelectItem>
                       ) : null}
                     </SelectContent>
                   </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">Default doctor when this nurse completes an OP visit.</p>
                 </div>
               )}
               <Button type="submit" disabled={createMutation.isPending} className="w-full">
@@ -489,7 +540,7 @@ const UsersAdminPage = () => {
                 <Select value={editAccountRole} onValueChange={(v) => {
                   const nextRole = v as AccountRole;
                   setEditAccountRole(nextRole);
-                  if (v === 'admin') { setEditNavRestricted(false); setEditNavPaths([]); setEditLinkedDoctorId('none'); }
+                  if (v === 'admin') { setEditNavRestricted(false); setEditNavPaths([]); setEditLinkedDoctorId('none'); setEditDoctorDisplayName(''); }
                 }}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -499,13 +550,25 @@ const UsersAdminPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {editAccountRole !== 'admin' && (
+              {editAccountRole === 'doctor' && (
                 <div>
-                  <Label>{editAccountRole === 'nurse' ? 'Linked doctor (optional)' : 'Mapped doctor (required)'}</Label>
+                  <Label>Doctor display name <span className="text-destructive">*</span></Label>
+                  <Input
+                    className="mt-1"
+                    placeholder="Dr. …"
+                    value={editDoctorDisplayName}
+                    onChange={(e) => setEditDoctorDisplayName(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Saving renames the linked doctor profile (or creates one if missing).</p>
+                </div>
+              )}
+              {editAccountRole === 'nurse' && (
+                <div>
+                  <Label>Linked doctor (optional)</Label>
                   <Select value={editLinkedDoctorId} onValueChange={setEditLinkedDoctorId}>
                     <SelectTrigger className="mt-1"><SelectValue placeholder="No linked doctor" /></SelectTrigger>
                     <SelectContent>
-                      {editAccountRole === 'nurse' ? <SelectItem value="none">No linked doctor</SelectItem> : null}
+                      <SelectItem value="none">No linked doctor</SelectItem>
                       {editDoctorOptions.map((doc) => <SelectItem key={doc.id} value={doc.id}>{doc.name}</SelectItem>)}
                       {editLinkedDoctorId !== 'none' && !editDoctorOptions.some((d) => d.id === editLinkedDoctorId) ? (
                         <SelectItem value={editLinkedDoctorId}>{doctorNameById[editLinkedDoctorId] || 'Current linked doctor'}</SelectItem>

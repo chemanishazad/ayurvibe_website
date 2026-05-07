@@ -221,6 +221,8 @@ export const api = {
       clinicIds?: string[];
       allowedNavPaths?: string[] | null;
       linkedDoctorId?: string | null;
+      /** Doctor only: display name for the auto-created/linked doctor profile. */
+      doctorDisplayName?: string;
     }) => fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>('/api/users', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -232,6 +234,8 @@ export const api = {
         role: 'admin' | 'doctor' | 'nurse';
         allowedNavPaths: string[] | null;
         linkedDoctorId: string | null;
+        /** Doctor only: rename (or auto-create) linked doctor profile. */
+        doctorDisplayName: string;
       }>,
     ) =>
       fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>(
@@ -250,6 +254,9 @@ export const api = {
       fetchApi<Record<string, unknown>>(`/api/users/${userId}/clinics`, { method: 'POST', body: JSON.stringify({ clinicId }) }),
     removeClinic: (userId: string, clinicId: string) =>
       fetchApi<{ success: boolean }>(`/api/users/${userId}/clinics/${clinicId}`, { method: 'DELETE' }),
+    /** One-off repair: create missing doctor profiles for doctor users and re-sync clinic mappings. */
+    backfillDoctorProfiles: () =>
+      fetchApi<{ created: number; synced: number }>(`/api/users/backfill-doctor-profiles`, { method: 'POST' }),
   },
   clinics: {
     list: () => fetchApi<{ id: string; name: string }[]>('/api/clinics'),

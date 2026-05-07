@@ -34,7 +34,6 @@ const InventoryPage = React.lazy(() => import("./pages/admin/InventoryPage"));
 const ReportsPage = React.lazy(() => import("./pages/admin/ReportsPage"));
 const UpcomingFollowUpsPage = React.lazy(() => import("./pages/admin/UpcomingFollowUpsPage"));
 const DirectSalesPage = React.lazy(() => import("./pages/admin/DirectSalesPage"));
-const DoctorsPage = React.lazy(() => import("./pages/admin/DoctorsPage"));
 const ClinicsPage = React.lazy(() => import("./pages/admin/ClinicsPage"));
 const UsersAdminPage = React.lazy(() => import("./pages/admin/UsersAdminPage"));
 const UomAdminPage = React.lazy(() => import("./pages/admin/UomAdminPage"));
@@ -111,7 +110,6 @@ const App = () => (
               <Route path="patients" element={<PatientsPage />} />
                   <Route path="patients/new" element={<NewPatientPage />} />
                   <Route path="patients/:id/edit" element={<EditPatientPage />} />
-              <Route path="doctors" element={<AdminOnlyRoute><DoctorsPage /></AdminOnlyRoute>} />
               <Route path="op" element={<ConsultationsPage />} />
               <Route path="op/new" element={<ConsultationsPage />} />
               <Route path="op/:id" element={<ConsultationsPage />} />
