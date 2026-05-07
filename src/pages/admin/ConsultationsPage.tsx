@@ -294,7 +294,7 @@ const ConsultationsPage = () => {
   });
   const defaultAyurvedaExamination = () => ({
     naadi: '' as '' | 'V' | 'P' | 'K' | 'VP' | 'VK' | 'PK',
-    malam: '' as '' | 'Regular' | 'Constipated',
+    malam: '' as '' | 'Regular' | 'Irregular' | 'Constipated',
     mootram: '' as '' | 'Regular' | 'Irregular',
     mootramColour: '' as '' | 'Clear' | 'White' | 'Yellow'| 'Red' ,
     jihwa: '' as '' | 'Lipta' | 'Alipta',
@@ -2048,7 +2048,7 @@ const ConsultationsPage = () => {
                       <td className="py-1.5 px-2 font-medium">Malam (Stool)</td>
                       <td className="py-1.5 px-2">
                         <div className="flex gap-3">
-                          {(['Regular', 'Constipated'] as const).map((opt) => (
+                          {(['Regular', 'Irregular', 'Constipated'] as const).map((opt) => (
                             <label key={opt} className="flex items-center gap-1 cursor-pointer">
                               <input type="radio" name="malam" checked={form.ayurvedaExamination.malam === opt} onChange={() => setForm((f) => ({ ...f, ayurvedaExamination: { ...f.ayurvedaExamination, malam: opt } }))} className="rounded border-input" />
                               <span>{opt}</span>
