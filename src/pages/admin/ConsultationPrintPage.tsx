@@ -74,6 +74,13 @@ const ConsultationPrintPage = () => {
   const prescription = (cons.prescription as PrescriptionRow[]) || (cons.medicines as PrescriptionRow[]) || [];
   const patientName = (cons.patientName as string) || '';
   const patientAge = cons.patientAge != null ? String(cons.patientAge) : '';
+  const patientAgeUnitRaw = String((cons.patientAgeUnit as string) || '').toLowerCase();
+  const patientAgeUnit =
+    patientAgeUnitRaw === 'month' || patientAgeUnitRaw === 'months'
+      ? 'months'
+      : patientAgeUnitRaw === 'year' || patientAgeUnitRaw === 'years'
+        ? 'years'
+        : '';
   const patientGender = (cons.patientGender as string) || '';
   const consultationDate = (cons.consultationDate as string) || '';
   const consultationTime = (cons.consultationTime as string) || '';
@@ -175,7 +182,9 @@ const ConsultationPrintPage = () => {
             </div>
             <div>
               <p className="text-[8px] font-semibold uppercase text-gray-500 mb-0.5">Age</p>
-              <p className="font-medium">{patientAge || '—'}</p>
+              <p className="font-medium">
+                {patientAge ? `${patientAge}${patientAgeUnit ? ` ${patientAgeUnit}` : ''}` : '—'}
+              </p>
             </div>
             <div>
               <p className="text-[8px] font-semibold uppercase text-gray-500 mb-0.5">Sex</p>
@@ -192,7 +201,7 @@ const ConsultationPrintPage = () => {
         <div className="border border-gray-300 rounded p-1.5 mb-2">
           <p className="text-[9px] font-semibold text-gray-600 mb-1 uppercase">Vital Signs</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-[10px]">
-            <span><strong>BP:</strong> {bpStr}</span>
+            <span><strong>BP:</strong> {bpStr}{bpStr !== '—' ? ' mmHg' : ''}</span>
             <span><strong>Weight:</strong> {weight ? `${weight} kgs` : '—'}</span>
             <span><strong>Height:</strong> {height ? `${height} cm` : '—'}</span>
             <span><strong>BMI:</strong> {bmi ? `${bmi} kg/m² (${bmiCategory})` : '—'}</span>

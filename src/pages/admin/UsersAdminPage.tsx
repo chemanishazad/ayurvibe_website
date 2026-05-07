@@ -475,7 +475,7 @@ const UsersAdminPage = () => {
 
       {/* ── Edit user dialog ── */}
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit user</DialogTitle></DialogHeader>
           <form onSubmit={editForm.handleSubmit((d) => updateMutation.mutate(d))}>
             <div className="space-y-4 py-2">
@@ -568,7 +568,7 @@ const UsersAdminPage = () => {
 
       {/* ── Reset password dialog ── */}
       <Dialog open={!!pwdUser} onOpenChange={(o) => !o && setPwdUser(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reset password</DialogTitle>
             <DialogDescription>User: {pwdUser?.username}</DialogDescription>
@@ -590,7 +590,7 @@ const UsersAdminPage = () => {
 
       {/* ── Clinic mapping dialog ── */}
       <Dialog open={!!mapUser} onOpenChange={(o) => { if (!o) { setMapUser(null); setMapClinicIdsDraft([]); setUserClinics([]); } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Clinic mapping</DialogTitle>
             <DialogDescription>User: {mapUser?.username}</DialogDescription>

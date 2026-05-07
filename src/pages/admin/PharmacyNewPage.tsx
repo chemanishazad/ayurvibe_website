@@ -33,7 +33,7 @@ import { buildPharmacyPrintPayload } from '@/lib/pharmacy-print-payload';
 import { openPharmacyPrint, savePharmacyPrintPayload } from '@/lib/print-handoff';
 import { COUNTRY_CODES } from '@/lib/country-codes';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus, Package } from 'lucide-react';
+import { Plus, Trash2, Search, Loader2, Printer, ArrowLeft, ListPlus, Package, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -1144,6 +1144,7 @@ const PharmacyNewPage = () => {
                       form.items.map((m, i) => {
                         const pick = getPickForLine(m);
                         const left = pick ? remainingForPick(pick, i) : 0;
+                        const maxQty = left + m.quantity;
                         const batchDisplay =
                           m.batchLabel && m.batchLabel !== 'Stock (FIFO)' ? m.batchLabel : m.inventoryBatchId ? m.batchLabel : 'FIFO';
                         return (
@@ -1202,18 +1203,41 @@ const PharmacyNewPage = () => {
                             </TableCell>
                             <TableCell className="text-right text-sm tabular-nums align-middle">{left}</TableCell>
                             <TableCell className="text-right align-middle">
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                className={`h-9 w-full min-w-[4rem] text-right tabular-nums ${INPUT_NO_SPIN}`}
-                                value={m.quantity}
-                                onChange={(e) => {
-                                  const max = left + m.quantity;
-                                  const q = Math.max(1, Math.min(Number(e.target.value) || 1, max));
-                                  updateItem(i, 'quantity', q);
-                                }}
-                                min={1}
-                              />
+                              <div className="relative w-full min-w-[4rem]">
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  className={`h-9 w-full text-right tabular-nums pr-8 ${INPUT_NO_SPIN}`}
+                                  value={m.quantity}
+                                  onChange={(e) => {
+                                    const q = Math.max(1, Math.min(Number(e.target.value) || 1, maxQty));
+                                    updateItem(i, 'quantity', q);
+                                  }}
+                                  min={1}
+                                />
+                                <div className="absolute right-0 top-0 h-9 w-7 border-l border-border/60 flex flex-col">
+                                  <button
+                                    type="button"
+                                    className="h-1/2 w-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-50 disabled:hover:bg-transparent"
+                                    onClick={() => updateItem(i, 'quantity', Math.min(maxQty, m.quantity + 1))}
+                                    disabled={m.quantity >= maxQty}
+                                    aria-label="Increase quantity"
+                                    title="Increase"
+                                  >
+                                    <ChevronUp className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="h-1/2 w-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-50 disabled:hover:bg-transparent"
+                                    onClick={() => updateItem(i, 'quantity', Math.max(1, m.quantity - 1))}
+                                    disabled={m.quantity <= 1}
+                                    aria-label="Decrease quantity"
+                                    title="Decrease"
+                                  >
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell className="text-right align-middle">
                               <Input

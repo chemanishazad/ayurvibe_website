@@ -726,6 +726,30 @@ const ConsultationsPage = () => {
       .list({ clinicId: targetClinicId })
       .then(async (data) => {
         const scoped = (data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name }));
+
+        // For doctor logins, lock the doctor dropdown to the mapped doctor.
+        // (Admin/Nurse staff can pick any doctor in the clinic.)
+        if (isDoctorLogin && linkedDoctorId) {
+          const inScoped = scoped.find((d) => d.id === linkedDoctorId);
+          if (inScoped) {
+            setDoctors([inScoped]);
+            return;
+          }
+          try {
+            const allDoctors = (await api.doctors.list()) as { id: string; name: string }[];
+            const linkedDoctor = allDoctors.find((d) => d.id === linkedDoctorId);
+            if (linkedDoctor) {
+              setDoctors([{ id: linkedDoctor.id, name: linkedDoctor.name }]);
+              return;
+            }
+          } catch {
+            // fall through
+          }
+          // Last resort: keep scoped list (shouldn't happen, but avoids empty dropdown).
+          setDoctors(scoped);
+          return;
+        }
+
         if (!linkedDoctorId || scoped.some((d) => d.id === linkedDoctorId)) {
           setDoctors(scoped);
           return;
@@ -743,7 +767,7 @@ const ConsultationsPage = () => {
         setDoctors(scoped);
       })
       .catch(() => setDoctors([]));
-  }, [targetClinicId, linkedDoctorId]);
+  }, [targetClinicId, linkedDoctorId, isDoctorLogin]);
 
   // Auto-pick mapped doctor on consult form for non-nurse users.
   useEffect(() => {
@@ -1740,7 +1764,7 @@ const ConsultationsPage = () => {
                 <Label className="text-xs">BP (mmHg)</Label>
                 <div className="flex gap-1 items-center">
                   <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpSystolic} onChange={(e) => setForm((f) => ({ ...f, bpSystolic: restrictVital(e.target.value, 3, 0) }))} />
-                  <span className="text-muted-foreground">/</span>
+                  <span className="text-muted-foreground font-semibold px-0.5">/</span>
                   <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpDiastolic} onChange={(e) => setForm((f) => ({ ...f, bpDiastolic: restrictVital(e.target.value, 3, 0) }))} />
                 </div>
               </div>
@@ -1764,10 +1788,6 @@ const ConsultationsPage = () => {
             {!isNurseStaff && (
             <>
             <div className="pt-4 border-t space-y-4">
-            <div>
-              <Label>Present Complaint with duration</Label>
-              <Textarea value={form.symptoms} onChange={(e) => setForm((f) => ({ ...f, symptoms: e.target.value }))} placeholder="Describe complaint and duration (e.g. Headache for 3 days)" rows={2} className="resize-none" />
-            </div>
             <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
               <Label className="text-sm font-semibold">Personal History</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
