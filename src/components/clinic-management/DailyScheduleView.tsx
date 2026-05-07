@@ -62,8 +62,8 @@ export default function DailyScheduleView({ items, dateLabel }: { items: DailySc
                         <p className="text-sm font-medium">{row.patientName}</p>
                         <p className="text-xs text-muted-foreground">
                           <Clock3 className="mr-1 inline h-3.5 w-3.5" />
-                          {new Date(row.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
-                          {new Date(row.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(row.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })} -{' '}
+                          {new Date(row.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

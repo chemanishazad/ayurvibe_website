@@ -16,7 +16,7 @@ type Props = {
   rangeLabel: string;
 };
 
-const TIME_COLUMNS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
+const TIME_COLUMNS = ['8 AM', '9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'];
 
 function timeToMinutes(timeLike: string) {
   const d = new Date(timeLike);
@@ -79,8 +79,8 @@ export default function TherapistAvailabilityDashboard({ slots, rangeLabel }: Pr
                           <p className="truncate">{slot.patientName}</p>
                           <p className="truncate text-[10px] opacity-90">
                             <Clock className="mr-1 inline h-3 w-3" />
-                            {new Date(slot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
-                            {new Date(slot.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Rm {slot.roomNumber}
+                            {new Date(slot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })} -{' '}
+                            {new Date(slot.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })} · Rm {slot.roomNumber}
                           </p>
                         </div>
                       );

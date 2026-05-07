@@ -197,7 +197,7 @@ const ConsultationPrintPage = () => {
             <span><strong>Height:</strong> {height ? `${height} cm` : '—'}</span>
             <span><strong>BMI:</strong> {bmi ? `${bmi} kg/m² (${bmiCategory})` : '—'}</span>
             <span><strong>Pulse:</strong> {pulse ? `${pulse} bpm` : '—'}</span>
-            <span><strong>Temperature:</strong> {temperature || '—'}</span>
+            <span><strong>Temperature:</strong> {temperature ? `${temperature}°F` : '—'}</span>
             <span><strong>SpO2:</strong> {spo2 ? `${spo2}%` : '—'}</span>
             <span><strong>CBG:</strong> {cbg ? `${cbg} mg/dL` : '—'}</span>
           </div>
