@@ -208,8 +208,8 @@ const DashboardPage = () => {
   const [appliedFrom, setAppliedFrom] = useState(initialRange.from);
   const [appliedTo, setAppliedTo] = useState(initialRange.to);
 
-  // Determine clinic scope for the current user / admin filter
-  const clinicScope = isAdmin ? (effectiveClinicId || undefined) : (user?.clinicId ?? undefined);
+  // Same clinic as JWT + header (effectiveClinicId). Do not use session user.clinicId alone — it can drift and breaks cache/analytics vs backend scope.
+  const clinicScope = effectiveClinicId || undefined;
   const showClinicView = isAdmin ? !!effectiveClinicId : true;
 
   const { data: dashData, isLoading: loading, error: queryError, refetch } = useQuery({
