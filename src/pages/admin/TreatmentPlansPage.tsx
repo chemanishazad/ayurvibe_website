@@ -1326,7 +1326,7 @@ function SessionDetailSheet({
       .list()
       .then((rows) =>
         setCatalogMedicines(
-          (rows as Record<string, unknown>[]).map((r) => ({ id: String(r.id), name: String(r.name ?? '') })),
+          rows.map((r) => ({ id: String(r.id), name: String(r.name ?? '') })),
         ),
       )
       .catch(() => setCatalogMedicines([]));

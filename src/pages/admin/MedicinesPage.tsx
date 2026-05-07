@@ -17,7 +17,19 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
 
-interface Medicine { id: string; name: string; uom: string; purchasePrice: string; sellingPrice: string; minStockLevel: number; description?: string; }
+interface Medicine {
+  id: string;
+  name: string;
+  uom: string;
+  purchasePrice: string;
+  sellingPrice: string;
+  minStockLevel: number;
+  description?: string;
+  status?: 'active' | 'pending' | 'archived';
+  createdVia?: 'admin' | 'doctor_quick_add' | 'import';
+}
+
+type MedicineStatusFilter = 'all' | 'active' | 'pending' | 'archived';
 
 const UOM_OPTIONS = ['tablet', 'capsule', 'syrup', 'bottle', 'strip', 'sachet', 'ml', 'gm', 'kg'];
 
@@ -46,11 +58,22 @@ const MedicinesPage = () => {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Medicine | null>(null);
+  const [statusFilter, setStatusFilter] = useState<MedicineStatusFilter>('all');
 
   const { data: medicines = [], isLoading } = useQuery<Medicine[]>({
     queryKey: ['medicines'],
     queryFn: () => api.medicines.list() as Promise<Medicine[]>,
   });
+
+  const filteredMedicines = React.useMemo(() => {
+    if (statusFilter === 'all') return medicines;
+    return medicines.filter((m) => (m.status ?? 'active') === statusFilter);
+  }, [medicines, statusFilter]);
+
+  const pendingCount = React.useMemo(
+    () => medicines.filter((m) => m.status === 'pending').length,
+    [medicines],
+  );
 
   const makeForm = (defaults?: Partial<MedicineForm>) =>
     useForm<MedicineForm>({
@@ -169,39 +192,102 @@ const MedicinesPage = () => {
     <div className="space-y-8">
       <PageHeader title="Medicine Master" description="Manage medicine catalog (Admin only for add/edit)">
         {isAdmin && (
-          <Button onClick={() => { setShowForm(true); setEditing(null); createForm.reset(); }}>
-            <Plus className="h-4 w-4 mr-2" />Add Medicine
-          </Button>
+          <div className="flex items-center gap-2">
+            {pendingCount > 0 && (
+              <Button asChild variant="outline" size="sm" className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-100">
+                <a href="/admin/medicines/pending">{pendingCount} pending review</a>
+              </Button>
+            )}
+            <Button onClick={() => { setShowForm(true); setEditing(null); createForm.reset(); }}>
+              <Plus className="h-4 w-4 mr-2" />Add Medicine
+            </Button>
+          </div>
         )}
       </PageHeader>
       <Card>
-        <CardHeader><CardTitle>Medicines</CardTitle><CardDescription>All medicines in the system</CardDescription></CardHeader>
+        <CardHeader>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <CardTitle>Medicines</CardTitle>
+              <CardDescription>All medicines in the system</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {(['all', 'active', 'pending', 'archived'] as const).map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  variant={statusFilter === s ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {s === 'all' ? 'All' : s[0].toUpperCase() + s.slice(1)}
+                  {s === 'pending' && pendingCount > 0 && (
+                    <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+                      {pendingCount}
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
         <CardContent>
-          {medicines.length === 0 ? (
-            <p className="text-muted-foreground">No medicines. Add one to get started.</p>
+          {filteredMedicines.length === 0 ? (
+            <p className="text-muted-foreground">{medicines.length === 0 ? 'No medicines. Add one to get started.' : 'No medicines match this filter.'}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead><tr className="border-b"><th className="text-left py-2">Name</th><th className="text-left py-2">UOM</th><th className="text-right py-2">Min Stock</th>{isAdmin && <th className="text-right py-2">Actions</th>}</tr></thead>
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">Name</th>
+                    <th className="text-left py-2">Status</th>
+                    <th className="text-left py-2">UOM</th>
+                    <th className="text-right py-2">Min Stock</th>
+                    {isAdmin && <th className="text-right py-2">Actions</th>}
+                  </tr>
+                </thead>
                 <tbody>
-                  {medicines.map((m) => (
-                    <tr key={m.id} className="border-b">
-                      <td className="py-2">{m.name}</td>
-                      <td className="py-2 text-muted-foreground">{m.uom?.trim() ? m.uom : '—'}</td>
-                      <td className="py-2 text-right">{m.minStockLevel}</td>
-                      {isAdmin && (
-                        <td className="py-2 text-right">
-                          <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="ghost" onClick={() => openEdit(m)}><Pencil className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                              onClick={() => { if (!confirm(`Delete "${m.name}"? Fails if in use.`)) return; deleteMutation.mutate(m.id); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                  {filteredMedicines.map((m) => {
+                    const status = m.status ?? 'active';
+                    return (
+                      <tr key={m.id} className="border-b">
+                        <td className="py-2">{m.name}</td>
+                        <td className="py-2">
+                          {status === 'pending' ? (
+                            <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                              Pending
+                            </span>
+                          ) : status === 'archived' ? (
+                            <span className="inline-flex items-center rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                              Archived
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                              Active
+                            </span>
+                          )}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="py-2 text-muted-foreground">{m.uom?.trim() ? m.uom : '—'}</td>
+                        <td className="py-2 text-right">{m.minStockLevel}</td>
+                        {isAdmin && (
+                          <td className="py-2 text-right">
+                            <div className="flex gap-1 justify-end">
+                              {status === 'pending' && (
+                                <Button asChild size="sm" variant="outline">
+                                  <a href={`/admin/medicines/pending#${m.id}`}>Complete</a>
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" onClick={() => openEdit(m)}><Pencil className="h-4 w-4" /></Button>
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                onClick={() => { if (!confirm(`Delete "${m.name}"? Fails if in use.`)) return; deleteMutation.mutate(m.id); }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

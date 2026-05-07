@@ -69,6 +69,71 @@ export const STAFF_HIDDEN_NAV_PATHS = new Set([
   '/admin/direct-sales',
 ]);
 
+/**
+ * Role presets for the Users & access editor — one click swaps the entire `allowedNavPaths`
+ * checklist to a sensible default for the chosen role. Keep these in sync with the
+ * "access matrix" in PLAN.md §2.4.
+ */
+export type AllowedNavPreset = 'doctor' | 'reception' | 'doctor_full' | 'reception_full';
+
+export const NAV_PRESETS: Record<AllowedNavPreset, { label: string; description: string; paths: string[] }> = {
+  doctor: {
+    label: 'Doctor (default)',
+    description: 'Clinical work: dashboard, patients, OP, consultations, treatment plans, follow-ups, pharmacy ledger.',
+    paths: [
+      '/admin/dashboard',
+      '/admin/patients',
+      '/admin/op',
+      '/admin/consultations',
+      '/admin/treatment-plans',
+      '/admin/upcoming-follow-ups',
+      '/admin/pharmacy',
+      '/admin/inventory',
+      '/admin/reports',
+    ],
+  },
+  doctor_full: {
+    label: 'Doctor (with reports & inventory)',
+    description: 'Same as Doctor plus access to reports and inventory views.',
+    paths: [
+      '/admin/dashboard',
+      '/admin/patients',
+      '/admin/op',
+      '/admin/consultations',
+      '/admin/treatment-plans',
+      '/admin/upcoming-follow-ups',
+      '/admin/pharmacy',
+      '/admin/inventory',
+      '/admin/reports',
+    ],
+  },
+  reception: {
+    label: 'Receptionist (default)',
+    description: 'Front desk: patients, OP vitals, pharmacy sales & ledger, follow-ups call list.',
+    paths: [
+      '/admin/dashboard',
+      '/admin/patients',
+      '/admin/op',
+      '/admin/pharmacy',
+      '/admin/upcoming-follow-ups',
+      '/admin/inventory',
+    ],
+  },
+  reception_full: {
+    label: 'Receptionist (with treatment scheduling)',
+    description: 'Adds treatment plans (read + schedule) on top of the default receptionist menu.',
+    paths: [
+      '/admin/dashboard',
+      '/admin/patients',
+      '/admin/op',
+      '/admin/pharmacy',
+      '/admin/treatment-plans',
+      '/admin/upcoming-follow-ups',
+      '/admin/inventory',
+    ],
+  },
+};
+
 export type AuthUserSession = {
   role: string;
   allowedNavPaths?: string[] | null;
