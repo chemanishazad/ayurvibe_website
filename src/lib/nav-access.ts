@@ -9,7 +9,6 @@ import {
   ClipboardList,
   Truck,
   CalendarClock,
-  UsersRound,
   ShoppingCart,
   Building2,
   UserCog,
@@ -27,7 +26,6 @@ export const ADMIN_NAV_CATALOG: {
 }[] = [
   { path: '/admin/dashboard', label: 'Dashboard', group: 'Overview', icon: LayoutDashboard },
   { path: '/admin/patients', label: 'Patients', group: 'Clinical', icon: Users },
-  { path: '/admin/doctors', label: 'Doctors', group: 'Clinical', icon: UsersRound },
   { path: '/admin/op', label: 'OP', group: 'Clinical', icon: HeartPulse },
   { path: '/admin/consultations', label: 'Consultations', group: 'Clinical', icon: Stethoscope },
   { path: '/admin/pharmacy', label: 'Pharmacy', group: 'Clinical', icon: Pill },
@@ -63,7 +61,6 @@ export function getFullNavGroups(): NavGroup[] {
 
 /** Default staff menu (no explicit `allowedNavPaths`): hide these. */
 export const STAFF_HIDDEN_NAV_PATHS = new Set([
-  '/admin/doctors',
   '/admin/medicines',
   '/admin/suppliers',
   '/admin/direct-sales',

@@ -121,7 +121,7 @@ type PrescriptionItem = {
   timeMorning: boolean;
   timeAfternoon: boolean;
   timeNight: boolean;
-  foodRelation: '' | 'before_food' | 'after_food';
+  foodRelation: '' | 'before_food' | 'after_food' | 'along_with_food';
   quantity: string;
   withHotWater: boolean;
   withMilk: boolean;
@@ -726,6 +726,30 @@ const ConsultationsPage = () => {
       .list({ clinicId: targetClinicId })
       .then(async (data) => {
         const scoped = (data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name }));
+
+        // For doctor logins, lock the doctor dropdown to the mapped doctor.
+        // (Admin/Nurse staff can pick any doctor in the clinic.)
+        if (isDoctorLogin && linkedDoctorId) {
+          const inScoped = scoped.find((d) => d.id === linkedDoctorId);
+          if (inScoped) {
+            setDoctors([inScoped]);
+            return;
+          }
+          try {
+            const allDoctors = (await api.doctors.list()) as { id: string; name: string }[];
+            const linkedDoctor = allDoctors.find((d) => d.id === linkedDoctorId);
+            if (linkedDoctor) {
+              setDoctors([{ id: linkedDoctor.id, name: linkedDoctor.name }]);
+              return;
+            }
+          } catch {
+            // fall through
+          }
+          // Last resort: keep scoped list (shouldn't happen, but avoids empty dropdown).
+          setDoctors(scoped);
+          return;
+        }
+
         if (!linkedDoctorId || scoped.some((d) => d.id === linkedDoctorId)) {
           setDoctors(scoped);
           return;
@@ -743,7 +767,7 @@ const ConsultationsPage = () => {
         setDoctors(scoped);
       })
       .catch(() => setDoctors([]));
-  }, [targetClinicId, linkedDoctorId]);
+  }, [targetClinicId, linkedDoctorId, isDoctorLogin]);
 
   // Auto-pick mapped doctor on consult form for non-nurse users.
   useEffect(() => {
@@ -998,13 +1022,15 @@ const ConsultationsPage = () => {
         });
         loadConsultations();
         const cid = updated?.id || consultationIdFromRoute;
-        navigate(`/admin/consultations/${cid}`);
-        api.consultations.get(cid).then((data) => {
-          saveConsultationPrintPayload(cid, data);
-          openConsultationPrint(cid);
-        }).catch(() => {
-          openConsultationPrint(cid);
-        });
+        // Important: open the print tab directly (avoid popup blockers).
+        openConsultationPrint(cid);
+        // Best-effort payload handoff (print page can live-fetch if storage fails).
+        api.consultations
+          .get(cid)
+          .then((data) => saveConsultationPrintPayload(cid, data))
+          .catch(() => {});
+        // After saving OP completion, return to Consultations list.
+        navigate('/admin/consultations', { replace: true });
         setLoading(false);
         return;
       }
@@ -1107,12 +1133,15 @@ const ConsultationsPage = () => {
       });
       loadConsultations();
       if (created?.id) {
-        api.consultations.get(created.id).then((data) => {
-          saveConsultationPrintPayload(created.id, data);
-          openConsultationPrint(created.id);
-        }).catch(() => {
-          openConsultationPrint(created.id);
-        });
+        // Important: open the print tab directly (avoid popup blockers).
+        openConsultationPrint(created.id);
+        // Best-effort payload handoff (print page can live-fetch if storage fails).
+        api.consultations
+          .get(created.id)
+          .then((data) => saveConsultationPrintPayload(created.id, data))
+          .catch(() => {});
+        // After saving, return to the main Consultations list.
+        navigate('/admin/consultations', { replace: true });
       }
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' });
@@ -1740,7 +1769,7 @@ const ConsultationsPage = () => {
                 <Label className="text-xs">BP (mmHg)</Label>
                 <div className="flex gap-1 items-center">
                   <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpSystolic} onChange={(e) => setForm((f) => ({ ...f, bpSystolic: restrictVital(e.target.value, 3, 0) }))} />
-                  <span className="text-muted-foreground">/</span>
+                  <span className="text-muted-foreground font-semibold px-0.5">/</span>
                   <Input type="text" inputMode="numeric" className="h-9 w-14" placeholder="—" value={form.bpDiastolic} onChange={(e) => setForm((f) => ({ ...f, bpDiastolic: restrictVital(e.target.value, 3, 0) }))} />
                 </div>
               </div>
@@ -1764,10 +1793,6 @@ const ConsultationsPage = () => {
             {!isNurseStaff && (
             <>
             <div className="pt-4 border-t space-y-4">
-            <div>
-              <Label>Present Complaint with duration</Label>
-              <Textarea value={form.symptoms} onChange={(e) => setForm((f) => ({ ...f, symptoms: e.target.value }))} placeholder="Describe complaint and duration (e.g. Headache for 3 days)" rows={2} className="resize-none" />
-            </div>
             <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
               <Label className="text-sm font-semibold">Personal History</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -2371,7 +2396,7 @@ const ConsultationsPage = () => {
                         </div>
 
                         <div className="rounded-lg border bg-white/60 p-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Food / Route</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Route of administration</p>
                           <RadioGroup
                             value={p.foodRelation || 'none'}
                             onValueChange={(v) => updatePrescription(i, 'foodRelation', v === 'none' ? '' : v)}
@@ -2385,6 +2410,11 @@ const ConsultationsPage = () => {
                               <RadioGroupItem value="after_food" />
                               After food
                             </label>
+                            <label className="flex items-center gap-2 text-sm">
+                              <RadioGroupItem value="along_with_food" />
+                              Along with food
+                            </label>
+
                             <label className="flex items-center gap-2 text-sm text-muted-foreground">
                               <RadioGroupItem value="none" />
                               External use
@@ -2925,7 +2955,10 @@ const ConsultationsPage = () => {
                                             ? 'Before food'
                                             : p.foodRelation === 'after_food'
                                               ? 'After food'
-                                              : '—';
+                                              : p.foodRelation === 'along_with_food'
+                                                ? 'Along with food'
+                                                : 'External / Not specified';
+                                              
                                         const durVal = p.durationDays;
                                         const duration =
                                           durVal != null && String(durVal).trim() !== ''
