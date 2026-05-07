@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarIcon, FileText, Loader2, Plus, Printer, RotateCcw, Stethoscope } from 'lucide-react';
+import { CalendarIcon, CornerDownRight, FileText, Loader2, Plus, Printer, RotateCcw, Stethoscope } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -109,15 +109,90 @@ export const ConsultationListTable: React.FC<Props> = ({
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState(10);
 
-  const sorted = React.useMemo(
-    () =>
-      [...consultations].sort((a, b) => {
-        const da = `${a.consultationDate} ${a.consultationTime || ''}`;
-        const db = `${b.consultationDate} ${b.consultationTime || ''}`;
-        return db.localeCompare(da);
-      }),
-    [consultations],
-  );
+  type DisplayRow = OutpatientRow & {
+    _groupIndex: number;
+    _isGroupStart: boolean;
+    _groupSize: number;
+    _positionInGroup: number;
+    _isOrphan: boolean;
+  };
+
+  const sorted = React.useMemo<DisplayRow[]>(() => {
+    if (isOpQueue) {
+      return [...consultations]
+        .sort((a, b) => {
+          const da = `${a.consultationDate} ${a.consultationTime || ''}`;
+          const db = `${b.consultationDate} ${b.consultationTime || ''}`;
+          return db.localeCompare(da);
+        })
+        .map((c, i) => ({
+          ...c,
+          _groupIndex: i + 1,
+          _isGroupStart: true,
+          _groupSize: 1,
+          _positionInGroup: 0,
+          _isOrphan: false,
+        }));
+    }
+
+    const byKey = (c: OutpatientRow) => `${c.consultationDate} ${c.consultationTime || ''}`;
+    const desc = (a: OutpatientRow, b: OutpatientRow) => byKey(b).localeCompare(byKey(a));
+
+    const initials = consultations.filter((c) => !c.parentConsultationId).sort(desc);
+    const initialIds = new Set(initials.map((i) => i.id));
+    const followUpsByParent = new Map<string, OutpatientRow[]>();
+    const orphanFollowUps: OutpatientRow[] = [];
+
+    for (const c of consultations) {
+      if (!c.parentConsultationId) continue;
+      if (initialIds.has(c.parentConsultationId)) {
+        const list = followUpsByParent.get(c.parentConsultationId) ?? [];
+        list.push(c);
+        followUpsByParent.set(c.parentConsultationId, list);
+      } else {
+        orphanFollowUps.push(c);
+      }
+    }
+
+    const out: DisplayRow[] = [];
+    initials.forEach((initial, idx) => {
+      const children = (followUpsByParent.get(initial.id) ?? []).sort(desc);
+      const groupSize = 1 + children.length;
+      out.push({
+        ...initial,
+        _groupIndex: idx + 1,
+        _isGroupStart: true,
+        _groupSize: groupSize,
+        _positionInGroup: 0,
+        _isOrphan: false,
+      });
+      children.forEach((child, ci) => {
+        out.push({
+          ...child,
+          _groupIndex: idx + 1,
+          _isGroupStart: false,
+          _groupSize: groupSize,
+          _positionInGroup: ci + 1,
+          _isOrphan: false,
+        });
+      });
+    });
+    if (orphanFollowUps.length) {
+      orphanFollowUps.sort(desc);
+      const orphanGroupIdx = initials.length + 1;
+      orphanFollowUps.forEach((c, i) => {
+        out.push({
+          ...c,
+          _groupIndex: orphanGroupIdx,
+          _isGroupStart: i === 0,
+          _groupSize: orphanFollowUps.length,
+          _positionInGroup: i,
+          _isOrphan: true,
+        });
+      });
+    }
+    return out;
+  }, [consultations, isOpQueue]);
 
   const totalRows = sorted.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / perPage));
@@ -202,6 +277,7 @@ export const ConsultationListTable: React.FC<Props> = ({
         >
             <TableHeader className="sticky top-0 z-10 border-b border-border/60 bg-muted/95 backdrop-blur-sm">
               <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[44px] text-right tabular-nums">#</TableHead>
                 <TableHead className="w-[100px] whitespace-nowrap">Visit</TableHead>
                 <TableHead className="min-w-[120px]">Patient</TableHead>
                 <TableHead className="min-w-[100px]">Mobile</TableHead>
@@ -231,41 +307,65 @@ export const ConsultationListTable: React.FC<Props> = ({
               {paginatedRows.map((c) => {
                 const isInitial = !c.parentConsultationId;
                 const ageLabel = formatPatientAgeDisplay(c.patientAge, c.patientAgeUnit);
+                const showGroupSeparator = !isOpQueue && c._isGroupStart && c._groupIndex > 1;
+                const indentChild = !isOpQueue && !isInitial;
+                const rowNumber = startIdx + paginatedRows.indexOf(c) + 1;
                 return (
-                  <TableRow
-                    key={c.id}
-                    className={cn(
-                      !disableRowOpen && 'cursor-pointer',
-                      disableRowOpen && 'cursor-default',
-                      activeConsId === c.id && 'bg-primary/5',
+                  <React.Fragment key={c.id}>
+                    {showGroupSeparator && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={17} className="h-2 border-t-2 border-border/70 bg-muted/30 p-0" />
+                      </TableRow>
                     )}
-                    onClick={disableRowOpen ? undefined : () => openConsultationRecord(c)}
-                  >
-                    <TableCell className="align-top">
-                      <span
+                    <TableRow
+                      className={cn(
+                        !disableRowOpen && 'cursor-pointer',
+                        disableRowOpen && 'cursor-default',
+                        activeConsId === c.id && 'bg-primary/5',
+                        !isOpQueue && isInitial && 'bg-primary/[0.03] hover:bg-primary/[0.06]',
+                        indentChild && 'bg-amber-50/30 hover:bg-amber-50/60 dark:bg-amber-950/10 dark:hover:bg-amber-950/20',
+                      )}
+                      onClick={disableRowOpen ? undefined : () => openConsultationRecord(c)}
+                    >
+                      <TableCell className="align-top text-right text-xs tabular-nums text-muted-foreground">
+                        {rowNumber}
+                      </TableCell>
+                      <TableCell
                         className={cn(
-                          'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold',
-                          isInitial
-                            ? 'border-primary/30 bg-primary/10 text-primary'
-                            : 'border-amber-200/80 bg-amber-50/90 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
+                          'align-top',
+                          indentChild && 'border-l-[3px] border-amber-400/80 pl-3 dark:border-amber-600/70',
+                          !isOpQueue && isInitial && 'border-l-[3px] border-primary/60 pl-3',
                         )}
                       >
-                        {isInitial ? (
-                          <>
-                            <Stethoscope className="h-3 w-3" /> Initial
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="h-3 w-3" /> Follow-up
-                          </>
-                        )}
-                      </span>
-                    </TableCell>
-                    <TableCell className="align-top font-medium">
-                      <span className="min-w-0 max-w-[220px] break-words sm:max-w-[280px]" title={c.patientName}>
-                        {c.patientName}
-                      </span>
-                    </TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {indentChild && (
+                            <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-amber-700/80 dark:text-amber-300/80" />
+                          )}
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold',
+                              isInitial
+                                ? 'border-primary/30 bg-primary/10 text-primary'
+                                : 'border-amber-200/80 bg-amber-50/90 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
+                            )}
+                          >
+                            {isInitial ? (
+                              <>
+                                <Stethoscope className="h-3 w-3" /> Initial
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="h-3 w-3" /> Follow-up
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className={cn('align-top font-medium', indentChild && 'pl-2 text-muted-foreground')}>
+                        <span className="min-w-0 max-w-[220px] break-words sm:max-w-[280px]" title={c.patientName}>
+                          {c.patientName}
+                        </span>
+                      </TableCell>
                     <TableCell className="align-top text-sm tabular-nums text-muted-foreground">{dash(c.patientMobile)}</TableCell>
                     <TableCell className="align-top text-sm">{ageLabel}</TableCell>
                     <TableCell className="align-top text-sm">{dash(c.patientGender)}</TableCell>
@@ -322,6 +422,7 @@ export const ConsultationListTable: React.FC<Props> = ({
                       </div>
                     </TableCell>
                   </TableRow>
+                  </React.Fragment>
                 );
               })}
             </TableBody>

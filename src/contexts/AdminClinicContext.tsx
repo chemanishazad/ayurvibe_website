@@ -87,9 +87,9 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
     return payload?.clinicId ?? user?.clinicId ?? null;
   }, [isAdmin, selectedClinicId, user?.clinicId, clinicRefreshKey]);
 
-  /** Keep stored user.clinicId aligned with JWT after refresh or tab restore. */
+  /** Keep stored user.clinicId aligned with JWT (all non-admin roles: doctor, nurse, legacy user). */
   useEffect(() => {
-    if (isAdmin || !user || user.role !== 'user') return;
+    if (isAdmin || !user || user.role === 'admin') return;
     const token = getAuthToken();
     if (!token) return;
     const payload = decodeJwtPayload<{ clinicId?: string | null }>(token);
@@ -102,7 +102,7 @@ export function AdminClinicProvider({ children }: { children: React.ReactNode })
 
   /** If JWT names a clinic no longer mapped to this user, switch to first mapped clinic. */
   useEffect(() => {
-    if (isAdmin || !user || user.role !== 'user' || clinicsLoading || clinics.length === 0) return;
+    if (isAdmin || !user || user.role === 'admin' || clinicsLoading || clinics.length === 0) return;
     const token = getAuthToken();
     const payload = decodeJwtPayload<{ clinicId?: string | null }>(token);
     const cid = payload?.clinicId;
