@@ -182,8 +182,8 @@ export const api = {
           username: string;
           role: string;
           clinicId: string;
+          displayName?: string | null;
           allowedNavPaths?: string[] | null;
-          linkedDoctorId?: string | null;
         };
       }>('/api/auth/switch-clinic', {
         method: 'POST',
@@ -207,10 +207,9 @@ export const api = {
           id: string;
           username: string;
           role: string;
+          displayName?: string | null;
           createdAt: string;
           allowedNavPaths?: string[] | null;
-          linkedDoctorId?: string | null;
-          linkedDoctorName?: string | null;
           clinicAccessNames?: string[];
         }[]
       >('/api/users'),
@@ -220,9 +219,8 @@ export const api = {
       role: 'admin' | 'doctor' | 'nurse';
       clinicIds?: string[];
       allowedNavPaths?: string[] | null;
-      linkedDoctorId?: string | null;
-      /** Doctor only: display name for the auto-created/linked doctor profile. */
-      doctorDisplayName?: string;
+      /** Doctor only: friendly name shown on consultations & prints (falls back to username). */
+      displayName?: string;
     }) => fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>('/api/users', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -233,9 +231,8 @@ export const api = {
         username: string;
         role: 'admin' | 'doctor' | 'nurse';
         allowedNavPaths: string[] | null;
-        linkedDoctorId: string | null;
-        /** Doctor only: rename (or auto-create) linked doctor profile. */
-        doctorDisplayName: string;
+        /** Doctor only: rename the printed name. */
+        displayName: string | null;
       }>,
     ) =>
       fetchApi<{ id: string; username: string; role: string; allowedNavPaths?: string[] | null }>(
@@ -254,9 +251,13 @@ export const api = {
       fetchApi<Record<string, unknown>>(`/api/users/${userId}/clinics`, { method: 'POST', body: JSON.stringify({ clinicId }) }),
     removeClinic: (userId: string, clinicId: string) =>
       fetchApi<{ success: boolean }>(`/api/users/${userId}/clinics/${clinicId}`, { method: 'DELETE' }),
-    /** One-off repair: create missing doctor profiles for doctor users and re-sync clinic mappings. */
-    backfillDoctorProfiles: () =>
-      fetchApi<{ created: number; synced: number }>(`/api/users/backfill-doctor-profiles`, { method: 'POST' }),
+    /** Doctor user picker for consultation/OP forms — pass `clinicId` to scope. */
+    listDoctors: (params?: { clinicId?: string }) => {
+      const q = params?.clinicId ? `?clinicId=${encodeURIComponent(params.clinicId)}` : '';
+      return fetchApi<
+        { id: string; name: string; username: string; displayName: string | null }[]
+      >(`/api/users/doctors${q}`);
+    },
   },
   clinics: {
     list: () => fetchApi<{ id: string; name: string }[]>('/api/clinics'),
@@ -293,26 +294,6 @@ export const api = {
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/patients/${id}`),
     update: (id: string, data: Record<string, unknown>) => fetchApi<Record<string, unknown>>(`/api/patients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     history: (id: string) => fetchApi<Record<string, unknown>[]>(`/api/patients/${id}/history`),
-  },
-  doctors: {
-    list: (params?: { clinicId?: string }) => {
-      const q = params?.clinicId ? `?clinicId=${params.clinicId}` : '';
-      return fetchApi<{ id: string; name: string; clinicIds?: string[] }[]>(`/api/doctors${q}`);
-    },
-    create: (data: { name: string; clinicIds?: string[] }) =>
-      fetchApi<{ id: string; name: string; clinicIds?: string[] }>('/api/doctors', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: { name: string }) =>
-      fetchApi<{ id: string; name: string; clinicIds?: string[] }>(`/api/doctors/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/doctors/${id}`, { method: 'DELETE' }),
-    listClinics: (doctorId: string) =>
-      fetchApi<{ id: string; name: string; mappingId: string }[]>(`/api/doctors/${doctorId}/clinics`),
-    addClinic: (doctorId: string, clinicId: string) =>
-      fetchApi<Record<string, unknown>>(`/api/doctors/${doctorId}/clinics`, {
-        method: 'POST',
-        body: JSON.stringify({ clinicId }),
-      }),
-    removeClinic: (doctorId: string, clinicId: string) =>
-      fetchApi<{ success: boolean }>(`/api/doctors/${doctorId}/clinics/${clinicId}`, { method: 'DELETE' }),
   },
   medicines: {
     list: () => fetchApi<MedicineRow[]>('/api/medicines'),

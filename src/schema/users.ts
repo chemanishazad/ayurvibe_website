@@ -14,7 +14,7 @@ export const userCreateSchema = z.object({
     required_error: 'Role is required',
     invalid_type_error: 'Select a valid role',
   }),
-  linkedDoctorId: z.string().optional().nullable(),
+  displayName: z.string().optional().nullable(),
   allowedNavPaths: z.array(z.string()).optional().nullable(),
   clinicIds: z.array(z.string()).optional(),
 });

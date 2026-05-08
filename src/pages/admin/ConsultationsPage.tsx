@@ -243,22 +243,19 @@ const ConsultationsPage = () => {
   }, [listFilters.search]);
 
   const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
-  const linkedDoctorId = (user?.linkedDoctorId ?? '').trim();
   const isDoctorLogin = user?.role === 'doctor';
+  /** Doctor user signs their own consultations — their `users.id` is the consultation `doctorId`. */
+  const doctorSelfUserId = (isDoctorLogin ? user?.id ?? '' : '').trim();
   const defaultDoctorIdForUser = useMemo(() => {
-    if (linkedDoctorId && doctors.some((d) => d.id === linkedDoctorId)) {
-      return linkedDoctorId;
+    if (doctorSelfUserId && doctors.some((d) => d.id === doctorSelfUserId)) {
+      return doctorSelfUserId;
     }
     if (isDoctorLogin) {
-      return linkedDoctorId;
-    }
-    // Legacy fallback for old "user" role.
-    if (user?.role === 'user' && doctors.length > 0) {
-      return doctors[0].id;
+      return doctorSelfUserId;
     }
     return '';
-  }, [doctors, linkedDoctorId, isDoctorLogin, user?.role]);
-  const forceMappedDoctorReadOnly = Boolean(isDoctorLogin && linkedDoctorId);
+  }, [doctors, doctorSelfUserId, isDoctorLogin]);
+  const forceMappedDoctorReadOnly = Boolean(isDoctorLogin && doctorSelfUserId);
   const [medicinesMaster, setMedicinesMaster] = useState<{ id: string; name: string }[]>([]);
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -506,7 +503,7 @@ const ConsultationsPage = () => {
         const intakeTime = (cons.consultationTime as string | null | undefined) ?? null;
         setOpNurseIntakeSnapshot({ date: intakeDate, time: intakeTime });
         if (user?.role === 'admin' && cons.clinicId) setSelectedClinicId(cons.clinicId as string);
-        const linkedDoc = user?.linkedDoctorId ?? '';
+        const linkedDoc = isDoctorLogin ? (user?.id ?? '') : '';
         let ph = defaultPersonalHistory();
         try {
           const rawPh = cons.personalHistory as string;
@@ -609,7 +606,7 @@ const ConsultationsPage = () => {
       })
       .catch(() => toast({ title: 'Failed to load OP visit', variant: 'destructive' }))
       .finally(() => setOpFormLoading(false));
-  }, [consultationIdFromRoute, isOpDoctorCompleteRoute, navigate, setSelectedClinicId, toast, user?.linkedDoctorId, user?.role]);
+  }, [consultationIdFromRoute, isOpDoctorCompleteRoute, navigate, setSelectedClinicId, toast, user?.id, user?.role, isDoctorLogin]);
 
 
   useEffect(() => {
@@ -722,52 +719,27 @@ const ConsultationsPage = () => {
       setDoctors([]);
       return;
     }
-    api.doctors
-      .list({ clinicId: targetClinicId })
+    api.users
+      .listDoctors({ clinicId: targetClinicId })
       .then(async (data) => {
         const scoped = (data as { id: string; name: string }[]).map((d) => ({ id: d.id, name: d.name }));
 
-        // For doctor logins, lock the doctor dropdown to the mapped doctor.
-        // (Admin/Nurse staff can pick any doctor in the clinic.)
-        if (isDoctorLogin && linkedDoctorId) {
-          const inScoped = scoped.find((d) => d.id === linkedDoctorId);
-          if (inScoped) {
-            setDoctors([inScoped]);
+        // Doctor login: lock the picker to themselves.
+        if (isDoctorLogin && doctorSelfUserId) {
+          const me = scoped.find((d) => d.id === doctorSelfUserId);
+          if (me) {
+            setDoctors([me]);
             return;
           }
-          try {
-            const allDoctors = (await api.doctors.list()) as { id: string; name: string }[];
-            const linkedDoctor = allDoctors.find((d) => d.id === linkedDoctorId);
-            if (linkedDoctor) {
-              setDoctors([{ id: linkedDoctor.id, name: linkedDoctor.name }]);
-              return;
-            }
-          } catch {
-            // fall through
-          }
-          // Last resort: keep scoped list (shouldn't happen, but avoids empty dropdown).
-          setDoctors(scoped);
+          // Fallback: if backend doesn't list this doctor for the clinic, surface a friendly placeholder.
+          setDoctors([{ id: doctorSelfUserId, name: user?.displayName?.trim() || user?.username || 'Me' }]);
           return;
         }
 
-        if (!linkedDoctorId || scoped.some((d) => d.id === linkedDoctorId)) {
-          setDoctors(scoped);
-          return;
-        }
-        try {
-          const allDoctors = (await api.doctors.list()) as { id: string; name: string }[];
-          const linkedDoctor = allDoctors.find((d) => d.id === linkedDoctorId);
-          if (linkedDoctor) {
-            setDoctors([...scoped, { id: linkedDoctor.id, name: linkedDoctor.name }]);
-            return;
-          }
-        } catch {
-          // fallback to scoped list
-        }
         setDoctors(scoped);
       })
       .catch(() => setDoctors([]));
-  }, [targetClinicId, linkedDoctorId, isDoctorLogin]);
+  }, [targetClinicId, doctorSelfUserId, isDoctorLogin, user?.displayName, user?.username]);
 
   // Auto-pick mapped doctor on consult form for non-nurse users.
   useEffect(() => {
@@ -1001,11 +973,11 @@ const ConsultationsPage = () => {
       };
 
       if (isOpDoctorCompleteRoute && consultationIdFromRoute) {
-        const doctorId = String(form.doctorId || user?.linkedDoctorId || '').trim();
+        const doctorId = String(form.doctorId || doctorSelfUserId || '').trim();
         if (!doctorId) {
           toast({
             title: 'Doctor required',
-            description: 'Select the examining doctor or ask admin to link a doctor to your account.',
+            description: 'Select the examining doctor.',
             variant: 'destructive',
           });
           setLoading(false);
@@ -1094,7 +1066,7 @@ const ConsultationsPage = () => {
 
       const created = (await api.consultations.create({
         ...basePayload,
-        doctorId: isDoctorLogin ? linkedDoctorId : form.doctorId,
+        doctorId: isDoctorLogin ? doctorSelfUserId : form.doctorId,
       })) as { id?: string };
       setConsultationErrors([]);
       toast({
@@ -1696,7 +1668,10 @@ const ConsultationsPage = () => {
                 <div className="sm:col-span-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
                   <Label className="text-muted-foreground">Examining doctor</Label>
                   <p className="mt-1 text-base font-semibold text-foreground">
-                    {doctors.find((d) => d.id === linkedDoctorId)?.name ?? '—'}
+                    {doctors.find((d) => d.id === doctorSelfUserId)?.name
+                      ?? user?.displayName?.trim()
+                      ?? user?.username
+                      ?? '—'}
                   </p>
                  
                 </div>
