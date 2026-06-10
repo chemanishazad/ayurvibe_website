@@ -36,7 +36,7 @@ import {
   type PurchaseBillRow,
   type NewPurchaseBillItem,
 } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
 import { formatIsoDateToApp, localDateYmd } from '@/lib/datetime';
 import { toAmount as money, formatINR as inr } from '@/lib/money';
@@ -116,7 +116,10 @@ function LineUnitSelect({
 }
 
 const PurchaseBillsPage = () => {
-  const me = getAuthUser();
+  const perms = usePermissions();
+  const canView = perms.has('purchase_bills.view');
+  const canCreate = perms.has('purchase_bills.create');
+  const canPay = perms.has('purchase_bills.edit');
   const { toast } = useToast();
   const qc = useQueryClient();
   const { clinics, effectiveClinicId, isAdmin } = useAdminClinic();
@@ -226,7 +229,7 @@ const PurchaseBillsPage = () => {
     onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
   });
 
-  if (me?.role !== 'admin') return <Navigate to="/admin/dashboard" replace />;
+  if (!canView) return <Navigate to="/admin/dashboard" replace />;
 
   const totalOutstanding = bills.reduce(
     (acc, b) => acc + (b.paymentStatus !== 'paid' ? money(b.totalAmount) - money(b.amountPaid) : 0),
@@ -240,10 +243,12 @@ const PurchaseBillsPage = () => {
         title="Purchases & Bills"
         description="Record medicine purchases per agency, track what's paid, and stay on top of payment deadlines."
       >
-        <Button onClick={openNew}>
-          <Plus className="mr-2 h-4 w-4" />
-          New bill
-        </Button>
+        {canCreate && (
+          <Button onClick={openNew}>
+            <Plus className="mr-2 h-4 w-4" />
+            New bill
+          </Button>
+        )}
       </PageHeader>
 
       {/* Summary strip */}
@@ -353,7 +358,7 @@ const PurchaseBillsPage = () => {
                         <td className="px-4 py-3 text-right align-top font-medium">{inr(pending)}</td>
                         <td className="px-4 py-3 align-top"><PaymentStatusBadge status={b.paymentStatus} /></td>
                         <td className="px-4 py-3 text-right align-top">
-                          {b.paymentStatus !== 'paid' && (
+                          {b.paymentStatus !== 'paid' && canPay && (
                             <Button size="sm" variant="outline" className="h-8" onClick={() => setPayBillId(b.id)}>
                               <IndianRupee className="mr-1 h-3.5 w-3.5" />Pay
                             </Button>
@@ -493,7 +498,7 @@ const PurchaseBillsPage = () => {
       </Dialog>
 
       <RecordPaymentDialog billId={payBillId} onClose={() => setPayBillId(null)} onPaid={invalidate} />
-      <BillDetailDialog billId={detailBillId} onClose={() => setDetailBillId(null)} onPay={(id) => { setDetailBillId(null); setPayBillId(id); }} />
+      <BillDetailDialog billId={detailBillId} canPay={canPay} onClose={() => setDetailBillId(null)} onPay={(id) => { setDetailBillId(null); setPayBillId(id); }} />
     </div>
   );
 };
@@ -585,7 +590,7 @@ function RecordPaymentDialog({ billId, onClose, onPaid }: { billId: string | nul
 }
 
 // ─── Bill detail dialog ────────────────────────────────────────────────────────
-function BillDetailDialog({ billId, onClose, onPay }: { billId: string | null; onClose: () => void; onPay: (id: string) => void }) {
+function BillDetailDialog({ billId, canPay, onClose, onPay }: { billId: string | null; canPay: boolean; onClose: () => void; onPay: (id: string) => void }) {
   const { data: bill, isLoading } = useQuery({
     queryKey: ['purchase-bill', billId],
     queryFn: () => api.purchaseBills.get(billId!),
@@ -653,7 +658,7 @@ function BillDetailDialog({ billId, onClose, onPay }: { billId: string | null; o
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          {bill && bill.paymentStatus !== 'paid' && (
+          {bill && bill.paymentStatus !== 'paid' && canPay && (
             <Button onClick={() => onPay(bill.id)}><IndianRupee className="mr-1 h-4 w-4" />Record payment</Button>
           )}
         </DialogFooter>

@@ -8,9 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
 import { Plus, Pencil, Trash2, AlertCircle, Loader2, Boxes } from 'lucide-react';
 import { MedicineUnitsDialog } from './MedicineUnitsDialog';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -53,8 +53,12 @@ const FieldError = ({ message }: { message?: string }) =>
   ) : null;
 
 const MedicinesPage = () => {
-  const user = getAuthUser();
-  const isAdmin = user?.role === 'admin';
+  const perms = usePermissions();
+  const canCreate = perms.has('medicines.create');
+  const canEdit = perms.has('medicines.edit');
+  const canDelete = perms.has('medicines.delete');
+  /** Show the actions column / management affordances if the user can do anything mutating. */
+  const isAdmin = canCreate || canEdit || canDelete;
   const { toast } = useToast();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -200,9 +204,11 @@ const MedicinesPage = () => {
                 <a href="/admin/medicines/pending">{pendingCount} pending review</a>
               </Button>
             )}
-            <Button onClick={() => { setShowForm(true); setEditing(null); createForm.reset(); }}>
-              <Plus className="h-4 w-4 mr-2" />Add Medicine
-            </Button>
+            {canCreate && (
+              <Button onClick={() => { setShowForm(true); setEditing(null); createForm.reset(); }}>
+                <Plus className="h-4 w-4 mr-2" />Add Medicine
+              </Button>
+            )}
           </div>
         )}
       </PageHeader>
@@ -279,12 +285,18 @@ const MedicinesPage = () => {
                                   <a href={`/admin/medicines/pending#${m.id}`}>Complete</a>
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost" title="Units (box / strip)" onClick={() => setUnitsFor(m)}><Boxes className="h-4 w-4" /></Button>
-                              <Button size="sm" variant="ghost" title="Edit" onClick={() => openEdit(m)}><Pencil className="h-4 w-4" /></Button>
-                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                                onClick={() => { if (!confirm(`Delete "${m.name}"? Fails if in use.`)) return; deleteMutation.mutate(m.id); }}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {canEdit && (
+                                <Button size="sm" variant="ghost" title="Units (box / strip)" onClick={() => setUnitsFor(m)}><Boxes className="h-4 w-4" /></Button>
+                              )}
+                              {canEdit && (
+                                <Button size="sm" variant="ghost" title="Edit" onClick={() => openEdit(m)}><Pencil className="h-4 w-4" /></Button>
+                              )}
+                              {canDelete && (
+                                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+                                  onClick={() => { if (!confirm(`Delete "${m.name}"? Fails if in use.`)) return; deleteMutation.mutate(m.id); }}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         )}

@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { getAuthUser } from '@/pages/Login';
 import { Plus, Pencil, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DataTable, type Column } from '@/components/admin/DataTable';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,8 +34,10 @@ const FieldError = ({ message }: { message?: string }) =>
   ) : null;
 
 const SuppliersPage = () => {
-  const user = getAuthUser();
-  const isAdmin = user?.role === 'admin';
+  const perms = usePermissions();
+  const canCreate = perms.has('suppliers.create');
+  const canEdit = perms.has('suppliers.edit');
+  const canDelete = perms.has('suppliers.delete');
   const { toast } = useToast();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -106,18 +108,22 @@ const SuppliersPage = () => {
     { key: 'name', header: 'Name', cell: (s) => <span className="font-medium">{s.name}</span> },
     { key: 'contact', header: 'Contact', cell: (s) => s.contact || '—' },
     { key: 'address', header: 'Address', cell: (s) => s.address || '—' },
-    ...(isAdmin
+    ...(canEdit || canDelete
       ? [{
           key: 'actions',
           header: 'Actions',
           align: 'right' as const,
           cell: (s: Supplier) => (
             <div className="flex justify-end gap-1">
-              <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" title="Delete"
-                onClick={() => { if (!confirm(`Delete supplier "${s.name}"?`)) return; deleteMutation.mutate(s.id); }}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {canEdit && (
+                <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+              )}
+              {canDelete && (
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" title="Delete"
+                  onClick={() => { if (!confirm(`Delete supplier "${s.name}"?`)) return; deleteMutation.mutate(s.id); }}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           ),
         }]
@@ -127,7 +133,7 @@ const SuppliersPage = () => {
   return (
     <div className="space-y-8">
       <PageHeader title="Suppliers" description="Manage suppliers. Same product can have different prices per supplier.">
-        {isAdmin && (
+        {canCreate && (
           <Button onClick={() => { setShowForm(true); setEditing(null); createForm.reset(); }}>
             <Plus className="h-4 w-4 mr-2" />Add Supplier
           </Button>
