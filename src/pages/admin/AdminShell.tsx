@@ -14,6 +14,7 @@ const AdminShell = () => {
       role: user.role,
       allowedNavPaths: user.allowedNavPaths ?? null,
       staffRole: user.staffRole ?? null,
+      permissions: user.permissions ?? null,
     };
     if (!userMayAccessRoute(session, normalized)) {
       if ((user.role === 'nurse' || (user.role === 'user' && user.staffRole === 'nurse')) && normalized.startsWith('/admin/consultations')) {

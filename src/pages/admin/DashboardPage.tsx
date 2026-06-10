@@ -24,6 +24,7 @@ import { formatChartDateLabel, formatIsoDateToApp } from '@/lib/datetime';
 import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
+import { PayablesWidget } from './PayablesWidget';
 import {
   BarChart,
   Bar,
@@ -327,6 +328,8 @@ const DashboardPage = () => {
           onApply={handleApply}
           loading={loading}
         />
+
+        <PayablesWidget />
 
         {loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">

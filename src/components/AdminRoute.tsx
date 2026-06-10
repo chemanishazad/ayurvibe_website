@@ -30,7 +30,7 @@ export const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   if (
     userMayAccessRoute(
       user
-        ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
+        ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null, permissions: user.permissions ?? null }
         : null,
       path,
     )

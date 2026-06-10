@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { getAuthUser } from '@/pages/Login';
 import { Plus, Pencil, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DataTable, type Column } from '@/components/admin/DataTable';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -101,16 +102,27 @@ const SuppliersPage = () => {
     </div>
   );
 
-  if (isLoading) {
-    return (
-      <div className="space-y-8">
-        <PageHeader title="Suppliers" description="Manage suppliers" />
-        <Card><CardContent className="pt-6">
-          <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted" />)}</div>
-        </CardContent></Card>
-      </div>
-    );
-  }
+  const columns: Column<Supplier>[] = [
+    { key: 'name', header: 'Name', cell: (s) => <span className="font-medium">{s.name}</span> },
+    { key: 'contact', header: 'Contact', cell: (s) => s.contact || '—' },
+    { key: 'address', header: 'Address', cell: (s) => s.address || '—' },
+    ...(isAdmin
+      ? [{
+          key: 'actions',
+          header: 'Actions',
+          align: 'right' as const,
+          cell: (s: Supplier) => (
+            <div className="flex justify-end gap-1">
+              <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" title="Delete"
+                onClick={() => { if (!confirm(`Delete supplier "${s.name}"?`)) return; deleteMutation.mutate(s.id); }}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ),
+        }]
+      : []),
+  ];
 
   return (
     <div className="space-y-8">
@@ -124,35 +136,14 @@ const SuppliersPage = () => {
       <Card>
         <CardHeader><CardTitle>Suppliers</CardTitle><CardDescription>All suppliers. Use Purchase flow in Inventory to add stock with supplier & price.</CardDescription></CardHeader>
         <CardContent>
-          {suppliers.length === 0 ? (
-            <p className="text-muted-foreground">No suppliers. Add one to get started.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b"><th className="text-left py-2">Name</th><th className="text-left py-2">Contact</th><th className="text-left py-2">Address</th>{isAdmin && <th className="text-right py-2">Actions</th>}</tr></thead>
-                <tbody>
-                  {suppliers.map((s) => (
-                    <tr key={s.id} className="border-b">
-                      <td className="py-2">{s.name}</td>
-                      <td className="py-2">{s.contact || '—'}</td>
-                      <td className="py-2">{s.address || '—'}</td>
-                      {isAdmin && (
-                        <td className="py-2 text-right">
-                          <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="ghost" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                              onClick={() => { if (!confirm(`Delete supplier "${s.name}"?`)) return; deleteMutation.mutate(s.id); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            rows={suppliers}
+            rowKey={(s) => s.id}
+            loading={isLoading}
+            emptyMessage="No suppliers. Add one to get started."
+            minWidthClassName="min-w-[560px]"
+          />
         </CardContent>
       </Card>
 

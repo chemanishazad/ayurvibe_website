@@ -39,6 +39,10 @@ export type AuthUser = {
   staffRole?: string | null;
   /** Doctor users: friendly name shown on consultations & prints. Falls back to `username`. */
   displayName?: string | null;
+  /** Custom role id (null = legacy role behavior). */
+  roleId?: string | null;
+  /** Effective permission keys, e.g. 'patients.edit'. Admin receives the full set. */
+  permissions?: string[] | null;
 };
 
 export function getAuthUser(): AuthUser | null {
