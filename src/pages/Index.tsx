@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Leaf, Heart, Users, MapPin, Phone, Mail, Calendar, Clock, Star, Sparkles, CheckCircle, Award, Shield, Stethoscope, Timer, Quote, Loader2 } from 'lucide-react';
+import { Leaf, Heart, Users, MapPin, Phone, Mail, Calendar, Clock, Star, Sparkles, CheckCircle, Award, Shield, Stethoscope, Timer, Quote, Loader2, ArrowRight } from 'lucide-react';
+import { Reveal, StaggerGroup, StaggerItem } from '@/components/Reveal';
 import DoshaQuiz from '@/components/DoshaQuiz';
 import HospitalMap from '@/components/HospitalMap';
 import InteractiveBodyMap from '@/components/InteractiveBodyMap';
@@ -489,74 +490,81 @@ const Index = () => {
       {/* Hero Slider Section */}
       <HeroSlider />
 
+      {/* Stats band */}
+      <section className="relative z-10 -mt-12 sm:-mt-16">
+        <div className="wide-wrapper">
+          <StaggerGroup className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 glass-card rounded-3xl p-5 sm:p-8 shadow-glow">
+            {[
+              { value: '100+', label: 'Patients Healed' },
+              { value: '50+', label: 'Authentic Therapies' },
+              { value: '4.9★', label: '12 Verified Reviews' },
+              { value: 'Chennai', label: 'Service Radius' },
+            ].map((s) => (
+              <StaggerItem key={s.label} className="text-center">
+                <div className="font-display text-3xl sm:text-4xl font-bold text-gradient-gold">{s.value}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-1">{s.label}</div>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+        </div>
+      </section>
+
       {/* About Section */}
-  <section id="about" className="bg-cream section-spacing">
+  <section id="about" className="bg-cream bg-mesh section-spacing">
   <div className="wide-wrapper">
           <div className="text-center">
-            <div className="flex items-center justify-center mb-8">
-              <Heart className="h-12 w-12 text-primary mr-4" />
-              <h2 className="font-bold text-foreground fluid-h2">Our Sacred Mission</h2>
-            </div>
-            
+            <Reveal className="flex flex-col items-center mb-10">
+              <span className="eyebrow mb-4"><Heart className="h-3.5 w-3.5" /> Our Sacred Mission</span>
+              <h2 className="font-display font-bold text-foreground fluid-h2 max-w-3xl">Authentic Ayurveda, rooted in Chennai</h2>
+            </Reveal>
+
             <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-              <div className="space-y-6 text-left">
+              <Reveal direction="right" className="space-y-6 text-left">
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  <strong>Sri Vinayaga Ayurvibe</strong> is the best Ayurveda hospital near Sholinganallur, Chennai. 
-                  Located at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), we serve patients within 20km – <Link to="/ayurveda-treatment-sholinganallur-chennai" className="text-primary hover:underline">Sholinganallur</Link>, <Link to="/ayurveda-clinic-omr-chennai" className="text-primary hover:underline">OMR</Link>, <Link to="/panchakarma-pallikaranai-chennai" className="text-primary hover:underline">Pallikaranai</Link>, <Link to="/ayurveda-hospital-perumbakkam-chennai" className="text-primary hover:underline">Perumbakkam</Link>, Navalur, Kelambakkam, Tambaram, <Link to="/ayurveda-hospital-medavakkam-chennai" className="text-primary hover:underline">Medavakkam</Link>, <Link to="/ayurveda-clinic-velachery-chennai" className="text-primary hover:underline">Velachery</Link>, Chromepet, and all nearby areas.
+                  <strong>Sri Vinayaga Ayurvibe</strong> is the best Ayurveda hospital near Sholinganallur, Chennai.
+                  Located at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), we serve patients within 20km – <Link to="/ayurveda-treatment-sholinganallur-chennai" className="text-primary font-medium hover:underline">Sholinganallur</Link>, <Link to="/ayurveda-clinic-omr-chennai" className="text-primary font-medium hover:underline">OMR</Link>, <Link to="/panchakarma-pallikaranai-chennai" className="text-primary font-medium hover:underline">Pallikaranai</Link>, <Link to="/ayurveda-hospital-perumbakkam-chennai" className="text-primary font-medium hover:underline">Perumbakkam</Link>, Navalur, Kelambakkam, Tambaram, <Link to="/ayurveda-hospital-medavakkam-chennai" className="text-primary font-medium hover:underline">Medavakkam</Link>, <Link to="/ayurveda-clinic-velachery-chennai" className="text-primary font-medium hover:underline">Velachery</Link>, Chromepet, and all nearby areas.
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic <Link to="/treatments" className="text-primary hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> treatments. Explore our <Link to="/about" className="text-primary hover:underline">about</Link> page, <Link to="/doctors" className="text-primary hover:underline">doctors</Link>, and <Link to="/faq" className="text-primary hover:underline">FAQ</Link>.
+                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic <Link to="/treatments" className="text-primary font-medium hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> treatments. Explore our <Link to="/about" className="text-primary font-medium hover:underline">about</Link> page, <Link to="/doctors" className="text-primary font-medium hover:underline">doctor</Link>, and <Link to="/faq" className="text-primary font-medium hover:underline">FAQ</Link>.
                 </p>
-              </div>
-              <div className="bg-gradient-gold rounded-2xl p-8 shadow-warm">
-                <div className="text-center">
-                  <Sparkles className="h-16 w-16 text-earth mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold text-earth mb-4">Holistic Approach</h3>
-                  <p className="text-earth/80">
-                    We treat not just symptoms, but the whole person—nurturing harmony between 
+                <Button asChild className="bg-primary hover:bg-primary/90 group">
+                  <Link to="/booking">Start your healing journey <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+                </Button>
+              </Reveal>
+              <Reveal direction="left" className="relative">
+                <div className="bg-gradient-earth text-white rounded-3xl p-10 shadow-glow relative overflow-hidden">
+                  <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-gold/20 blur-2xl float-slow" />
+                  <Sparkles className="h-14 w-14 text-gold mb-5" />
+                  <h3 className="font-display text-2xl font-bold mb-4">A Holistic Approach</h3>
+                  <p className="text-white/85 leading-relaxed">
+                    We treat not just symptoms, but the whole person—nurturing harmony between
                     physical health, mental clarity, and spiritual well-being.
                   </p>
                 </div>
-              </div>
+              </Reveal>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              <Card className="border-none shadow-soft bg-card/50">
-                <CardHeader className="text-center">
-                  <Users className="h-12 w-12 text-primary mx-auto mb-4" />
-                  <CardTitle className="text-xl">Expert Practitioners</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Our team combines decades of traditional knowledge with modern medical expertise.
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-none shadow-soft bg-card/50">
-                <CardHeader className="text-center">
-                  <Leaf className="h-12 w-12 text-primary mx-auto mb-4" />
-                  <CardTitle className="text-xl">Natural Remedies</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    We use only the finest herbs and natural ingredients, sourced with care and prepared with love.
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-none shadow-soft bg-card/50">
-                <CardHeader className="text-center">
-                  <Star className="h-12 w-12 text-primary mx-auto mb-4" />
-                  <CardTitle className="text-xl">Modern Comfort</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Experience ancient healing in luxurious, comfortable surroundings designed for your peace.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+            <StaggerGroup className="grid md:grid-cols-3 gap-6">
+              {[
+                { icon: Users, title: 'Expert Practitioners', text: 'Care led by Dr. Vaitheeshwari, B.A.M.S., blending traditional knowledge with modern clinical rigour.' },
+                { icon: Leaf, title: 'Natural Remedies', text: 'Only the finest herbs and authentic formulations, sourced with care and prepared the traditional way.' },
+                { icon: Star, title: 'Modern Comfort', text: 'Ancient healing delivered in clean, calm, comfortable surroundings designed for your peace of mind.' },
+              ].map((f) => (
+                <StaggerItem key={f.title}>
+                  <Card className="border border-border/60 shadow-soft bg-card/70 card-lift h-full text-left">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
+                        <f.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <CardTitle className="text-xl">{f.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground">{f.text}</p>
+                    </CardContent>
+                  </Card>
+                </StaggerItem>
+              ))}
+            </StaggerGroup>
           </div>
         </div>
       </section>
@@ -564,36 +572,39 @@ const Index = () => {
       {/* Treatments Section */}
   <section id="treatments" className="bg-background section-spacing">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Best Ayurvedic Treatments in Chennai</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Experience Chennai's most authentic Ayurvedic treatments near Sholinganallur at Sri Vinayaga Ayurvibe. 
-              Our comprehensive <Link to="/authentic-panchakarma-treatment-chennai" className="text-primary hover:underline">Panchakarma</Link>, <Link to="/best-abhyanga-massage-chennai" className="text-primary hover:underline">Abhyanga</Link>, and <Link to="/shirodhara-therapy-chennai" className="text-primary hover:underline">Shirodhara</Link> programs. Read our <Link to="/blog" className="text-primary hover:underline">blog</Link> for wellness tips.
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow mb-4"><Sparkles className="h-3.5 w-3.5" /> Signature Therapies</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Best Ayurvedic Treatments in Chennai</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Chennai's most authentic Ayurvedic care near Sholinganallur.
+              Explore our <Link to="/authentic-panchakarma-treatment-chennai" className="text-primary font-medium hover:underline">Panchakarma</Link>, <Link to="/best-abhyanga-massage-chennai" className="text-primary font-medium hover:underline">Abhyanga</Link>, and <Link to="/shirodhara-therapy-chennai" className="text-primary font-medium hover:underline">Shirodhara</Link> programs — or read the <Link to="/blog" className="text-primary font-medium hover:underline">blog</Link> for wellness tips.
             </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 md:gap-8">
+          </Reveal>
+
+          <StaggerGroup amount={0.05} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 md:gap-8">
             {treatments.map((treatment, index) => (
-              <Card key={index} className="border-none shadow-soft bg-card hover:shadow-warm transition-all duration-300 hover:scale-105 overflow-hidden">
+              <StaggerItem key={index} className="h-full">
+              <Card className="group border border-border/60 shadow-soft bg-card card-lift overflow-hidden h-full flex flex-col">
                 <div className="relative h-48 overflow-hidden">
-                  <img 
+                  <img
                     loading="lazy"
-                    src={treatment.image} 
+                    src={treatment.image}
                     alt={treatment.name}
-                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
                   <div className="absolute top-4 left-4">
-                    <Badge className="bg-gold text-earth border-none font-medium">
+                    <Badge className="bg-gradient-gold text-earth border-none font-semibold shadow-sm">
                       {treatment.category}
                     </Badge>
                   </div>
                   <div className="absolute top-4 right-4">
-                    <Badge variant="secondary" className="bg-black/20 text-white border-none backdrop-blur-sm">
+                    <Badge variant="secondary" className="bg-black/30 text-white border-none backdrop-blur-sm">
                       {treatment.duration}
                     </Badge>
                   </div>
                 </div>
-                
+
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between mb-2">
                     <CardTitle className="text-xl text-foreground">{treatment.name}</CardTitle>
@@ -603,11 +614,11 @@ const Index = () => {
                   </div>
                 </CardHeader>
                 
-                <CardContent className="space-y-4">
-                  <CardDescription className="text-base leading-relaxed">
+                <CardContent className="space-y-4 flex flex-col flex-grow">
+                  <CardDescription className="text-base leading-relaxed line-clamp-3">
                     {treatment.description}
                   </CardDescription>
-                  
+
                   <div>
                     <h4 className="font-semibold text-foreground mb-2 text-sm">Key Benefits:</h4>
                     <div className="grid grid-cols-1 gap-1">
@@ -619,14 +630,14 @@ const Index = () => {
                       ))}
                     </div>
                   </div>
-                  
-                  <div className="flex gap-2 pt-2">
+
+                  <div className="flex gap-2 pt-2 mt-auto">
                     <Button asChild className="flex-1 bg-primary hover:bg-primary/90" size="sm">
                       <Link to="/booking">Book Now</Link>
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                       onClick={() => { setActiveTreatmentIndex(index); setDetailsOpen(true); }}
                     >
@@ -635,8 +646,9 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerGroup>
           {/* Treatment Details Modal */}
           <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
             <DialogContent className="max-w-lg">
@@ -694,81 +706,86 @@ const Index = () => {
       </section>
 
       {/* Interactive Body Map Section */}
-  <section id="body-map" className="bg-cream section-spacing">
+  <section id="body-map" className="bg-cream bg-mesh section-spacing">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Targeted Healing Solutions</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Explore our interactive treatment map to discover personalized Ayurvedic solutions 
-              for different areas of your body and specific health concerns.
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow mb-4"><Stethoscope className="h-3.5 w-3.5" /> Personalised Care</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Targeted Healing Solutions</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Tap any area on our interactive map to discover the Ayurvedic therapies best suited
+              to your body and specific health concerns.
             </p>
-          </div>
-          <InteractiveBodyMap />
+          </Reveal>
+          <Reveal><InteractiveBodyMap /></Reveal>
         </div>
       </section>
 
       {/* Treatment Comparison Section */}
   <section id="comparison" className="bg-background section-spacing">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Compare Our Treatments</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Not sure which treatment is right for you? Use our comparison tool to explore 
-              different therapies and find the perfect match for your wellness goals.
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow mb-4"><CheckCircle className="h-3.5 w-3.5" /> Find Your Fit</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Compare Our Treatments</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Not sure where to begin? Compare therapies side by side and find the perfect
+              match for your wellness goals.
             </p>
-          </div>
-          <TreatmentComparison />
+          </Reveal>
+          <Reveal><TreatmentComparison /></Reveal>
         </div>
       </section>
 
       {/* Our Expert Practitioner Section */}
-  <section id="doctors" className="bg-cream section-spacing">
+  <section id="doctors" className="bg-cream bg-mesh section-spacing">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">👩‍⚕️ Dr. Vaitheeshwari BAMS - Best Ayurveda Doctor in Chennai</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Meet <strong>Dr. Vaitheeshwari BAMS</strong>, Chennai's leading Ayurveda doctor specializing in Panchakarma and Women's Health. 
-              With 3+ years of experience, she provides authentic Ayurvedic treatments for patients from Perumbakkam, Nookampalayam, OMR, Sholinganallur, 
-              Pallikaranai, Navalur, Kelambakkam, and Tambaram areas.
+          <Reveal className="text-center mb-12 flex flex-col items-center">
+            <span className="eyebrow mb-4"><Stethoscope className="h-3.5 w-3.5" /> Meet Your Doctor</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Dr. Vaitheeshwari, B.A.M.S. — Chennai's trusted Ayurveda doctor</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              A Panchakarma and women's-health specialist serving Perumbakkam, Nookampalayam, OMR, Sholinganallur,
+              Pallikaranai, Navalur, Kelambakkam, and Tambaram with authentic, personalised care.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="max-w-2xl mx-auto">
-            <Card className="border-none shadow-soft bg-card hover:shadow-warm transition-all duration-300 text-center">
-              <CardContent className="pt-8">
-                <div className="w-40 h-40 mx-auto mb-6 rounded-full overflow-hidden shadow-soft">
-                  <img 
-                    loading="lazy"
-                    src={drVaitheeshwari}
-                    alt="Dr. Vaitheeshwari"
-                    className="w-full h-full object-cover"
-                  />
+          <Reveal className="max-w-3xl mx-auto">
+            <Card className="border border-border/60 shadow-glow bg-card overflow-hidden">
+              <div className="grid sm:grid-cols-[auto,1fr]">
+                <div className="relative bg-gradient-earth p-8 flex items-center justify-center">
+                  <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-gold/25 blur-2xl float-slow" />
+                  <div className="w-44 h-44 rounded-full overflow-hidden ring-4 ring-gold/50 shadow-warm">
+                    <img loading="lazy" src={drVaitheeshwari} alt="Dr. Vaitheeshwari" className="w-full h-full object-cover" />
+                  </div>
                 </div>
-                <h3 className="text-3xl font-bold text-foreground mb-2">Dr. Vaitheeshwari</h3>
-                <p className="text-primary font-medium mb-2">BAMS (Ayurveda)</p>
-                <p className="text-muted-foreground mb-3">Panchakarma & Women's Health</p>
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <Stethoscope className="h-4 w-4 text-gold" />
-                  <span className="text-sm text-muted-foreground">3 Years Experience</span>
-                </div>
-                <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                  <Link to="/booking">Book Consultation</Link>
-                </Button>
-              </CardContent>
+                <CardContent className="p-8 flex flex-col justify-center text-left">
+                  <h3 className="font-display text-3xl font-bold text-foreground mb-1">Dr. Vaitheeshwari</h3>
+                  <p className="text-primary font-semibold mb-1">BAMS (Ayurveda)</p>
+                  <p className="text-muted-foreground mb-4">Panchakarma &amp; Women's Health Specialist</p>
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    <Badge variant="outline" className="border-primary/30 text-foreground">3+ Years Experience</Badge>
+                    <Badge variant="outline" className="border-primary/30 text-foreground">Govt. Certified</Badge>
+                    <Badge variant="outline" className="border-primary/30 text-foreground">English · Tamil · Hindi</Badge>
+                  </div>
+                  <Button asChild className="bg-primary hover:bg-primary/90 w-fit group">
+                    <Link to="/booking">Book Consultation <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+                  </Button>
+                </CardContent>
+              </div>
             </Card>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Testimonials Section */}
-  <section id="testimonials" className="bg-gradient-earth text-white section-spacing full-bleed">
-  <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold mb-6 fluid-h2">Healing Stories</h2>
-            <p className="text-xl text-white/90 max-w-3xl mx-auto">
-              Real stories from our patients who found healing and transformation through Ayurveda.
+  <section id="testimonials" className="bg-gradient-earth text-white section-spacing full-bleed relative overflow-hidden">
+  <div className="absolute top-0 left-1/4 w-72 h-72 rounded-full bg-gold/10 blur-3xl float-slow" aria-hidden />
+  <div className="wide-wrapper relative">
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow !text-gold !bg-white/10 !border-white/20 mb-4"><Quote className="h-3.5 w-3.5" /> Real Stories</span>
+            <h2 className="font-display font-bold mb-5 fluid-h2">Healing Stories</h2>
+            <p className="text-lg text-white/85 max-w-3xl mx-auto">
+              Real transformations from patients who found relief and renewal through authentic Ayurveda.
             </p>
-          </div>
+          </Reveal>
 
           {/* Marquee row 1 */}
           <div className="overflow-hidden marquee-container [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
@@ -829,105 +846,90 @@ const Index = () => {
       {/* Why Choose Us Section */}
   <section id="why" className="bg-background section-spacing">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Why Choose Ayurveda Hospital</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Experience the perfect blend of ancient wisdom and modern facilities in your healing journey.
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow mb-4"><Shield className="h-3.5 w-3.5" /> Why Sri Vinayaga</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Why Choose Our Ayurveda Hospital</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              The perfect blend of ancient wisdom and modern, hygienic facilities — for a healing journey you can trust.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div className="relative">
+          <div className="grid md:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <Reveal direction="right" className="relative">
               <img
                 src={hospitalImg}
                 alt="Ayurveda Hospital"
-                className="w-full h-64 md:h-80 lg:h-96 object-cover rounded-2xl shadow-warm"
+                className="w-full h-64 md:h-80 lg:h-[26rem] object-cover rounded-3xl shadow-glow"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent rounded-2xl"></div>
-            </div>
-            
-            <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                  <Award className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">Certified Excellence</h3>
-                  <p className="text-muted-foreground">Government certified facility with internationally trained practitioners.</p>
-                </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-3xl"></div>
+              <div className="absolute bottom-5 left-5 glass rounded-2xl px-4 py-3 text-white">
+                <p className="text-2xl font-display font-bold">Reg. 2095</p>
+                <p className="text-xs text-white/80">Govt. Certified Hospital</p>
               </div>
+            </Reveal>
 
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                  <Shield className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">Safe & Natural</h3>
-                  <p className="text-muted-foreground">Only pure, organic herbs and time-tested therapeutic methods.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                  <Timer className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">Personalized Care</h3>
-                  <p className="text-muted-foreground">Individual treatment plans tailored to your unique constitution and needs.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                  <Heart className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">Holistic Wellness</h3>
-                  <p className="text-muted-foreground">Complete approach addressing physical, mental, and spiritual well-being.</p>
-                </div>
-              </div>
-            </div>
+            <StaggerGroup className="space-y-4">
+              {[
+                { icon: Award, title: 'Certified Excellence', text: 'Government-certified facility (Reg. 2095) with a qualified B.A.M.S. practitioner.' },
+                { icon: Shield, title: 'Safe & Natural', text: 'Only pure, authentic herbs and time-tested therapeutic methods — no shortcuts.' },
+                { icon: Timer, title: 'Personalised Care', text: 'Treatment plans tailored to your unique constitution, history, and goals.' },
+                { icon: Heart, title: 'Holistic Wellness', text: 'A complete approach addressing physical, mental, and emotional well-being.' },
+              ].map((item) => (
+                <StaggerItem key={item.title}>
+                  <div className="flex items-start gap-4 p-4 rounded-2xl hover:bg-card/60 transition-colors card-lift">
+                    <div className="flex-shrink-0 w-12 h-12 bg-gradient-gold rounded-2xl flex items-center justify-center shadow-sm">
+                      <item.icon className="h-6 w-6 text-earth" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-foreground mb-1">{item.title}</h3>
+                      <p className="text-muted-foreground">{item.text}</p>
+                    </div>
+                  </div>
+                </StaggerItem>
+              ))}
+            </StaggerGroup>
           </div>
         </div>
       </section>
 
       {/* Find Your Dosha Section */}
-  <section id="dosha" className="bg-gradient-healing section-spacing full-bleed">
+  <section id="dosha" className="bg-gradient-healing bg-mesh section-spacing full-bleed">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Discover Your Dosha</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Understanding your constitutional type is the first step toward personalized healing. 
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow mb-4"><Sparkles className="h-3.5 w-3.5" /> Know Yourself</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Discover Your Dosha</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Your constitutional type is the first step toward personalised healing.
               Explore the three doshas and find your path to balance.
             </p>
-          </div>
+          </Reveal>
 
           <div className="text-center">
             <div className="max-w-4xl mx-auto">
-              <div className="grid md:grid-cols-3 gap-8 mb-12">
+              <StaggerGroup className="grid md:grid-cols-3 gap-6 mb-12">
                 {doshas.map((dosha, index) => (
-                  <Card key={index} className="border-none shadow-soft bg-card/80 backdrop-blur-sm">
+                  <StaggerItem key={index} className="h-full">
+                  <Card className="border border-border/60 shadow-soft glass-card card-lift h-full">
                     <CardHeader className="text-center">
-                      <div className={`w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r ${dosha.color} flex items-center justify-center`}>
-                        <span className="text-2xl font-bold text-earth">{dosha.name[0]}</span>
+                      <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${dosha.color} flex items-center justify-center shadow-sm`}>
+                        <span className="font-display text-3xl font-bold text-earth">{dosha.name[0]}</span>
                       </div>
                       <CardTitle className="text-xl text-foreground">{dosha.name}</CardTitle>
                       <CardDescription className="text-primary font-medium">{dosha.element}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-center">
-                        <div className="flex flex-wrap justify-center gap-1 mb-4">
-                          {dosha.traits.slice(0, 3).map((trait, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs border-primary/30">
-                              {trait}
-                            </Badge>
-                          ))}
-                        </div>
+                      <div className="flex flex-wrap justify-center gap-1.5 mb-2">
+                        {dosha.traits.slice(0, 4).map((trait, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs border-primary/30">
+                            {trait}
+                          </Badge>
+                        ))}
                       </div>
                     </CardContent>
                   </Card>
+                  </StaggerItem>
                 ))}
-              </div>
+              </StaggerGroup>
               
               <div className="space-y-6">
                 <p className="text-lg text-muted-foreground">
@@ -973,17 +975,19 @@ const Index = () => {
       {/* Booking Section with Map */}
   <section id="booking" className="bg-background section-spacing">
   <div className="wide-wrapper">
-          <div className="text-center mb-16">
-            <h2 className="font-bold text-foreground mb-6 fluid-h2">Book Your Healing Journey</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Begin your transformation today. Schedule a consultation with our expert practitioners 
+          <Reveal className="text-center mb-14 flex flex-col items-center">
+            <span className="eyebrow mb-4"><Calendar className="h-3.5 w-3.5" /> Get Started</span>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Book Your Healing Journey</h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Begin your transformation today. Schedule a consultation with Dr. Vaitheeshwari
               and discover the perfect treatment plan for your unique constitution.
             </p>
-          </div>
+          </Reveal>
 
           <div className="grid lg:grid-cols-2 gap-12 items-stretch">
             {/* Booking Form */}
-            <Card className="border-none shadow-soft">
+            <Reveal direction="right" className="h-full">
+            <Card className="border border-border/60 shadow-glow h-full">
               <CardHeader>
                 <CardTitle className="text-2xl text-center flex items-center justify-center">
                   <Calendar className="h-6 w-6 text-primary mr-2" />
@@ -1114,11 +1118,12 @@ const Index = () => {
                 </form>
               </CardContent>
             </Card>
+            </Reveal>
 
             {/* Map Only */}
-            <div className="h-full">
+            <Reveal direction="left" className="h-full">
               <HospitalMap />
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>

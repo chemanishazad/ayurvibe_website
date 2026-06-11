@@ -1,0 +1,5 @@
+# Netlify / Cloudflare Pages SPA fallback.
+# Prerendered routes are served from their own dist/<route>/index.html files
+# automatically. This catch-all only handles paths with no prerendered file
+# (e.g. /admin/*, dynamic blog slugs not in the build) — React Router takes over.
+/*    /index.html   200

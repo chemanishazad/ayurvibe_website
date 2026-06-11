@@ -33,6 +33,7 @@ export default defineConfig({
           ui: ["@radix-ui/react-dialog", "@radix-ui/react-select", "@radix-ui/react-toast"],
           router: ["react-router-dom"],
           icons: ["lucide-react"],
+          motion: ["framer-motion"],
         },
       },
     },

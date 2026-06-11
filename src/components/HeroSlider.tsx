@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Phone, ShieldCheck, Star, Leaf } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Import background images
@@ -16,38 +17,62 @@ const slides = [
   {
     id: 1,
     image: hospitalImg,
-    title: "Best Ayurveda Clinic in Chennai",
-    subtitle: "Where Ancient Wisdom Meets Modern Healing",
-    description: "Experience the timeless art of Ayurvedic medicine in a sanctuary designed for your complete wellness journey"
+    eyebrow: 'Government-Certified · Reg No. 2095',
+    title: 'Best Ayurveda Clinic in Chennai',
+    subtitle: 'Where Ancient Wisdom Meets Modern Healing',
+    description:
+      'Authentic Ayurvedic care at Nookampalayam, Perumbakkam — led by Dr. Vaitheeshwari, B.A.M.S. Personalised treatment for your unique constitution.',
   },
   {
     id: 2,
     image: panchakarmaImg,
-    title: "Panchakarma Detox",
-    subtitle: "Complete Body Purification",
-    description: "Transform your health with our signature detoxification treatments that cleanse, rejuvenate, and restore natural balance"
+    eyebrow: 'Signature Detox',
+    title: 'Panchakarma Detox',
+    subtitle: 'Complete Body Purification',
+    description:
+      'A 7–21 day cleansing journey that eliminates toxins, rebalances your doshas, and restores deep, lasting vitality.',
   },
   {
     id: 3,
     image: shirodharaImg,
-    title: "Therapeutic Treatments",
-    subtitle: "Mind, Body & Soul Harmony",
-    description: "Discover personalized healing therapies that address your unique constitution and restore optimal wellbeing"
+    eyebrow: 'Mind & Nervous System',
+    title: 'Shirodhara Therapy',
+    subtitle: 'Calm the Mind, Restore Clarity',
+    description:
+      'A continuous stream of warm medicated oil melts away stress, eases insomnia, and brings profound mental stillness.',
   },
   {
     id: 4,
     image: abhyangaImg,
-    title: "Rejuvenation Therapy",
-    subtitle: "Restore Your Natural Vitality",
-    description: "Indulge in ancient massage techniques and oil therapies that nourish your body from within"
+    eyebrow: 'Therapeutic Touch',
+    title: 'Abhyanga Massage',
+    subtitle: 'Nourish Body & Circulation',
+    description:
+      'Full-body synchronised massage with warm herbal oils to release tension, improve circulation, and deeply nourish tissue.',
   },
   {
     id: 5,
     image: herbsImg,
-    title: "Natural Medicine",
-    subtitle: "Pure Herbal Healing",
-    description: "Experience the power of carefully selected herbs and natural remedies prepared with traditional wisdom"
-  }
+    eyebrow: 'Pure & Natural',
+    title: 'Natural Herbal Medicine',
+    subtitle: 'Healing the Way Nature Intended',
+    description:
+      'Carefully selected herbs and time-tested formulations, prepared with traditional wisdom for safe, effective healing.',
+  },
+];
+
+const trustBadges = [
+  { icon: ShieldCheck, label: 'Govt. Certified' },
+  { icon: Star, label: '4.9 ★ (12 reviews)' },
+  { icon: Leaf, label: '100% Authentic' },
+];
+
+const navLinks = [
+  { to: '/about', label: 'About' },
+  { to: '/treatments', label: 'Treatments' },
+  { to: '/dosha', label: 'Find Your Dosha' },
+  { to: '/blog', label: 'Blog' },
+  { to: '/booking', label: 'Book' },
 ];
 
 const HeroSlider = () => {
@@ -56,111 +81,165 @@ const HeroSlider = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
-
+    }, 6000);
     return () => clearInterval(timer);
   }, []);
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-  };
+  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % slides.length);
+  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  const goToSlide = (index: number) => setCurrentSlide(index);
 
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  };
-
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index);
-  };
+  const slide = slides[currentSlide];
 
   return (
-  <div className="relative h-[90vh] min-h-[600px] sm:h-screen overflow-hidden">
-      {/* Background Images */}
-      {slides.map((slide, index) => (
+    <div className="relative h-[92vh] min-h-[640px] sm:h-screen overflow-hidden">
+      {/* Background Images with cross-fade + Ken Burns */}
+      {slides.map((s, index) => (
         <div
-          key={slide.id}
+          key={s.id}
           className={cn(
-            "absolute inset-0 transition-opacity duration-1000",
-            index === currentSlide ? "opacity-100" : "opacity-0"
+            'absolute inset-0 transition-opacity duration-[1200ms]',
+            index === currentSlide ? 'opacity-100' : 'opacity-0'
           )}
         >
-          <div 
-            className="w-full h-full bg-cover bg-center bg-no-repeat"
-            style={{ backgroundImage: `url(${slide.image})` }}
+          <div
+            className={cn(
+              'w-full h-full bg-cover bg-center bg-no-repeat',
+              index === currentSlide && 'ken-burns'
+            )}
+            style={{ backgroundImage: `url(${s.image})` }}
           />
-          {/* Dark overlay */}
-          <div className="absolute inset-0 bg-black/40" />
         </div>
       ))}
+
+      {/* Cinematic gradient overlay (forest → terracotta mesh) */}
+      <div className="absolute inset-0 bg-gradient-hero" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/40" />
 
       {/* Navigation */}
       <nav className="relative z-20 container mx-auto px-4 py-4 md:py-6">
         <div className="flex items-center justify-between">
-          <Logo className="h-16 md:h-20 w-auto drop-shadow-lg" withText textClassName="hidden sm:block text-white" subtitleText="Holistic Ayurveda" />
-          <div className="hidden md:flex space-x-6 lg:space-x-8">
-            <Link to="/about" className="text-white hover:text-gold transition-colors">About</Link>
-            <Link to="/treatments" className="text-white hover:text-gold transition-colors">Treatments</Link>
-            <Link to="/dosha" className="text-white hover:text-gold transition-colors">Find Your Dosha</Link>
-            <Link to="/booking" className="text-white hover:text-gold transition-colors">Book Appointment</Link>
-            <Link to="/contact" className="text-white hover:text-gold transition-colors">Contact</Link>
+          <Logo
+            className="h-14 md:h-20 w-auto drop-shadow-lg"
+            withText
+            textClassName="hidden sm:block text-white"
+            subtitleText="Holistic Ayurveda"
+          />
+          <div className="hidden md:flex items-center gap-1 glass rounded-full px-2 py-1.5">
+            {navLinks.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="text-white/90 hover:text-white text-sm font-medium px-4 py-2 rounded-full hover:bg-white/15 transition-colors"
+              >
+                {l.label}
+              </Link>
+            ))}
           </div>
+          <a
+            href="tel:+918122939197"
+            className="md:hidden glass rounded-full p-2.5 text-white"
+            aria-label="Call us"
+          >
+            <Phone className="h-5 w-5" />
+          </a>
         </div>
       </nav>
 
       {/* Content */}
-      <div className="relative z-20 container mx-auto px-4 py-16 md:py-20 text-center text-white">
-        <div className="max-w-4xl mx-auto px-0 sm:px-2">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 animate-fade-in">
-            {slides[currentSlide].title}
-          </h1>
-          <p className="text-lg md:text-2xl mb-8 text-white/90 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            {slides[currentSlide].subtitle}
-          </p>
-          <p className="text-base md:text-lg mb-12 max-w-2xl mx-auto text-white/80 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-            {slides[currentSlide].description}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            <Button asChild size="lg" className="bg-gold hover:bg-gold/90 text-earth px-8 py-4 text-lg">
-              <Link to="/booking">
-                <Calendar className="mr-2 h-5 w-5" />
-                Book Consultation
-              </Link>
-            </Button>
-            {/* <Button asChild variant="outline" size="lg" className="border-gold text-gold hover:bg-gold hover:text-earth px-8 py-4 text-lg bg-white/10 backdrop-blur-sm">
-              <Link to="/about">Learn More</Link>
-            </Button> */}
-          </div>
-        </div>
+      <div className="relative z-20 container mx-auto px-4 pt-10 md:pt-16 text-center text-white">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={slide.id}
+            className="max-w-4xl mx-auto"
+            initial={{ opacity: 0, y: 26 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <span className="eyebrow !text-white !bg-white/15 !border-white/25 backdrop-blur-sm mb-6">
+              <Leaf className="h-3.5 w-3.5" /> {slide.eyebrow}
+            </span>
+            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold mt-6 mb-5 leading-[1.05] drop-shadow-md">
+              {slide.title}
+            </h1>
+            <p className="text-lg md:text-2xl mb-5 text-gold font-medium">{slide.subtitle}</p>
+            <p className="text-base md:text-lg mb-9 max-w-2xl mx-auto text-white/85">
+              {slide.description}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+
+        <motion.div
+          className="flex flex-col sm:flex-row gap-4 justify-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.25 }}
+        >
+          <Button
+            asChild
+            size="lg"
+            className="bg-gradient-gold hover:opacity-95 text-earth px-8 py-6 text-lg font-semibold shadow-gold pulse-ring"
+          >
+            <Link to="/booking">
+              <Calendar className="mr-2 h-5 w-5" />
+              Book Consultation
+            </Link>
+          </Button>
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            className="px-8 py-6 text-lg glass border-white/30 text-white hover:bg-white/20 hover:text-white"
+          >
+            <a href="tel:+918122939197">
+              <Phone className="mr-2 h-5 w-5" />
+              +91 81229 39197
+            </a>
+          </Button>
+        </motion.div>
+
+        {/* Trust badges */}
+        <motion.div
+          className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.45 }}
+        >
+          {trustBadges.map((b) => (
+            <span key={b.label} className="flex items-center gap-2 text-sm text-white/85">
+              <b.icon className="h-4 w-4 text-gold" />
+              {b.label}
+            </span>
+          ))}
+        </motion.div>
       </div>
 
       {/* Arrow Navigation */}
       <button
         onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-3 transition-all duration-300 group"
+        className="absolute left-3 md:left-5 top-1/2 -translate-y-1/2 z-20 glass rounded-full p-3 transition-all duration-300 group hover:scale-110"
         aria-label="Previous slide"
       >
         <ChevronLeft className="h-6 w-6 text-white group-hover:text-gold" />
       </button>
-
       <button
         onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-3 transition-all duration-300 group"
+        className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 z-20 glass rounded-full p-3 transition-all duration-300 group hover:scale-110"
         aria-label="Next slide"
       >
         <ChevronRight className="h-6 w-6 text-white group-hover:text-gold" />
       </button>
 
-      {/* Dot Indicators */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex space-x-3">
+      {/* Progress-style dot indicators */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5">
         {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => goToSlide(index)}
             className={cn(
-              "w-3 h-3 rounded-full transition-all duration-300",
-              index === currentSlide 
-                ? "bg-gold scale-125" 
-                : "bg-white/50 hover:bg-white/70"
+              'h-2 rounded-full transition-all duration-500',
+              index === currentSlide ? 'w-9 bg-gold' : 'w-2 bg-white/50 hover:bg-white/80'
             )}
             aria-label={`Go to slide ${index + 1}`}
           />
