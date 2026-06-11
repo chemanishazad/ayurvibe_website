@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/lib/api';
-import { localDateYmd } from '@/lib/datetime';
+import { api, type ExpiringBatchRow } from '@/lib/api';
+import { localDateYmd, formatIsoDateToApp } from '@/lib/datetime';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
-import { AlertTriangle, Plus, Truck } from 'lucide-react';
+import { MedicineBatchPanel } from '@/components/admin/MedicineBatchPanel';
+import { AlertTriangle, Plus, Truck, ChevronRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,8 @@ const InventoryPage = () => {
   const [uoms, setUoms] = useState<{ id: string; code: string; name: string }[]>([]);
   const [inventory, setInventory] = useState<Record<string, unknown>[]>([]);
   const [lowStock, setLowStock] = useState<Record<string, unknown>[]>([]);
+  const [expiring, setExpiring] = useState<ExpiringBatchRow[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showPurchase, setShowPurchase] = useState(false);
   const [form, setForm] = useState({ medicineId: '', quantity: '', purchasePrice: '', sellingPrice: '', uomCode: '' });
@@ -79,10 +82,13 @@ const InventoryPage = () => {
     if (targetClinicId) {
       api.inventory.list(targetClinicId).then(setInventory).catch(() => setInventory([]));
       api.inventory.lowStock(targetClinicId).then(setLowStock).catch(() => setLowStock([]));
+      api.inventory.expiring(targetClinicId, 90).then(setExpiring).catch(() => setExpiring([]));
     } else {
       setInventory([]);
       setLowStock([]);
+      setExpiring([]);
     }
+    setExpandedId(null);
   }, [targetClinicId]);
 
   const handleAddStock = async () => {
@@ -189,10 +195,54 @@ const InventoryPage = () => {
         </Card>
       )}
 
+      {expiring.length > 0 && (() => {
+        const todayYmd = localDateYmd();
+        const expiredCount = expiring.filter((e) => e.expiryDate && e.expiryDate < todayYmd).length;
+        const ordered = [...expiring].sort((a, b) => (a.expiryDate ?? '') < (b.expiryDate ?? '') ? -1 : 1);
+        return (
+          <Card className="overflow-hidden border-amber-300/70">
+            <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/30">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">Expiry attention</span>
+              <span className="ml-auto flex items-center gap-2 text-xs">
+                {expiredCount > 0 && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700">{expiredCount} expired</span>
+                )}
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">{expiring.length - expiredCount} within 90 days</span>
+              </span>
+            </div>
+            <CardContent className="py-3">
+              <div className="flex flex-wrap gap-2">
+                {ordered.map((e) => {
+                  const isExpired = !!e.expiryDate && e.expiryDate < todayYmd;
+                  return (
+                    <span
+                      key={e.id}
+                      className={
+                        isExpired
+                          ? 'inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700'
+                          : 'inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800'
+                      }
+                      title={`${e.batchNumber ?? 'No batch'} · ${e.remainingQuantity} left · ${e.supplierName ?? ''}`}
+                    >
+                      <span className="font-semibold">{e.medicineName}</span>
+                      <span className="opacity-70">·</span>
+                      <span>{formatIsoDateToApp(e.expiryDate)}</span>
+                      <span className="opacity-70">·</span>
+                      <span>{e.remainingQuantity} left</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <Card>
         <CardHeader>
           <CardTitle>Stock by Clinic</CardTitle>
-          <CardDescription>Current inventory levels</CardDescription>
+          <CardDescription>Current inventory levels — click a row to see its batches, costs &amp; movement.</CardDescription>
         </CardHeader>
         <CardContent>
           {!targetClinicId ? (
@@ -206,6 +256,7 @@ const InventoryPage = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
+                    <th className="w-8 py-2" />
                     <th className="text-left py-2">Medicine</th>
                     <th className="text-left py-2">UOM</th>
                     <th className="text-right py-2">Stock</th>
@@ -214,26 +265,46 @@ const InventoryPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {inventory.map((inv) => (
-                    <tr key={(inv as { id: string }).id} className="border-b">
-                      <td className="py-2">{(inv as { medicineName: string }).medicineName}</td>
-                      <td className="py-2">{(inv as { uom: string }).uom}</td>
-                      <td className="py-2 text-right">
-                        {(inv as { currentStock: number }).currentStock}
-                        {(() => {
-                          const b = (inv as { stockBreakdown?: string }).stockBreakdown;
-                          const stock = (inv as { currentStock: number }).currentStock;
-                          const base = (inv as { baseUnit?: string | null; uom: string }).baseUnit || (inv as { uom: string }).uom || 'unit';
-                          // Only show breakdown when packs make it differ from "<n> <base>".
-                          return b && b !== `${stock} ${base}` ? (
-                            <div className="text-xs text-muted-foreground">{b}</div>
-                          ) : null;
-                        })()}
-                      </td>
-                      <td className="py-2 text-right">{(inv as { minStockLevel: number }).minStockLevel}</td>
-                      <td className="py-2 text-right">₹{(inv as { sellingPrice: string }).sellingPrice}</td>
-                    </tr>
-                  ))}
+                  {inventory.map((inv) => {
+                    const row = inv as {
+                      id: string; medicineId: string; medicineName: string; uom: string;
+                      currentStock: number; minStockLevel: number; sellingPrice: string;
+                      baseUnit?: string | null; stockBreakdown?: string;
+                    };
+                    const base = row.baseUnit || row.uom || 'unit';
+                    const open = expandedId === row.id;
+                    return (
+                      <React.Fragment key={row.id}>
+                        <tr
+                          className="border-b cursor-pointer hover:bg-muted/30"
+                          onClick={() => setExpandedId(open ? null : row.id)}
+                        >
+                          <td className="py-2 pl-1 text-muted-foreground">
+                            <ChevronRight className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`} />
+                          </td>
+                          <td className="py-2 font-medium">{row.medicineName}</td>
+                          <td className="py-2">{row.uom}</td>
+                          <td className="py-2 text-right">
+                            {row.currentStock}
+                            {row.stockBreakdown && row.stockBreakdown !== `${row.currentStock} ${base}` ? (
+                              <div className="text-xs text-muted-foreground">{row.stockBreakdown}</div>
+                            ) : null}
+                          </td>
+                          <td className="py-2 text-right">{row.minStockLevel}</td>
+                          <td className="py-2 text-right">₹{row.sellingPrice}</td>
+                        </tr>
+                        {open && (
+                          <tr className="border-b bg-muted/10">
+                            <td colSpan={6} className="p-3">
+                              {targetClinicId && (
+                                <MedicineBatchPanel clinicId={targetClinicId} medicineId={row.medicineId} baseUnit={base} />
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
