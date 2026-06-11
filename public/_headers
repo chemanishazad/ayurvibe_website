@@ -1,0 +1,35 @@
+# Netlify / Cloudflare Pages cache headers.
+# HTML must always revalidate so deploys go live immediately.
+# Hashed assets are content-addressed and can be cached forever.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Vite-hashed JS/CSS — filename changes on every content change, cache forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Static images & icons (rarely change; safe to cache long with revalidation).
+/*.png
+  Cache-Control: public, max-age=2592000
+/*.jpg
+  Cache-Control: public, max-age=2592000
+/*.svg
+  Cache-Control: public, max-age=2592000
+/*.ico
+  Cache-Control: public, max-age=2592000
+/*.webp
+  Cache-Control: public, max-age=2592000
+
+# Sitemaps & robots — short cache, must stay fresh for crawlers.
+/sitemap*.xml
+  Cache-Control: public, max-age=3600
+/robots.txt
+  Cache-Control: public, max-age=3600
+
+# HTML documents — never cache; always revalidate against the latest deploy.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
