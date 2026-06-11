@@ -36,6 +36,8 @@ type UserRow = {
   id: string;
   username: string;
   role: string;
+  roleId?: string | null;
+  roleName?: string | null;
   displayName?: string | null;
   createdAt: string;
   allowedNavPaths?: string[] | null;
@@ -77,12 +79,14 @@ const UsersAdminPage = () => {
 
   const [showCreate, setShowCreate] = useState(false);
   const [createAccountRole, setCreateAccountRole] = useState<AccountRole>('doctor');
+  const [createRoleId, setCreateRoleId] = useState<string>('');
   const [createClinicIds, setCreateClinicIds] = useState<string[]>([]);
   /** Doctor role: friendly name shown on consultations & prints. */
   const [createDoctorDisplayName, setCreateDoctorDisplayName] = useState('');
 
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [editAccountRole, setEditAccountRole] = useState<AccountRole>('doctor');
+  const [editRoleId, setEditRoleId] = useState<string>('');
   const [editNavRestricted, setEditNavRestricted] = useState(false);
   const [editNavPaths, setEditNavPaths] = useState<string[]>([]);
   const [editDoctorDisplayName, setEditDoctorDisplayName] = useState('');
@@ -121,6 +125,11 @@ const UsersAdminPage = () => {
     queryFn: () => api.clinics.list() as Promise<{ id: string; name: string }[]>,
   });
 
+  const { data: roleOptions = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => api.roles.list(),
+  });
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });
 
   const userClinicNamesByUserId = useMemo(() =>
@@ -142,6 +151,7 @@ const UsersAdminPage = () => {
         username: data.username.trim(),
         password: data.password,
         role: createAccountRole,
+        ...(createRoleId ? { roleId: createRoleId } : {}),
         clinicIds: createAccountRole !== 'admin' ? createClinicIds : undefined,
         ...(createAccountRole === 'doctor'
           ? { displayName: createDoctorDisplayName.trim() }
@@ -155,6 +165,7 @@ const UsersAdminPage = () => {
       setCreateClinicIds([]);
       setCreateDoctorDisplayName('');
       setCreateAccountRole('doctor');
+      setCreateRoleId('');
       invalidate();
     },
     onError: (e) => toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed', variant: 'destructive' }),
@@ -174,6 +185,7 @@ const UsersAdminPage = () => {
       return api.users.update(editing.id, {
         username: data.username.trim(),
         role: editAccountRole,
+        roleId: editRoleId || null,
         ...(editAccountRole !== 'admin' ? { allowedNavPaths } : {}),
         ...(editAccountRole === 'doctor'
           ? { displayName: editDoctorDisplayName.trim() }
@@ -203,6 +215,7 @@ const UsersAdminPage = () => {
   const openEditUser = async (u: UserRow) => {
     setEditing(u);
     editForm.reset({ username: u.username });
+    setEditRoleId(u.roleId ?? '');
     setEditAccountRole(u.role === 'admin' ? 'admin' : u.role === 'nurse' ? 'nurse' : 'doctor');
     const paths = u.allowedNavPaths;
     setEditNavRestricted(Boolean(paths && paths.length > 0));
@@ -274,7 +287,7 @@ const UsersAdminPage = () => {
         description="Administrator, doctor, and nurse logins. Doctor/Nurse users must be mapped to one or more clinics to sign in."
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => { setShowCreate(true); createForm.reset(); setCreateClinicIds([]); setCreateDoctorDisplayName(''); setCreateAccountRole('doctor'); }}>
+          <Button onClick={() => { setShowCreate(true); createForm.reset(); setCreateClinicIds([]); setCreateDoctorDisplayName(''); setCreateAccountRole('doctor'); setCreateRoleId(''); }}>
             <Plus className="mr-2 h-4 w-4" />Add user
           </Button>
         </div>
@@ -308,7 +321,7 @@ const UsersAdminPage = () => {
                       ) : null}
                     </td>
                     <td className="px-4 py-3 align-top capitalize">
-                      <span className="inline-flex rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-medium">{u.role}</span>
+                      <span className="inline-flex rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-medium">{u.roleName || u.role}</span>
                     </td>
                     <td className="px-4 py-3 align-top">
                       {u.role === 'admin' ? (
@@ -392,6 +405,18 @@ const UsersAdminPage = () => {
                     <SelectItem value="nurse">Nurse</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="mt-1 text-xs text-muted-foreground">Base behavior (clinic scope, doctor pickers). Pick a custom role below for fine-grained permissions.</p>
+              </div>
+              <div>
+                <Label>Custom role <span className="text-muted-foreground">(optional)</span></Label>
+                <Select value={createRoleId || '__none__'} onValueChange={(v) => setCreateRoleId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Default for base role" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Default for base role</SelectItem>
+                    {roleOptions.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">Controls exactly which pages & actions this user gets. Manage roles on the Roles & permissions page.</p>
               </div>
               {createAccountRole === 'doctor' && (
                 <div>
@@ -452,6 +477,17 @@ const UsersAdminPage = () => {
                     <SelectItem value="nurse">Nurse</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Custom role <span className="text-muted-foreground">(optional)</span></Label>
+                <Select value={editRoleId || '__none__'} onValueChange={(v) => setEditRoleId(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Default for base role" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Default for base role</SelectItem>
+                    {roleOptions.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">Drives this user's page & action permissions.</p>
               </div>
               {editAccountRole === 'doctor' && (
                 <div>

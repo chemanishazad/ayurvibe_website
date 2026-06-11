@@ -138,11 +138,23 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 export type MedicineStatus = 'active' | 'pending' | 'archived';
 export type MedicineCreatedVia = 'admin' | 'doctor_quick_add' | 'import';
 
+export interface MedicineUnitDef {
+  unitCode: string;
+  factorToBase: number;
+  isBase?: boolean;
+}
+
+export interface MedicineUnitsResponse {
+  baseUnit: string | null;
+  units: MedicineUnitDef[];
+}
+
 export interface MedicineRow {
   id: string;
   name: string;
   category?: string | null;
   uom: string;
+  baseUnit?: string | null;
   purchasePrice: string;
   sellingPrice: string;
   minStockLevel: number;
@@ -170,6 +182,131 @@ export interface CompleteMedicinePayload {
   minStockLevel?: number | string;
   expiryDate?: string;
   description?: string;
+}
+
+// ─── Purchase bills / agency payables ─────────────────────────────────────────
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid';
+export type PaymentMode = 'CASH' | 'UPI' | 'CARD' | 'BANK' | 'CHEQUE';
+
+export interface PurchaseBillRow {
+  id: string;
+  clinicId: string;
+  supplierId: string;
+  supplierName: string | null;
+  clinicName: string | null;
+  billNumber: string | null;
+  billDate: string;
+  dueDate: string | null;
+  subtotal: string;
+  taxAmount: string;
+  totalAmount: string;
+  amountPaid: string;
+  paymentStatus: PaymentStatus;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface PurchaseBillItemRow {
+  id: string;
+  medicineId: string;
+  medicineName: string | null;
+  quantity: number;
+  unitPurchasePrice: string;
+  sellingPrice: string | null;
+  batchNumber: string | null;
+  expiryDate: string | null;
+  lineTotal: string;
+}
+
+export interface SupplierPaymentRow {
+  id: string;
+  amount: string;
+  paymentDate: string;
+  paymentMode: PaymentMode | null;
+  reference: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface PurchaseBillDetail extends PurchaseBillRow {
+  items: PurchaseBillItemRow[];
+  payments: SupplierPaymentRow[];
+}
+
+export interface NewPurchaseBillItem {
+  medicineId: string;
+  quantity: number;
+  unitPurchasePrice: number | string;
+  sellingPrice?: number | string;
+  batchNumber?: string;
+  expiryDate?: string;
+}
+
+export interface NewPurchaseBillPayload {
+  clinicId: string;
+  supplierId: string;
+  billNumber?: string;
+  billDate: string;
+  dueDate?: string;
+  taxAmount?: number | string;
+  notes?: string;
+  items: NewPurchaseBillItem[];
+}
+
+interface OpenBillRow {
+  id: string;
+  supplierId: string;
+  supplierName: string | null;
+  billNumber: string | null;
+  dueDate: string | null;
+  totalAmount: string;
+  amountPaid: string;
+  pending: string;
+}
+
+export interface PayablesSummary {
+  totalOutstanding: string;
+  openCount: number;
+  overdue: { count: number; amount: string; bills: OpenBillRow[] };
+  dueSoon: { count: number; amount: string; bills: OpenBillRow[] };
+  supplierBalances: {
+    supplierId: string;
+    supplierName: string | null;
+    billCount: number;
+    totalBilled: string;
+    totalPaid: string;
+    outstanding: string;
+  }[];
+}
+
+export interface SupplierLedger {
+  supplierId: string;
+  totalBilled: string;
+  totalPaid: string;
+  outstanding: string;
+  bills: PurchaseBillRow[];
+}
+
+// ─── Roles & permissions ───────────────────────────────────────────────────────
+export type BaseRole = 'admin' | 'doctor' | 'receptionist' | 'nurse';
+
+export interface PermissionModuleDef {
+  key: string;
+  label: string;
+  group: string;
+  navPath: string | null;
+  actions: ('view' | 'create' | 'edit' | 'delete')[];
+}
+
+export interface RoleRow {
+  id: string;
+  name: string;
+  description: string | null;
+  baseRole: BaseRole;
+  isSystem: boolean;
+  permissionKeys: string[];
+  userCount?: number;
+  createdAt?: string;
 }
 
 export const api = {
@@ -207,6 +344,8 @@ export const api = {
           id: string;
           username: string;
           role: string;
+          roleId?: string | null;
+          roleName?: string | null;
           displayName?: string | null;
           createdAt: string;
           allowedNavPaths?: string[] | null;
@@ -217,6 +356,7 @@ export const api = {
       username: string;
       password: string;
       role: 'admin' | 'doctor' | 'nurse';
+      roleId?: string | null;
       clinicIds?: string[];
       allowedNavPaths?: string[] | null;
       /** Doctor only: friendly name shown on consultations & prints (falls back to username). */
@@ -230,6 +370,7 @@ export const api = {
       data: Partial<{
         username: string;
         role: 'admin' | 'doctor' | 'nurse';
+        roleId: string | null;
         allowedNavPaths: string[] | null;
         /** Doctor only: rename the printed name. */
         displayName: string | null;
@@ -314,6 +455,11 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: string) => fetchApi<{ success: boolean }>(`/api/medicines/${id}`, { method: 'DELETE' }),
+    /** Pack units for a medicine (base + conversions). */
+    getUnits: (id: string) => fetchApi<MedicineUnitsResponse>(`/api/medicines/${id}/units`),
+    /** Admin: define base unit + pack conversions. */
+    setUnits: (id: string, data: { baseUnit: string; packs: { unitCode: string; factorToBase: number }[] }) =>
+      fetchApi<MedicineUnitsResponse>(`/api/medicines/${id}/units`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   suppliers: {
     list: () => fetchApi<{ id: string; name: string; contact?: string; address?: string }[]>('/api/suppliers'),
@@ -333,6 +479,41 @@ export const api = {
       expiryDate?: string;
       batchNumber?: string;
     }) => fetchApi<Record<string, unknown>>('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  purchaseBills: {
+    list: (params?: { supplierId?: string; status?: PaymentStatus; dueBefore?: string }) => {
+      const p = params ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')) : {};
+      const q = new URLSearchParams(p as Record<string, string>).toString();
+      return fetchApi<PurchaseBillRow[]>(`/api/purchase-bills${q ? `?${q}` : ''}`);
+    },
+    get: (id: string) => fetchApi<PurchaseBillDetail>(`/api/purchase-bills/${id}`),
+    create: (data: NewPurchaseBillPayload) =>
+      fetchApi<PurchaseBillDetail>('/api/purchase-bills', { method: 'POST', body: JSON.stringify(data) }),
+    recordPayment: (
+      id: string,
+      data: { amount: number | string; paymentDate: string; paymentMode?: PaymentMode; reference?: string; notes?: string },
+    ) => fetchApi<PurchaseBillDetail>(`/api/purchase-bills/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  payables: {
+    summary: (dueDays?: number) =>
+      fetchApi<PayablesSummary>(`/api/payables/summary${dueDays ? `?dueDays=${dueDays}` : ''}`),
+    supplierLedger: (supplierId: string) => fetchApi<SupplierLedger>(`/api/suppliers/${supplierId}/ledger`),
+  },
+  roles: {
+    catalog: () => fetchApi<{ modules: PermissionModuleDef[] }>('/api/permissions/catalog'),
+    list: () => fetchApi<RoleRow[]>('/api/roles'),
+    get: (id: string) => fetchApi<RoleRow>(`/api/roles/${id}`),
+    create: (data: { name: string; description?: string; baseRole: BaseRole; permissionKeys: string[] }) =>
+      fetchApi<RoleRow>('/api/roles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (
+      id: string,
+      data: Partial<{ name: string; description: string | null; baseRole: BaseRole; permissionKeys: string[] }>,
+    ) => fetchApi<RoleRow>(`/api/roles/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi<{ success: boolean }>(`/api/roles/${id}`, { method: 'DELETE' }),
+  },
+  authz: {
+    /** Live permission set for the current user (role edits apply without re-login). */
+    permissions: () => fetchApi<{ permissions: string[] }>('/api/auth/permissions'),
   },
   inventory: {
     list: (clinicId?: string) => fetchApi<Record<string, unknown>[]>(`/api/inventory${clinicId ? `?clinicId=${clinicId}` : ''}`),

@@ -31,11 +31,13 @@ const MedicinesPage = React.lazy(() => import("./pages/admin/MedicinesPage"));
 const PendingMedicinesPage = React.lazy(() => import("./pages/admin/PendingMedicinesPage"));
 const SuppliersPage = React.lazy(() => import("./pages/admin/SuppliersPage"));
 const InventoryPage = React.lazy(() => import("./pages/admin/InventoryPage"));
+const PurchaseBillsPage = React.lazy(() => import("./pages/admin/PurchaseBillsPage"));
 const ReportsPage = React.lazy(() => import("./pages/admin/ReportsPage"));
 const UpcomingFollowUpsPage = React.lazy(() => import("./pages/admin/UpcomingFollowUpsPage"));
 const DirectSalesPage = React.lazy(() => import("./pages/admin/DirectSalesPage"));
 const ClinicsPage = React.lazy(() => import("./pages/admin/ClinicsPage"));
 const UsersAdminPage = React.lazy(() => import("./pages/admin/UsersAdminPage"));
+const RolesAdminPage = React.lazy(() => import("./pages/admin/RolesAdminPage"));
 const UomAdminPage = React.lazy(() => import("./pages/admin/UomAdminPage"));
 const TherapistsRoomsPage = React.lazy(() => import("./pages/admin/TherapistsRoomsPage"));
 
@@ -124,12 +126,14 @@ const App = () => (
               <Route path="medicines/pending" element={<AdminOnlyRoute><PendingMedicinesPage /></AdminOnlyRoute>} />
               <Route path="suppliers" element={<AdminOnlyRoute><SuppliersPage /></AdminOnlyRoute>} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="purchase-bills" element={<AdminOnlyRoute><PurchaseBillsPage /></AdminOnlyRoute>} />
               <Route path="direct-sales" element={<AdminOnlyRoute><DirectSalesPage /></AdminOnlyRoute>} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="upcoming-follow-ups" element={<UpcomingFollowUpsPage />} />
               <Route path="clinics" element={<ClinicsPage />} />
               <Route path="therapists-rooms" element={<AdminOnlyRoute><TherapistsRoomsPage /></AdminOnlyRoute>} />
               <Route path="users" element={<UsersAdminPage />} />
+              <Route path="roles" element={<AdminOnlyRoute><RolesAdminPage /></AdminOnlyRoute>} />
               <Route path="uom" element={<UomAdminPage />} />
             </Route>
           </Route>

@@ -51,7 +51,7 @@ function getAdminPageTitle(pathname: string, user: ReturnType<typeof getAuthUser
   }
   const items = getNavGroupsForSession(
     user
-      ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
+      ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null, permissions: user.permissions ?? null }
       : null,
   ).flatMap((g) => g.items);
   const sorted = [...items].sort((a, b) => b.path.length - a.path.length);
@@ -78,7 +78,7 @@ const AdminLayoutInner: React.FC<{ children: React.ReactNode }> = ({ children })
   const pageTitle = getAdminPageTitle(location.pathname, user);
   const visibleNavGroups = getNavGroupsForSession(
     user
-      ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null }
+      ? { role: user.role, allowedNavPaths: user.allowedNavPaths ?? null, staffRole: user.staffRole ?? null, permissions: user.permissions ?? null }
       : null,
   );
 

@@ -218,7 +218,18 @@ const InventoryPage = () => {
                     <tr key={(inv as { id: string }).id} className="border-b">
                       <td className="py-2">{(inv as { medicineName: string }).medicineName}</td>
                       <td className="py-2">{(inv as { uom: string }).uom}</td>
-                      <td className="py-2 text-right">{(inv as { currentStock: number }).currentStock}</td>
+                      <td className="py-2 text-right">
+                        {(inv as { currentStock: number }).currentStock}
+                        {(() => {
+                          const b = (inv as { stockBreakdown?: string }).stockBreakdown;
+                          const stock = (inv as { currentStock: number }).currentStock;
+                          const base = (inv as { baseUnit?: string | null; uom: string }).baseUnit || (inv as { uom: string }).uom || 'unit';
+                          // Only show breakdown when packs make it differ from "<n> <base>".
+                          return b && b !== `${stock} ${base}` ? (
+                            <div className="text-xs text-muted-foreground">{b}</div>
+                          ) : null;
+                        })()}
+                      </td>
                       <td className="py-2 text-right">{(inv as { minStockLevel: number }).minStockLevel}</td>
                       <td className="py-2 text-right">₹{(inv as { sellingPrice: string }).sellingPrice}</td>
                     </tr>

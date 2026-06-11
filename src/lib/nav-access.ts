@@ -15,6 +15,8 @@ import {
   Scale,
   HeartPulse,
   ContactRound,
+  ReceiptText,
+  ShieldCheck,
 } from 'lucide-react';
 
 /** Single source for admin “Users & access” checkboxes and sidebar filtering. */
@@ -34,11 +36,13 @@ export const ADMIN_NAV_CATALOG: {
   { path: '/admin/medicines', label: 'Medicines', group: 'Commerce', icon: Pill },
   { path: '/admin/suppliers', label: 'Suppliers', group: 'Commerce', icon: Truck },
   { path: '/admin/inventory', label: 'Inventory', group: 'Commerce', icon: Package },
+  { path: '/admin/purchase-bills', label: 'Purchases & Bills', group: 'Commerce', icon: ReceiptText },
   { path: '/admin/direct-sales', label: 'Direct sales', group: 'Commerce', icon: ShoppingCart },
   { path: '/admin/reports', label: 'Reports', group: 'Reports', icon: FileText },
   { path: '/admin/clinics', label: 'Clinics', group: 'Administration', icon: Building2 },
   { path: '/admin/therapists-rooms', label: 'Therapists & rooms', group: 'Administration', icon: ContactRound },
   { path: '/admin/users', label: 'Users & access', group: 'Administration', icon: UserCog },
+  { path: '/admin/roles', label: 'Roles & permissions', group: 'Administration', icon: ShieldCheck },
   { path: '/admin/uom', label: 'Units (UOM)', group: 'Administration', icon: Scale },
 ];
 
@@ -64,6 +68,7 @@ export const STAFF_HIDDEN_NAV_PATHS = new Set([
   '/admin/medicines',
   '/admin/suppliers',
   '/admin/direct-sales',
+  '/admin/purchase-bills',
 ]);
 
 /**
@@ -136,7 +141,39 @@ export type AuthUserSession = {
   allowedNavPaths?: string[] | null;
   /** Legacy compatibility (older token format). */
   staffRole?: string | null;
+  /** Phase 2: effective permission keys. When present, drives sidebar + route access. */
+  permissions?: string[] | null;
 };
+
+/** Admin nav path → its `view` permission key. Mirror of backend permission catalog navPaths. */
+export const NAV_PATH_TO_VIEW_PERMISSION: Record<string, string> = {
+  '/admin/dashboard': 'dashboard.view',
+  '/admin/patients': 'patients.view',
+  '/admin/op': 'op.view',
+  '/admin/consultations': 'consultations.view',
+  '/admin/pharmacy': 'pharmacy.view',
+  '/admin/treatment-plans': 'treatment_plans.view',
+  '/admin/upcoming-follow-ups': 'follow_ups.view',
+  '/admin/medicines': 'medicines.view',
+  '/admin/suppliers': 'suppliers.view',
+  '/admin/inventory': 'inventory.view',
+  '/admin/purchase-bills': 'purchase_bills.view',
+  '/admin/direct-sales': 'direct_sales.view',
+  '/admin/reports': 'reports.view',
+  '/admin/clinics': 'clinics.view',
+  '/admin/therapists-rooms': 'therapists_rooms.view',
+  '/admin/users': 'users.view',
+  '/admin/roles': 'roles.view',
+  '/admin/uom': 'uom.view',
+};
+
+function viewPermissionForPath(path: string): string | null {
+  const clean = path.replace(/\/$/, '') || '/';
+  for (const [navPath, perm] of Object.entries(NAV_PATH_TO_VIEW_PERMISSION)) {
+    if (clean === navPath || clean.startsWith(`${navPath}/`)) return perm;
+  }
+  return null;
+}
 
 function pathMatchesAllowed(pathname: string, allowedPrefix: string): boolean {
   const p = pathname.replace(/\/$/, '') || '/';
@@ -144,11 +181,26 @@ function pathMatchesAllowed(pathname: string, allowedPrefix: string): boolean {
   return p === a || p.startsWith(`${a}/`);
 }
 
-/** Whether the user may open this route (admin: always; staff: default rules or explicit list). */
+/** Whether the user may open this route (admin: always; staff: permissions, then legacy rules). */
 export function userMayAccessRoute(user: AuthUserSession | null, pathname: string): boolean {
   if (!user) return false;
   if (user.role === 'admin') return true;
   const p = pathname.replace(/\/$/, '') || '/';
+
+  // Phase 2: permission-driven access when the session carries permission keys.
+  if (user.permissions && user.permissions.length > 0) {
+    const required = viewPermissionForPath(p);
+    // Routes not in the catalog (e.g. nested sub-routes) inherit their prefix's decision;
+    // if no permission maps, allow (non-gated helper pages).
+    if (!required) return true;
+    if (!user.permissions.includes(required)) return false;
+    // Honor an extra per-user nav restriction layered on top of the role, if present.
+    const allowed = user.allowedNavPaths;
+    if (allowed && allowed.length > 0) {
+      return allowed.some((prefix) => pathMatchesAllowed(p, prefix));
+    }
+    return true;
+  }
   /** Nurses record vitals under OP only; consultation charts are for doctors. */
   const isNurse = user.role === 'nurse' || (user.role === 'user' && user.staffRole === 'nurse');
   if (isNurse && pathMatchesAllowed(p, '/admin/consultations')) {
@@ -176,6 +228,26 @@ export function getNavGroupsForSession(user: AuthUserSession | null): NavGroup[]
   const full = getFullNavGroups();
   if (!user || user.role === 'admin') return full;
   const isNurse = user.role === 'nurse' || (user.role === 'user' && user.staffRole === 'nurse');
+
+  // Phase 2: build the sidebar from the permission set when present.
+  if (user.permissions && user.permissions.length > 0) {
+    const perms = new Set(user.permissions);
+    const allowed = user.allowedNavPaths;
+    return full
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((item) => {
+          const required = viewPermissionForPath(item.path);
+          if (required && !perms.has(required)) return false;
+          if (allowed && allowed.length > 0) {
+            return allowed.some((prefix) => pathMatchesAllowed(item.path, prefix));
+          }
+          return true;
+        }),
+      }))
+      .filter((g) => g.items.length > 0);
+  }
+
   const allowed = user.allowedNavPaths;
   if (allowed && allowed.length > 0) {
     return full
