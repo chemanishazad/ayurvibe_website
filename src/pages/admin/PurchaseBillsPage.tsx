@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { QuickAddMedicineDialog } from './QuickAddMedicineDialog';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,7 @@ import {
   type PaymentMode,
   type PurchaseBillRow,
   type NewPurchaseBillItem,
+  type MedicineRow,
 } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAdminClinic } from '@/contexts/AdminClinicContext';
@@ -138,6 +141,9 @@ const PurchaseBillsPage = () => {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([{ _key: 1, medicineId: '', quantity: 1, unitPurchasePrice: '' }]);
 
+  // ─ Quick-add medicine (inline master creation) ─
+  const [quickAdd, setQuickAdd] = useState<{ lineKey: number; name: string } | null>(null);
+
   // ─ Payment + detail dialogs ─
   const [payBillId, setPayBillId] = useState<string | null>(null);
   const [detailBillId, setDetailBillId] = useState<string | null>(null);
@@ -166,6 +172,24 @@ const PurchaseBillsPage = () => {
     qc.invalidateQueries({ queryKey: ['payables-summary'] });
     qc.invalidateQueries({ queryKey: ['inventory'] });
   };
+
+  const medicineOptions = useMemo<ComboboxOption[]>(
+    () =>
+      medicines
+        .filter((m) => m.status !== 'archived')
+        .map((m) => ({
+          value: m.id,
+          label: m.name,
+          hint: m.baseUnit || m.uom || undefined,
+          keywords: [m.category, m.baseUnit, m.uom].filter(Boolean).join(' '),
+        })),
+    [medicines],
+  );
+
+  const supplierOptions = useMemo<ComboboxOption[]>(
+    () => suppliers.map((s) => ({ value: s.id, label: s.name, keywords: s.contact ?? '' })),
+    [suppliers],
+  );
 
   const draftSubtotal = useMemo(
     () => items.reduce((acc, it) => acc + money(it.unitPurchasePrice) * (it.quantity || 0), 0),
@@ -290,15 +314,16 @@ const PurchaseBillsPage = () => {
               <CardDescription>Newest first. Overdue rows are flagged.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="All agencies" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All agencies</SelectItem>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="w-[200px]">
+                <Combobox
+                  options={[{ value: 'all', label: 'All agencies' }, ...supplierOptions]}
+                  value={supplierFilter}
+                  onChange={setSupplierFilter}
+                  placeholder="All agencies"
+                  searchPlaceholder="Search agencies…"
+                  triggerClassName="h-9"
+                />
+              </div>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PaymentStatus | 'all')}>
                 <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -396,12 +421,15 @@ const PurchaseBillsPage = () => {
               )}
               <div>
                 <Label>Agency / Supplier <span className="text-destructive">*</span></Label>
-                <Select value={newSupplierId} onValueChange={setNewSupplierId}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select agency" /></SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="mt-1">
+                  <Combobox
+                    options={supplierOptions}
+                    value={newSupplierId}
+                    onChange={setNewSupplierId}
+                    placeholder="Select agency"
+                    searchPlaceholder="Search agencies…"
+                  />
+                </div>
               </div>
               <div>
                 <Label>Bill / Invoice number</Label>
@@ -419,55 +447,103 @@ const PurchaseBillsPage = () => {
             </div>
 
             {/* Line items */}
-            <div className="rounded-lg border">
-              <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2">
-                <span className="text-sm font-medium">Medicines purchased</span>
+            <div className="overflow-hidden rounded-lg border">
+              <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2.5">
+                <div>
+                  <span className="text-sm font-medium">Medicines purchased</span>
+                  <p className="text-xs text-muted-foreground">Search to pick a medicine, or type a new name to add it.</p>
+                </div>
                 <Button type="button" size="sm" variant="outline" onClick={addItemRow}><Plus className="mr-1 h-3.5 w-3.5" />Add line</Button>
               </div>
-              <div className="space-y-3 p-3">
-                {items.map((it) => (
-                  <div key={it._key} className="grid items-end gap-2 sm:grid-cols-[1fr_64px_100px_90px_90px_auto]">
-                    <div>
-                      <Label className="text-xs">Medicine</Label>
-                      <Select value={it.medicineId} onValueChange={(v) => updateItem(it._key, { medicineId: v, purchaseUnit: undefined })}>
-                        <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent>
-                          {medicines.filter((m) => m.status !== 'archived').map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}{m.baseUnit || m.uom ? ` (${m.baseUnit || m.uom})` : ''}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Qty</Label>
-                      <Input type="number" min={1} className="mt-1 h-9" value={it.quantity}
-                        onChange={(e) => updateItem(it._key, { quantity: parseInt(e.target.value, 10) || 0 })} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Unit</Label>
-                      <div className="mt-1">
-                        <LineUnitSelect
-                          medicineId={it.medicineId}
-                          value={it.purchaseUnit}
-                          onChange={(unitCode) => updateItem(it._key, { purchaseUnit: unitCode })}
-                        />
+
+              {/* Column headers (desktop) */}
+              <div className="hidden gap-2 border-b bg-muted/20 px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:grid sm:grid-cols-[1fr_72px_110px_96px_96px_40px]">
+                <span>Medicine</span>
+                <span>Qty</span>
+                <span>Unit</span>
+                <span>Cost/unit</span>
+                <span>Sell/base</span>
+                <span className="sr-only">Remove</span>
+              </div>
+
+              <div className="divide-y">
+                {items.map((it, idx) => {
+                  const lineCost = money(it.unitPurchasePrice) * (it.quantity || 0);
+                  return (
+                    <div key={it._key} className="grid items-start gap-2 px-3 py-3 sm:grid-cols-[1fr_72px_110px_96px_96px_40px]">
+                      <div>
+                        <Label className="text-xs sm:hidden">Medicine</Label>
+                        <div className="mt-1 sm:mt-0">
+                          <Combobox
+                            options={medicineOptions}
+                            value={it.medicineId || undefined}
+                            onChange={(v) => updateItem(it._key, { medicineId: v, purchaseUnit: undefined })}
+                            placeholder="Select medicine"
+                            searchPlaceholder="Search medicines…"
+                            onCreate={(q) => setQuickAdd({ lineKey: it._key, name: q })}
+                            createLabel={(q) => `Add new medicine “${q}”`}
+                          />
+                        </div>
+                        {lineCost > 0 && (
+                          <div className="mt-1 text-xs text-muted-foreground">Line total: {inr(lineCost)}</div>
+                        )}
+                      </div>
+                      <div>
+                        <Label className="text-xs sm:hidden">Qty</Label>
+                        <Input type="number" min={1} className="mt-1 h-9 sm:mt-0" value={it.quantity}
+                          onChange={(e) => updateItem(it._key, { quantity: parseInt(e.target.value, 10) || 0 })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs sm:hidden">Unit</Label>
+                        <div className="mt-1 sm:mt-0">
+                          <LineUnitSelect
+                            medicineId={it.medicineId}
+                            value={it.purchaseUnit}
+                            onChange={(unitCode) => updateItem(it._key, { purchaseUnit: unitCode })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs sm:hidden">Cost/unit</Label>
+                        <Input type="number" min={0} step="0.01" className="mt-1 h-9 sm:mt-0" value={String(it.unitPurchasePrice)}
+                          onChange={(e) => updateItem(it._key, { unitPurchasePrice: e.target.value })} placeholder="0.00" />
+                      </div>
+                      <div>
+                        <Label className="text-xs sm:hidden">Sell/base</Label>
+                        <Input type="number" min={0} step="0.01" className="mt-1 h-9 sm:mt-0" value={String(it.sellingPrice ?? '')}
+                          onChange={(e) => updateItem(it._key, { sellingPrice: e.target.value })} placeholder="0.00" />
+                      </div>
+                      <div className="flex justify-end sm:block">
+                        <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-destructive" onClick={() => removeItemRow(it._key)} disabled={items.length === 1} title={`Remove line ${idx + 1}`}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Batch no. + expiry — span the full line width, below the main grid. */}
+                      <div className="grid gap-2 sm:col-span-full sm:grid-cols-[1fr_1fr_auto]">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Batch / lot no.</Label>
+                          <Input
+                            className="mt-1 h-9"
+                            value={it.batchNumber ?? ''}
+                            onChange={(e) => updateItem(it._key, { batchNumber: e.target.value })}
+                            placeholder="Manufacturer batch (optional)"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Expiry date</Label>
+                          <Input
+                            type="date"
+                            className="mt-1 h-9"
+                            value={it.expiryDate ?? ''}
+                            onChange={(e) => updateItem(it._key, { expiryDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="hidden sm:block sm:w-10" aria-hidden />
                       </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">Cost/unit</Label>
-                      <Input type="number" min={0} step="0.01" className="mt-1 h-9" value={String(it.unitPurchasePrice)}
-                        onChange={(e) => updateItem(it._key, { unitPurchasePrice: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Sell/base</Label>
-                      <Input type="number" min={0} step="0.01" className="mt-1 h-9" value={String(it.sellingPrice ?? '')}
-                        onChange={(e) => updateItem(it._key, { sellingPrice: e.target.value })} />
-                    </div>
-                    <Button type="button" size="icon" variant="ghost" className="h-9 w-9 text-destructive" onClick={() => removeItemRow(it._key)} disabled={items.length === 1}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -496,6 +572,17 @@ const PurchaseBillsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <QuickAddMedicineDialog
+        open={!!quickAdd}
+        initialName={quickAdd?.name}
+        onClose={() => setQuickAdd(null)}
+        onCreated={(med: MedicineRow) => {
+          qc.invalidateQueries({ queryKey: ['medicines'] });
+          if (quickAdd) updateItem(quickAdd.lineKey, { medicineId: med.id, purchaseUnit: undefined });
+          setQuickAdd(null);
+        }}
+      />
 
       <RecordPaymentDialog billId={payBillId} onClose={() => setPayBillId(null)} onPaid={invalidate} />
       <BillDetailDialog billId={detailBillId} canPay={canPay} onClose={() => setDetailBillId(null)} onPay={(id) => { setDetailBillId(null); setPayBillId(id); }} />

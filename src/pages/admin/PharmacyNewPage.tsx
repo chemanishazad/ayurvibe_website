@@ -1176,22 +1176,34 @@ const PharmacyNewPage = () => {
                                       <CommandGroup>
                                         {linePickOptions
                                           .filter((p) => remainingForPick(p, i) > 0)
-                                          .map((p) => (
-                                            <CommandItem
-                                              key={p.kind === 'batch' ? p.id : `fifo-${p.medicineId}`}
-                                              value={p.kind === 'batch' ? `${p.medicineName} ${p.batchNumber ?? ''}` : p.medicineName}
-                                              onSelect={() => selectLinePick(i, p)}
-                                            >
-                                              <div className="flex flex-col gap-0.5">
-                                                <span className="font-medium">{p.kind === 'batch' ? p.medicineName : `${p.medicineName} (FIFO)`}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                  {p.kind === 'batch'
-                                                    ? `${p.batchNumber ?? '—'} · Exp ${p.expiryDate ? formatAppDate(String(p.expiryDate).slice(0, 10) + 'T12:00:00') : '—'} · ${remainingForPick(p, i)} left · ₹${parseFloat(p.effectiveSellingPrice).toFixed(2)}`
-                                                    : `${remainingForPick(p, i)} left · ₹${parseFloat(p.sellingPrice).toFixed(2)}`}
-                                                </span>
-                                              </div>
-                                            </CommandItem>
-                                          ))}
+                                          .map((p) => {
+                                            // Unique value per option so cmdk never conflates two batches of the
+                                            // same medicine (esp. when batchNumber is empty). Search text keeps
+                                            // name + batch so typing still matches; the trailing id makes it unique.
+                                            const uid = p.kind === 'batch' ? p.id : `fifo-${p.inventoryId}`;
+                                            const searchText =
+                                              p.kind === 'batch'
+                                                ? `${p.medicineName} ${p.batchNumber ?? ''} ${uid}`
+                                                : `${p.medicineName} fifo ${uid}`;
+                                            const expLabel =
+                                              p.kind === 'batch' && p.expiryDate
+                                                ? formatAppDate(String(p.expiryDate).slice(0, 10) + 'T12:00:00')
+                                                : null;
+                                            return (
+                                              <CommandItem key={uid} value={searchText} onSelect={() => selectLinePick(i, p)}>
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span className="font-medium">
+                                                    {p.kind === 'batch' ? p.medicineName : `${p.medicineName} (FIFO)`}
+                                                  </span>
+                                                  <span className="text-xs text-muted-foreground">
+                                                    {p.kind === 'batch'
+                                                      ? `${p.batchNumber ? p.batchNumber : 'No batch no.'} · Exp ${expLabel ?? '—'} · ${remainingForPick(p, i)} left · ₹${parseFloat(p.effectiveSellingPrice).toFixed(2)}`
+                                                      : `${remainingForPick(p, i)} left · ₹${parseFloat(p.sellingPrice).toFixed(2)}`}
+                                                  </span>
+                                                </div>
+                                              </CommandItem>
+                                            );
+                                          })}
                                       </CommandGroup>
                                     </CommandList>
                                   </Command>

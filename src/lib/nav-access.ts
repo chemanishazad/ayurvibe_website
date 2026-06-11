@@ -17,6 +17,7 @@ import {
   ContactRound,
   ReceiptText,
   ShieldCheck,
+  Layers,
 } from 'lucide-react';
 
 /** Single source for admin “Users & access” checkboxes and sidebar filtering. */
@@ -36,6 +37,7 @@ export const ADMIN_NAV_CATALOG: {
   { path: '/admin/medicines', label: 'Medicines', group: 'Commerce', icon: Pill },
   { path: '/admin/suppliers', label: 'Suppliers', group: 'Commerce', icon: Truck },
   { path: '/admin/inventory', label: 'Inventory', group: 'Commerce', icon: Package },
+  { path: '/admin/batches', label: 'Batches & Costing', group: 'Commerce', icon: Layers },
   { path: '/admin/purchase-bills', label: 'Purchases & Bills', group: 'Commerce', icon: ReceiptText },
   { path: '/admin/direct-sales', label: 'Direct sales', group: 'Commerce', icon: ShoppingCart },
   { path: '/admin/reports', label: 'Reports', group: 'Reports', icon: FileText },
@@ -157,6 +159,7 @@ export const NAV_PATH_TO_VIEW_PERMISSION: Record<string, string> = {
   '/admin/medicines': 'medicines.view',
   '/admin/suppliers': 'suppliers.view',
   '/admin/inventory': 'inventory.view',
+  '/admin/batches': 'inventory.view',
   '/admin/purchase-bills': 'purchase_bills.view',
   '/admin/direct-sales': 'direct_sales.view',
   '/admin/reports': 'reports.view',

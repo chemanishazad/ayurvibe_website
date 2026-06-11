@@ -31,6 +31,7 @@ const MedicinesPage = React.lazy(() => import("./pages/admin/MedicinesPage"));
 const PendingMedicinesPage = React.lazy(() => import("./pages/admin/PendingMedicinesPage"));
 const SuppliersPage = React.lazy(() => import("./pages/admin/SuppliersPage"));
 const InventoryPage = React.lazy(() => import("./pages/admin/InventoryPage"));
+const BatchCostingPage = React.lazy(() => import("./pages/admin/BatchCostingPage"));
 const PurchaseBillsPage = React.lazy(() => import("./pages/admin/PurchaseBillsPage"));
 const ReportsPage = React.lazy(() => import("./pages/admin/ReportsPage"));
 const UpcomingFollowUpsPage = React.lazy(() => import("./pages/admin/UpcomingFollowUpsPage"));
@@ -126,6 +127,7 @@ const App = () => (
               <Route path="medicines/pending" element={<AdminOnlyRoute><PendingMedicinesPage /></AdminOnlyRoute>} />
               <Route path="suppliers" element={<AdminOnlyRoute><SuppliersPage /></AdminOnlyRoute>} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="batches" element={<BatchCostingPage />} />
               <Route path="purchase-bills" element={<AdminOnlyRoute><PurchaseBillsPage /></AdminOnlyRoute>} />
               <Route path="direct-sales" element={<AdminOnlyRoute><DirectSalesPage /></AdminOnlyRoute>} />
               <Route path="reports" element={<ReportsPage />} />

@@ -149,6 +149,65 @@ export interface MedicineUnitsResponse {
   units: MedicineUnitDef[];
 }
 
+// ─── Batch monitoring / FIFO costing ─────────────────────────────────────────
+export interface MedicineBatchRow {
+  id: string;
+  supplierId: string;
+  supplierName: string | null;
+  quantity: number;
+  remainingQuantity: number;
+  consumedQuantity: number;
+  batchNumber: string | null;
+  purchaseDate: string;
+  expiryDate: string | null;
+  unitPurchasePrice: string;
+  unitSellingPrice: string | null;
+  defaultSellingPrice: string | null;
+  effectiveSellingPrice: string;
+  margin: string;
+  marginPct: number;
+  isDepleted: boolean;
+  stockValue: string;
+  createdAt: string;
+}
+
+export interface StockLedgerEntry {
+  id: string;
+  type: 'in' | 'out';
+  date: string;
+  createdAt: string;
+  quantity: number;
+  unitPrice: string;
+  costPrice: string | null;
+  lineValue: string;
+  profit: string | null;
+  party: string | null;
+  batchNumber: string | null;
+  balance: number;
+}
+
+export interface StockLedger {
+  entries: StockLedgerEntry[];
+  summary: {
+    totalIn: number;
+    totalOut: number;
+    balance: number;
+    purchaseValue: string;
+    salesValue: string;
+    totalProfit: string;
+  } | null;
+}
+
+export interface ExpiringBatchRow {
+  id: string;
+  medicineId: string;
+  medicineName: string;
+  batchNumber: string | null;
+  remainingQuantity: number;
+  expiryDate: string | null;
+  supplierName: string | null;
+}
+
 export interface MedicineRow {
   id: string;
   name: string;
@@ -533,6 +592,15 @@ export const api = {
         }>
       >(`/api/inventory/batches?clinicId=${encodeURIComponent(clinicId)}`),
     lowStock: (clinicId?: string) => fetchApi<Record<string, unknown>[]>(`/api/inventory/low-stock${clinicId ? `?clinicId=${clinicId}` : ''}`),
+    /** Every batch (incl. depleted) for one medicine — cost, sell, margin, expiry. */
+    medicineBatches: (clinicId: string, medicineId: string) =>
+      fetchApi<MedicineBatchRow[]>(`/api/inventory/medicine-batches?clinicId=${encodeURIComponent(clinicId)}&medicineId=${encodeURIComponent(medicineId)}`),
+    /** Stock movement ledger (purchases in + sales out) with running balance & profit. */
+    ledger: (clinicId: string, medicineId: string) =>
+      fetchApi<StockLedger>(`/api/inventory/ledger?clinicId=${encodeURIComponent(clinicId)}&medicineId=${encodeURIComponent(medicineId)}`),
+    /** Batches with stock that expire within `days`. */
+    expiring: (clinicId: string, days = 90) =>
+      fetchApi<ExpiringBatchRow[]>(`/api/inventory/expiring?clinicId=${encodeURIComponent(clinicId)}&days=${days}`),
     update: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/inventory', { method: 'POST', body: JSON.stringify(data) }),
   },
   /** Nurse OP vitals (patient master); doctors complete via `complete`. */
