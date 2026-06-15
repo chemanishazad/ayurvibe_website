@@ -21,7 +21,7 @@ const slides = [
     title: 'Best Ayurveda Clinic in Chennai',
     subtitle: 'Where Ancient Wisdom Meets Modern Healing',
     description:
-      'Authentic Ayurvedic care at Nookampalayam, Perumbakkam — led by Dr. Vaitheeshwari, B.A.M.S. Personalised treatment for your unique constitution.',
+      'Authentic Ayurvedic care at Nookampalayam, Perumbakkam — led by Dr. V.Vaitheeshwari, B.A.M.S. Personalised treatment for your unique constitution.',
   },
   {
     id: 2,
@@ -63,7 +63,7 @@ const slides = [
 
 const trustBadges = [
   { icon: ShieldCheck, label: 'Govt. Certified' },
-  { icon: Star, label: '4.9 ★ (12 reviews)' },
+  { icon: Star, label: '4.9 ★ (13 reviews)' },
   { icon: Leaf, label: '100% Authentic' },
 ];
 
@@ -113,8 +113,13 @@ const HeroSlider = () => {
       ))}
 
       {/* Cinematic gradient overlay (forest → terracotta mesh) */}
-      <div className="absolute inset-0 bg-gradient-hero" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/40" />
+      <div className="absolute inset-0 bg-gradient-hero animate-gradient" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/55" />
+      <div className="absolute inset-0 bg-black/20" />
+
+      {/* Floating decorative orbs */}
+      <div className="absolute -top-16 -left-10 w-72 h-72 rounded-full bg-gold/20 blur-3xl float-slow pointer-events-none" aria-hidden />
+      <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-sage/25 blur-3xl float-x pointer-events-none" aria-hidden />
 
       {/* Navigation */}
       <nav className="relative z-20 container mx-auto px-4 py-4 md:py-6">
@@ -160,11 +165,11 @@ const HeroSlider = () => {
             <span className="eyebrow !text-white !bg-white/15 !border-white/25 backdrop-blur-sm mb-6">
               <Leaf className="h-3.5 w-3.5" /> {slide.eyebrow}
             </span>
-            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold mt-6 mb-5 leading-[1.05] drop-shadow-md">
+            <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold mt-6 mb-5 leading-[1.05] hero-text-shadow">
               {slide.title}
             </h1>
-            <p className="text-lg md:text-2xl mb-5 text-gold font-medium">{slide.subtitle}</p>
-            <p className="text-base md:text-lg mb-9 max-w-2xl mx-auto text-white/85">
+            <p className="text-lg md:text-2xl mb-5 text-gold font-semibold hero-text-shadow">{slide.subtitle}</p>
+            <p className="text-base md:text-lg mb-9 max-w-2xl mx-auto text-white/90 hero-text-shadow">
               {slide.description}
             </p>
           </motion.div>
@@ -201,18 +206,30 @@ const HeroSlider = () => {
 
         {/* Trust badges */}
         <motion.div
-          className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.45 }}
+          className="mt-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-3"
+          initial="hidden"
+          animate="show"
+          variants={{ show: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } } }}
         >
           {trustBadges.map((b) => (
-            <span key={b.label} className="flex items-center gap-2 text-sm text-white/85">
-              <b.icon className="h-4 w-4 text-gold" />
+            <motion.span
+              key={b.label}
+              variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="group flex items-center gap-2 text-sm text-white/90 glass rounded-full px-4 py-2 hover:bg-white/20 transition-colors"
+            >
+              <b.icon className="h-4 w-4 text-gold icon-pop" />
               {b.label}
-            </span>
+            </motion.span>
           ))}
         </motion.div>
+      </div>
+
+      {/* Scroll-down hint */}
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 hidden sm:flex flex-col items-center gap-1 pointer-events-none">
+        <div className="w-6 h-10 rounded-full border-2 border-white/50 flex justify-center pt-2">
+          <div className="w-1 h-2 rounded-full bg-white/80 scroll-hint" />
+        </div>
       </div>
 
       {/* Arrow Navigation */}

@@ -238,7 +238,7 @@ const BlogPost = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center space-x-3">
-              <Logo className="h-12 w-auto" withText textClassName="" subtitleText="Dr. Vaitheeshwari BAMS" />
+              <Logo className="h-12 w-auto" withText textClassName="" subtitleText="Dr. V.Vaitheeshwari BAMS" />
             </Link>
             <Button asChild variant="outline">
               <Link to="/">
