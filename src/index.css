@@ -38,7 +38,7 @@ All colors MUST be HSL.
     --ring: 113 63% 43%;
 
     /* Ayurveda Design Tokens */
-    --gold: 45 85% 60%;
+    --gold: 43 92% 56%;
     --gold-muted: 45 45% 85%;
     --earth-brown: 25 35% 35%;
     --sage-green: 140 25% 45%;
@@ -55,7 +55,7 @@ All colors MUST be HSL.
     --gradient-healing: linear-gradient(135deg, hsl(var(--cream)), hsl(var(--warm-beige)));
     --gradient-earth: linear-gradient(135deg, hsl(var(--forest-deep)), hsl(var(--forest)) 55%, hsl(var(--sage-green)));
     --gradient-gold: linear-gradient(135deg, hsl(var(--gold)) 0%, hsl(var(--saffron)) 100%);
-    --gradient-hero: linear-gradient(120deg, hsl(var(--forest-deep) / 0.92) 0%, hsl(var(--forest) / 0.55) 45%, hsl(var(--terracotta) / 0.35) 100%);
+    --gradient-hero: linear-gradient(120deg, hsl(var(--forest-deep) / 0.96) 0%, hsl(var(--forest) / 0.78) 45%, hsl(var(--terracotta) / 0.62) 100%);
     /* Soft radial mesh for section backgrounds */
     --gradient-mesh:
       radial-gradient(at 18% 20%, hsl(var(--gold) / 0.18) 0px, transparent 50%),
@@ -125,6 +125,10 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground overflow-x-hidden;
   }
@@ -179,10 +183,41 @@ All colors MUST be HSL.
   70% { box-shadow: 0 0 0 14px hsl(var(--saffron) / 0); }
   100% { box-shadow: 0 0 0 0 hsl(var(--saffron) / 0); }
 }
+@keyframes float-x {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes gradient-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-2deg); }
+}
+@keyframes underline-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes scroll-hint {
+  0% { opacity: 0; transform: translateY(0); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(10px); }
+}
 
 /* ---- Reusable visual utilities ---- */
 .bg-mesh { background-image: var(--gradient-mesh); }
 .bg-gradient-hero { background-image: var(--gradient-hero); }
+
+/* Hero text legibility on photographic backgrounds */
+.hero-text-shadow {
+  text-shadow: 0 2px 18px hsl(var(--forest-deep) / 0.55), 0 1px 3px hsl(0 0% 0% / 0.45);
+}
 
 .glass {
   background: hsl(0 0% 100% / 0.1);
@@ -199,10 +234,11 @@ All colors MUST be HSL.
 
 /* Gradient text */
 .text-gradient-gold {
+  color: hsl(var(--saffron));
   background: var(--gradient-gold);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Animated section eyebrow / divider */
@@ -222,8 +258,17 @@ All colors MUST be HSL.
 }
 
 .float-slow { animation: float-slow 6s ease-in-out infinite; }
+.float-x { animation: float-x 7s ease-in-out infinite; }
+.spin-slow { animation: spin-slow 22s linear infinite; }
+.bob { animation: bob 4s ease-in-out infinite; }
 .ken-burns { animation: ken-burns 8s ease-out forwards; }
 .pulse-ring { animation: pulse-ring 2.2s ease-out infinite; }
+
+/* Animated gradient backgrounds (gentle pan) */
+.animate-gradient {
+  background-size: 220% 220%;
+  animation: gradient-pan 14s ease infinite;
+}
 
 .card-lift {
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
@@ -234,9 +279,44 @@ All colors MUST be HSL.
   box-shadow: var(--shadow-glow);
 }
 
+/* Subtle scale/glow on interactive surfaces */
+.hover-grow {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+}
+.hover-grow:hover { transform: scale(1.03); }
+
+/* Animated underline for links/headings */
+.link-underline {
+  position: relative;
+}
+.link-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 2px;
+  width: 100%;
+  background: var(--gradient-gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.link-underline:hover::after { transform: scaleX(1); }
+
+/* Icon pop on hover (apply to a parent with .group) */
+.group:hover .icon-pop {
+  transform: scale(1.15) rotate(-6deg);
+}
+.icon-pop { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Scroll-down hint */
+.scroll-hint { animation: scroll-hint 1.8s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .ken-burns, .float-slow, .pulse-ring, .marquee-track { animation: none !important; }
-  .card-lift { transition: none; }
+  .ken-burns, .float-slow, .float-x, .spin-slow, .bob, .pulse-ring,
+  .marquee-track, .animate-gradient, .scroll-hint { animation: none !important; }
+  .card-lift, .hover-grow, .icon-pop, .link-underline::after { transition: none; }
+  html { scroll-behavior: auto; }
 }
 
 /* Fluid responsive typography scale */

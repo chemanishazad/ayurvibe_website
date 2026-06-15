@@ -368,6 +368,45 @@ export interface RoleRow {
   createdAt?: string;
 }
 
+// ─── Website appointment / inquiry requests ────────────────────────────────────
+export type AppointmentStatus = 'new' | 'contacted' | 'booked' | 'closed';
+
+export interface AppointmentRequestRow {
+  id: string;
+  name: string;
+  age: number | null;
+  mobile: string;
+  email: string | null;
+  inquiryType: string;
+  message: string | null;
+  status: AppointmentStatus;
+  convertedPatientId: string | null;
+  clinicId: string | null;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppointmentRequestInput {
+  name: string;
+  age?: number;
+  mobile: string;
+  email?: string;
+  inquiryType?: string;
+  message?: string;
+}
+
+/**
+ * PUBLIC submit from the marketing website's booking form — no auth required.
+ * Fire-and-forget friendly: throws ApiError on failure so the caller can decide.
+ */
+export async function submitAppointmentRequest(data: AppointmentRequestInput) {
+  return fetchApi<{ success: boolean; id: string }>('/api/appointment-requests', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export const api = {
   auth: {
     switchClinic: (clinicId: string) =>
@@ -1041,6 +1080,22 @@ export const api = {
         }[]
       >(`/api/follow-ups/upcoming${q ? `?${q}` : ''}`);
     },
+  },
+  appointments: {
+    /** Admin/doctor: every website booking request, newest first. */
+    list: () => fetchApi<AppointmentRequestRow[]>('/api/appointment-requests'),
+    updateStatus: (id: string, status: AppointmentStatus) =>
+      fetchApi<AppointmentRequestRow>(`/api/appointment-requests/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+    convert: (id: string) =>
+      fetchApi<{ appointment: AppointmentRequestRow; patient: { id: string; name: string; mobile: string } }>(
+        `/api/appointment-requests/${id}/convert`,
+        { method: 'POST' },
+      ),
+    delete: (id: string) =>
+      fetchApi<{ success: boolean }>(`/api/appointment-requests/${id}`, { method: 'DELETE' }),
   },
   reports: {
     dailyConsultations: (params?: { clinicId?: string; from?: string; to?: string }) => {

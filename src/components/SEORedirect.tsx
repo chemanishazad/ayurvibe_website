@@ -22,7 +22,7 @@ const seoConfigs: Record<string, {
   '/dr-vaitheeshwari-ayurveda-doctor-chennai': {
     title: "Dr.V.Vaitheeshwari B.A.M.S., - Best Ayurveda Doctor in Chennai | Sri Vinayaga Ayurvibe",
     description: "Dr.V.Vaitheeshwari B.A.M.S., - Expert Ayurvedic doctor in Chennai. Specializes in Panchakarma, women's health, chronic diseases. Book consultation at Sri Vinayaga Ayurvibe.",
-    keywords: ['Dr. Vaitheeshwari', 'BAMS doctor Chennai', 'Ayurvedic doctor Chennai', 'Best Ayurveda doctor', 'Panchakarma specialist']
+    keywords: ['Dr. V.Vaitheeshwari', 'BAMS doctor Chennai', 'Ayurvedic doctor Chennai', 'Best Ayurveda doctor', 'Panchakarma specialist']
   },
   '/government-certified-ayurveda-hospital-chennai': {
     title: "Government Certified Ayurveda Hospital in Chennai | Sri Vinayaga Ayurvibe | Licensed Ayurvedic Center",

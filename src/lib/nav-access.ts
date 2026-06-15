@@ -18,6 +18,7 @@ import {
   ReceiptText,
   ShieldCheck,
   Layers,
+  CalendarCheck,
 } from 'lucide-react';
 
 /** Single source for admin “Users & access” checkboxes and sidebar filtering. */
@@ -34,6 +35,7 @@ export const ADMIN_NAV_CATALOG: {
   { path: '/admin/pharmacy', label: 'Pharmacy', group: 'Clinical', icon: Pill },
   { path: '/admin/treatment-plans', label: 'Treatment Plans', group: 'Clinical', icon: ClipboardList },
   { path: '/admin/upcoming-follow-ups', label: 'Upcoming Follow Ups', group: 'Clinical', icon: CalendarClock },
+  { path: '/admin/appointments', label: 'Appointments', group: 'Clinical', icon: CalendarCheck },
   { path: '/admin/medicines', label: 'Medicines', group: 'Commerce', icon: Pill },
   { path: '/admin/suppliers', label: 'Suppliers', group: 'Commerce', icon: Truck },
   { path: '/admin/inventory', label: 'Inventory', group: 'Commerce', icon: Package },
@@ -91,6 +93,7 @@ export const NAV_PRESETS: Record<AllowedNavPreset, { label: string; description:
       '/admin/consultations',
       '/admin/treatment-plans',
       '/admin/upcoming-follow-ups',
+      '/admin/appointments',
       '/admin/pharmacy',
       '/admin/inventory',
       '/admin/reports',
@@ -106,6 +109,7 @@ export const NAV_PRESETS: Record<AllowedNavPreset, { label: string; description:
       '/admin/consultations',
       '/admin/treatment-plans',
       '/admin/upcoming-follow-ups',
+      '/admin/appointments',
       '/admin/pharmacy',
       '/admin/inventory',
       '/admin/reports',
@@ -156,6 +160,7 @@ export const NAV_PATH_TO_VIEW_PERMISSION: Record<string, string> = {
   '/admin/pharmacy': 'pharmacy.view',
   '/admin/treatment-plans': 'treatment_plans.view',
   '/admin/upcoming-follow-ups': 'follow_ups.view',
+  '/admin/appointments': 'appointments.view',
   '/admin/medicines': 'medicines.view',
   '/admin/suppliers': 'suppliers.view',
   '/admin/inventory': 'inventory.view',

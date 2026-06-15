@@ -141,7 +141,7 @@ const LiveChat = () => {
     },
     {
       step: 9,
-      question: "Almost done! Any specific health concerns or notes you'd like to share with Dr. Vaitheeshwari?",
+      question: "Almost done! Any specific health concerns or notes you'd like to share with Dr. V.Vaitheeshwari?",
       field: 'notes',
       type: 'textarea',
       required: false
@@ -153,7 +153,7 @@ const LiveChat = () => {
     { text: 'Panchakarma Treatment', action: 'panchakarma', icon: Star },
     { text: 'Abhyanga Massage', action: 'abhyanga', icon: CheckCircle },
     { text: 'Shirodhara Therapy', action: 'shirodhara', icon: Star },
-    { text: 'Dr. Vaitheeshwari', action: 'doctor', icon: User },
+    { text: 'Dr. V.Vaitheeshwari', action: 'doctor', icon: User },
     { text: 'Location & Hours', action: 'location', icon: MapPin },
     { text: 'Treatment Costs', action: 'pricing', icon: CheckCircle },
     { text: 'Emergency Contact', action: 'emergency', icon: Phone }
@@ -178,7 +178,7 @@ const LiveChat = () => {
     'panchakarma': 'Panchakarma is our signature detox treatment that includes 5 cleansing procedures. It\'s perfect for deep detoxification and rejuvenation. Would you like to book a consultation?',
     'abhyanga': 'Abhyanga is our therapeutic oil massage that promotes relaxation and healing. It\'s excellent for stress relief and improving circulation. Shall I help you schedule a session?',
     'shirodhara': 'Shirodhara involves warm oil being poured on your forehead in a continuous stream. It\'s highly effective for stress, insomnia, and mental wellness. Would you like to book this treatment?',
-    'doctor': 'Dr. Vaitheeshwari is our Chief Ayurvedic Doctor with BAMS qualification and extensive experience in traditional medicine. She specializes in Panchakarma, women\'s health, and chronic disease management. Would you like to book a consultation with her?',
+    'doctor': 'Dr. V.Vaitheeshwari is our Chief Ayurvedic Doctor with BAMS qualification and extensive experience in traditional medicine. She specializes in Panchakarma, women\'s health, and chronic disease management. Would you like to book a consultation with her?',
     'location': 'We\'re located at 12/597, Main Road, Nethaji Nagar Main Rd, Nookampalayam, Perumbakkam, Chennai, Tamil Nadu 600131. Our hours are 10:00 AM - 8:00 PM every day. We serve areas within 20km including OMR, Sholinganallur, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Chromepet, and more.',
     'pricing': 'Our treatment costs are: Consultation: ₹500, Abhyanga: ₹2,000, Shirodhara: ₹2,500, Panchakarma (14 days): ₹15,000. We offer package deals and accept insurance. Would you like to book any treatment?',
     'emergency': 'For emergency consultations, please call us immediately at +91 8122939197. We provide 24/7 emergency Ayurvedic care for urgent health issues.',

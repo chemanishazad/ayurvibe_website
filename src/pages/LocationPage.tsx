@@ -35,7 +35,7 @@ const locationData: Record<string, LocationData> = {
     testimonials: [
       {
         name: 'Rajesh Kumar',
-        text: 'Living in Perumbakkam, this hospital is so convenient. Dr. Vaitheeshwari\'s treatments cured my chronic back pain.',
+        text: 'Living in Perumbakkam, this hospital is so convenient. Dr. V.Vaitheeshwari\'s treatments cured my chronic back pain.',
         rating: 5
       },
       {
@@ -155,7 +155,7 @@ const locationData: Record<string, LocationData> = {
       },
       {
         name: 'Sunita Krishnan',
-        text: 'Best wellness consultation near Kelambakkam. Dr. Vaitheeshwari\'s approach is holistic and effective.',
+        text: 'Best wellness consultation near Kelambakkam. Dr. V.Vaitheeshwari\'s approach is holistic and effective.',
         rating: 5
       }
     ],

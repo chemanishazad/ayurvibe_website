@@ -25,6 +25,7 @@ import HeroSlider from '@/components/HeroSlider';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { submitAppointmentRequest } from '@/lib/api';
 
 declare global {
   namespace JSX {
@@ -153,6 +154,19 @@ const Index = () => {
     const trimmedMobile = mobile.trim();
     const trimmedEmail = emailAddr.trim();
     const trimmedNotes = notes.trim();
+
+    // Persist to the clinic backend so it shows up in the admin/doctor panel.
+    // Non-blocking: a backend hiccup must not stop the confirmation email.
+    submitAppointmentRequest({
+      name: trimmedName,
+      age: trimmedAge ? Number(trimmedAge) : undefined,
+      mobile: trimmedMobile,
+      email: trimmedEmail,
+      inquiryType,
+      message: trimmedNotes,
+    }).catch((err) => {
+      console.error('[booking] failed to save appointment request to backend', err);
+    });
 
     const templateParams = {
       name: trimmedName,
@@ -391,7 +405,7 @@ const Index = () => {
   <div className="min-h-dvh bg-gradient-healing pb-10">
       <SEO 
         title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR"
-        description="Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr. Vaitheeshwari BAMS. Book now."
+        description="Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr. V.Vaitheeshwari BAMS. Book now."
         canonical="https://svayurvibe.com/"
         locationKeywords={['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai', '20km radius', 'near Sholinganallur', 'Nookampalayam']}
         jsonLd={[
@@ -493,14 +507,14 @@ const Index = () => {
       {/* Stats band */}
       <section className="relative z-10 -mt-12 sm:-mt-16">
         <div className="wide-wrapper">
-          <StaggerGroup className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 glass-card rounded-3xl p-5 sm:p-8 shadow-glow">
+          <StaggerGroup className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 bg-card rounded-3xl p-5 sm:p-8 shadow-glow border border-border/60 divide-y sm:divide-y-0 lg:divide-x divide-border/50">
             {[
               { value: '100+', label: 'Patients Healed' },
               { value: '50+', label: 'Authentic Therapies' },
               { value: '4.9★', label: '12 Verified Reviews' },
               { value: 'Chennai', label: 'Service Radius' },
             ].map((s) => (
-              <StaggerItem key={s.label} className="text-center">
+              <StaggerItem key={s.label} className="text-center pt-3 sm:pt-0">
                 <div className="font-display text-3xl sm:text-4xl font-bold text-gradient-gold">{s.value}</div>
                 <div className="text-xs sm:text-sm text-muted-foreground mt-1">{s.label}</div>
               </StaggerItem>
@@ -525,16 +539,17 @@ const Index = () => {
                   Located at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), we serve patients within 20km – <Link to="/ayurveda-treatment-sholinganallur-chennai" className="text-primary font-medium hover:underline">Sholinganallur</Link>, <Link to="/ayurveda-clinic-omr-chennai" className="text-primary font-medium hover:underline">OMR</Link>, <Link to="/panchakarma-pallikaranai-chennai" className="text-primary font-medium hover:underline">Pallikaranai</Link>, <Link to="/ayurveda-hospital-perumbakkam-chennai" className="text-primary font-medium hover:underline">Perumbakkam</Link>, Navalur, Kelambakkam, Tambaram, <Link to="/ayurveda-hospital-medavakkam-chennai" className="text-primary font-medium hover:underline">Medavakkam</Link>, <Link to="/ayurveda-clinic-velachery-chennai" className="text-primary font-medium hover:underline">Velachery</Link>, Chromepet, and all nearby areas.
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Led by <strong>Dr. Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic <Link to="/treatments" className="text-primary font-medium hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> treatments. Explore our <Link to="/about" className="text-primary font-medium hover:underline">about</Link> page, <Link to="/doctors" className="text-primary font-medium hover:underline">doctor</Link>, and <Link to="/faq" className="text-primary font-medium hover:underline">FAQ</Link>.
+                  Led by <strong>Dr. V.Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic <Link to="/treatments" className="text-primary font-medium hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> treatments. Explore our <Link to="/about" className="text-primary font-medium hover:underline">about</Link> page, <Link to="/doctors" className="text-primary font-medium hover:underline">doctor</Link>, and <Link to="/faq" className="text-primary font-medium hover:underline">FAQ</Link>.
                 </p>
                 <Button asChild className="bg-primary hover:bg-primary/90 group">
                   <Link to="/booking">Start your healing journey <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
                 </Button>
               </Reveal>
               <Reveal direction="left" className="relative">
-                <div className="bg-gradient-earth text-white rounded-3xl p-10 shadow-glow relative overflow-hidden">
+                <div className="bg-gradient-earth animate-gradient text-white rounded-3xl p-10 shadow-glow relative overflow-hidden">
                   <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-gold/20 blur-2xl float-slow" />
-                  <Sparkles className="h-14 w-14 text-gold mb-5" />
+                  <div className="absolute -bottom-10 -left-8 w-28 h-28 rounded-full bg-sage/30 blur-2xl float-x" />
+                  <Sparkles className="h-14 w-14 text-gold mb-5 bob" />
                   <h3 className="font-display text-2xl font-bold mb-4">A Holistic Approach</h3>
                   <p className="text-white/85 leading-relaxed">
                     We treat not just symptoms, but the whole person—nurturing harmony between
@@ -546,15 +561,15 @@ const Index = () => {
 
             <StaggerGroup className="grid md:grid-cols-3 gap-6">
               {[
-                { icon: Users, title: 'Expert Practitioners', text: 'Care led by Dr. Vaitheeshwari, B.A.M.S., blending traditional knowledge with modern clinical rigour.' },
+                { icon: Users, title: 'Expert Practitioners', text: 'Care led by Dr. V.Vaitheeshwari, B.A.M.S., blending traditional knowledge with modern clinical rigour.' },
                 { icon: Leaf, title: 'Natural Remedies', text: 'Only the finest herbs and authentic formulations, sourced with care and prepared the traditional way.' },
                 { icon: Star, title: 'Modern Comfort', text: 'Ancient healing delivered in clean, calm, comfortable surroundings designed for your peace of mind.' },
               ].map((f) => (
                 <StaggerItem key={f.title}>
-                  <Card className="border border-border/60 shadow-soft bg-card/70 card-lift h-full text-left">
+                  <Card className="group border border-border/60 shadow-soft bg-card/70 card-lift h-full text-left">
                     <CardHeader>
-                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
-                        <f.icon className="h-6 w-6 text-primary" />
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 transition-colors group-hover:bg-primary/20">
+                        <f.icon className="h-6 w-6 text-primary icon-pop" />
                       </div>
                       <CardTitle className="text-xl">{f.title}</CardTitle>
                     </CardHeader>
@@ -740,7 +755,7 @@ const Index = () => {
   <div className="wide-wrapper">
           <Reveal className="text-center mb-12 flex flex-col items-center">
             <span className="eyebrow mb-4"><Stethoscope className="h-3.5 w-3.5" /> Meet Your Doctor</span>
-            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Dr. Vaitheeshwari, B.A.M.S. — Chennai's trusted Ayurveda doctor</h2>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Dr. V.Vaitheeshwari, B.A.M.S. — Chennai's trusted Ayurveda doctor</h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
               A Panchakarma and women's-health specialist serving Perumbakkam, Nookampalayam, OMR, Sholinganallur,
               Pallikaranai, Navalur, Kelambakkam, and Tambaram with authentic, personalised care.
@@ -750,14 +765,14 @@ const Index = () => {
           <Reveal className="max-w-3xl mx-auto">
             <Card className="border border-border/60 shadow-glow bg-card overflow-hidden">
               <div className="grid sm:grid-cols-[auto,1fr]">
-                <div className="relative bg-gradient-earth p-8 flex items-center justify-center">
+                <div className="relative bg-gradient-earth animate-gradient p-8 flex items-center justify-center">
                   <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-gold/25 blur-2xl float-slow" />
-                  <div className="w-44 h-44 rounded-full overflow-hidden ring-4 ring-gold/50 shadow-warm">
-                    <img loading="lazy" src={drVaitheeshwari} alt="Dr. Vaitheeshwari" className="w-full h-full object-cover" />
+                  <div className="w-44 h-44 rounded-full overflow-hidden ring-4 ring-gold/50 shadow-warm transition-transform duration-500 hover:scale-105">
+                    <img loading="lazy" src={drVaitheeshwari} alt="Dr. V.Vaitheeshwari" className="w-full h-full object-cover" />
                   </div>
                 </div>
                 <CardContent className="p-8 flex flex-col justify-center text-left">
-                  <h3 className="font-display text-3xl font-bold text-foreground mb-1">Dr. Vaitheeshwari</h3>
+                  <h3 className="font-display text-3xl font-bold text-foreground mb-1">Dr. V.Vaitheeshwari</h3>
                   <p className="text-primary font-semibold mb-1">BAMS (Ayurveda)</p>
                   <p className="text-muted-foreground mb-4">Panchakarma &amp; Women's Health Specialist</p>
                   <div className="flex flex-wrap gap-2 mb-6">
@@ -876,9 +891,9 @@ const Index = () => {
                 { icon: Heart, title: 'Holistic Wellness', text: 'A complete approach addressing physical, mental, and emotional well-being.' },
               ].map((item) => (
                 <StaggerItem key={item.title}>
-                  <div className="flex items-start gap-4 p-4 rounded-2xl hover:bg-card/60 transition-colors card-lift">
+                  <div className="group flex items-start gap-4 p-4 rounded-2xl hover:bg-card/60 transition-colors card-lift">
                     <div className="flex-shrink-0 w-12 h-12 bg-gradient-gold rounded-2xl flex items-center justify-center shadow-sm">
-                      <item.icon className="h-6 w-6 text-earth" />
+                      <item.icon className="h-6 w-6 text-earth icon-pop" />
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-foreground mb-1">{item.title}</h3>
@@ -909,9 +924,9 @@ const Index = () => {
               <StaggerGroup className="grid md:grid-cols-3 gap-6 mb-12">
                 {doshas.map((dosha, index) => (
                   <StaggerItem key={index} className="h-full">
-                  <Card className="border border-border/60 shadow-soft glass-card card-lift h-full">
+                  <Card className="group border border-border/60 shadow-soft glass-card card-lift h-full">
                     <CardHeader className="text-center">
-                      <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${dosha.color} flex items-center justify-center shadow-sm`}>
+                      <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${dosha.color} flex items-center justify-center shadow-sm transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
                         <span className="font-display text-3xl font-bold text-earth">{dosha.name[0]}</span>
                       </div>
                       <CardTitle className="text-xl text-foreground">{dosha.name}</CardTitle>
@@ -979,7 +994,7 @@ const Index = () => {
             <span className="eyebrow mb-4"><Calendar className="h-3.5 w-3.5" /> Get Started</span>
             <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Book Your Healing Journey</h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Begin your transformation today. Schedule a consultation with Dr. Vaitheeshwari
+              Begin your transformation today. Schedule a consultation with Dr. V.Vaitheeshwari
               and discover the perfect treatment plan for your unique constitution.
             </p>
           </Reveal>
@@ -1164,7 +1179,7 @@ const Index = () => {
           <Logo className="h-10 w-auto object-contain" withText textClassName="" subtitleText="Ayurveda Wellness" />
         </div>
               <p className="text-primary-foreground/80 leading-relaxed mb-2">
-                Dr. Vaitheeshwari BAMS
+                Dr. V.Vaitheeshwari BAMS
               </p>
               <p className="text-primary-foreground/80 leading-relaxed mb-6">
                 Reg No: 2095
@@ -1172,7 +1187,7 @@ const Index = () => {
               <p className="text-primary-foreground/80 leading-relaxed mb-6">
                 Sri Vinayaga Ayurvibe is your destination for authentic Ayurvedic treatments. 
                 Located at Nookampalayam, Perumbakkam, we serve patients across Chennai and nearby areas within 20km. 
-                Experience Panchakarma, Abhyanga massage, and Shirodhara therapy with Dr. Vaitheeshwari BAMS.
+                Experience Panchakarma, Abhyanga massage, and Shirodhara therapy with Dr. V.Vaitheeshwari BAMS.
               </p>
               
             </div>
