@@ -111,8 +111,8 @@ const seoConfigs: Record<string, {
   },
   '/ayurveda-hospital-perumbakkam-chennai': {
     title: "Ayurveda Hospital in Perumbakkam, Chennai | Sri Vinayaga Ayurvibe | Nookampalayam",
-    description: "Ayurveda hospital at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), Chennai 600131. Easily reachable within 20km. Authentic Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.",
-    keywords: ['Ayurveda Hospital Perumbakkam', 'Nookampalayam Ayurveda', 'Perumbakkam Chennai', 'Ayurveda Perumbakkam', '20km reachable']
+    description: "Ayurveda hospital at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), Chennai 600131. Authentic Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.",
+    keywords: ['Ayurveda Hospital Perumbakkam', 'Nookampalayam Ayurveda', 'Perumbakkam Chennai', 'Ayurveda Perumbakkam']
   },
   '/ayurveda-clinic-omr-chennai': {
     title: "Ayurveda Clinic in OMR, Chennai | Sri Vinayaga Ayurvibe | OMR Healthcare Services",
@@ -145,19 +145,19 @@ const seoConfigs: Record<string, {
     keywords: ['Ayurveda Doctor Tambaram', 'Tambaram Chennai', 'Local Physician', 'Doctor Tambaram', 'Healthcare Tambaram']
   },
   '/ayurveda-hospital-medavakkam-chennai': {
-    title: "Ayurveda Hospital in Medavakkam, Chennai | Sri Vinayaga Ayurvibe | 20km Reachable",
-    description: "Ayurveda hospital near Medavakkam, Chennai. Located at Nookampalayam, Perumbakkam – easily reachable within 20km. Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.",
-    keywords: ['Ayurveda Hospital Medavakkam', 'Medavakkam Ayurveda', 'Ayurveda near Medavakkam', 'Panchakarma Medavakkam', '20km reachable']
+    title: "Ayurveda Hospital near Medavakkam, Chennai | Sri Vinayaga Ayurvibe",
+    description: "Ayurveda hospital near Medavakkam, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.",
+    keywords: ['Ayurveda Hospital Medavakkam', 'Medavakkam Ayurveda', 'Ayurveda near Medavakkam', 'Panchakarma Medavakkam']
   },
   '/ayurveda-clinic-velachery-chennai': {
-    title: "Ayurveda Clinic in Velachery, Chennai | Sri Vinayaga Ayurvibe | 20km Reachable",
-    description: "Ayurveda clinic near Velachery, Chennai. Located at Nookampalayam, Perumbakkam – easily reachable within 20km. Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.",
-    keywords: ['Ayurveda Clinic Velachery', 'Velachery Ayurveda', 'Ayurveda near Velachery', 'Panchakarma Velachery', '20km reachable']
+    title: "Ayurveda Clinic near Velachery, Chennai | Sri Vinayaga Ayurvibe",
+    description: "Ayurveda clinic near Velachery, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.",
+    keywords: ['Ayurveda Clinic Velachery', 'Velachery Ayurveda', 'Ayurveda near Velachery', 'Panchakarma Velachery']
   },
   '/ayurveda-treatment-chromepet-chennai': {
-    title: "Ayurveda Treatment in Chromepet, Chennai | Sri Vinayaga Ayurvibe | 20km Reachable",
-    description: "Ayurveda treatment near Chromepet, Chennai. Located at Nookampalayam, Perumbakkam – easily reachable within 20km. Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.",
-    keywords: ['Ayurveda Treatment Chromepet', 'Chromepet Ayurveda', 'Ayurveda near Chromepet', 'Panchakarma Chromepet', '20km reachable']
+    title: "Ayurveda Treatment near Chromepet, Chennai | Sri Vinayaga Ayurvibe",
+    description: "Ayurveda treatment near Chromepet, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.",
+    keywords: ['Ayurveda Treatment Chromepet', 'Chromepet Ayurveda', 'Ayurveda near Chromepet', 'Panchakarma Chromepet']
   }
 };
 

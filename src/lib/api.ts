@@ -663,6 +663,12 @@ export const api = {
     },
     get: (id: string) => fetchApi<Record<string, unknown>>(`/api/consultations/${id}`),
     create: (data: Record<string, unknown>) => fetchApi<Record<string, unknown>>('/api/consultations', { method: 'POST', body: JSON.stringify(data) }),
+    /** Full replace of the prescription rows (admin/doctor only). */
+    updatePrescription: (id: string, prescription: Array<Record<string, unknown>>) =>
+      fetchApi<Record<string, unknown>>(`/api/consultations/${id}/prescription`, {
+        method: 'PUT',
+        body: JSON.stringify({ prescription }),
+      }),
     addPharmacy: (id: string, payload: {
       items: Array<{
         inventoryId: string;

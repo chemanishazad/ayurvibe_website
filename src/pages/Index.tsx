@@ -1,5 +1,4 @@
-import React, { FormEvent, useState } from 'react';
-// (imports restored above after cleanup)
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import SEO from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,55 +8,177 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Leaf, Heart, Users, MapPin, Phone, Mail, Calendar, Clock, Star, Sparkles, CheckCircle, Award, Shield, Stethoscope, Timer, Quote, Loader2, ArrowRight } from 'lucide-react';
+import { Leaf, Heart, Users, MapPin, Phone, Mail, Calendar, Clock, Star, Sparkles, CheckCircle, Award, Shield, Stethoscope, Timer, Quote, Loader2, ArrowRight, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Reveal, StaggerGroup, StaggerItem } from '@/components/Reveal';
+import { cn } from '@/lib/utils';
+import { treatments, treatmentCategories, type Treatment } from '@/data/treatments';
 import DoshaQuiz from '@/components/DoshaQuiz';
 import HospitalMap from '@/components/HospitalMap';
 import InteractiveBodyMap from '@/components/InteractiveBodyMap';
-import TreatmentComparison from '@/components/TreatmentComparison';
 import LiveChat from '@/components/LiveChat';
-import WellnessBlog from '@/components/WellnessBlog';
 import FAQSection from '@/components/FAQSection';
 import SmoothScroll from '@/components/SmoothScroll';
 import BackToTop from '@/components/BackToTop';
 import ProgressiveWebApp from '@/components/ProgressiveWebApp';
 import HeroSlider from '@/components/HeroSlider';
+import SiteHeader from '@/components/SiteHeader';
+import AnimatedCounter from '@/components/AnimatedCounter';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { submitAppointmentRequest } from '@/lib/api';
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'lottie-player': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        src?: string;
-        autoplay?: boolean | '';
-        loop?: boolean | '';
-        mode?: string;
-      };
-    }
-  }
-}
+// The <lottie-player> custom element is typed globally in src/vite-env.d.ts.
 
-// Import treatment images
-import panchakarmaImg from '@/assets/panchakarma-treatment.jpg';
-import abhyangaImg from '@/assets/abhyanga-massage.jpg';
-import shirodharaImg from '@/assets/shirodhara-therapy.jpg';
-import herbsImg from '@/assets/ayurvedic-herbs.jpg';
-import doctorImg from '@/assets/ayurvedic-doctor.jpg';
 import hospitalImg from '@/assets/hospital-exterior.jpg';
 import { Logo } from '@/components/Logo';
 import drVaitheeshwari from '@/assets/dr-vaitheeshwari.jpg';
 
 const Index = () => {
-  const [selectedDosha, setSelectedDosha] = useState<string | null>(null);
   const [showDoshaQuiz, setShowDoshaQuiz] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeTreatmentIndex, setActiveTreatmentIndex] = useState<number | null>(null);
+  const [treatmentFilter, setTreatmentFilter] = useState('All');
   const { toast } = useToast();
   const [showThankYou, setShowThankYou] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  // Treatments auto-scrolling list
+  const treatmentScrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollPausedRef = useRef(false);
+  const resumeTimerRef = useRef<number>();
+  const [showAllTreatments, setShowAllTreatments] = useState(false);
+
+  const filteredTreatments =
+    treatmentFilter === 'All'
+      ? treatments
+      : treatments.filter((t) => t.category === treatmentFilter);
+
+  // Jump back to the start of the list whenever the filter changes.
+  useEffect(() => {
+    treatmentScrollRef.current?.scrollTo({ left: 0 });
+  }, [treatmentFilter]);
+
+  // Continuous auto-scroll. scrollLeft rounds to whole pixels, so sub-pixel
+  // increments stall — accumulate a float position and drive it by frame time.
+  useEffect(() => {
+    const el = treatmentScrollRef.current;
+    if (!el || showAllTreatments) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let raf = 0;
+    let pos = el.scrollLeft;
+    let last: number | null = null;
+    const SPEED = 45; // px per second
+
+    const step = (now: number) => {
+      if (last === null) last = now;
+      const elapsed = Math.min(now - last, 100);
+      last = now;
+
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (!autoScrollPausedRef.current && maxScroll > 1) {
+        // Re-sync if the user moved the list manually (wheel, drag, arrows).
+        if (Math.abs(el.scrollLeft - pos) > 2) pos = el.scrollLeft;
+        pos += (elapsed / 1000) * SPEED;
+        if (pos >= maxScroll) pos = 0;
+        el.scrollLeft = pos;
+      } else {
+        pos = el.scrollLeft;
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(resumeTimerRef.current);
+    };
+  }, [treatmentFilter, showAllTreatments]);
+
+  const pauseAutoScroll = (resumeAfterMs?: number) => {
+    autoScrollPausedRef.current = true;
+    window.clearTimeout(resumeTimerRef.current);
+    if (resumeAfterMs) {
+      resumeTimerRef.current = window.setTimeout(() => {
+        autoScrollPausedRef.current = false;
+      }, resumeAfterMs);
+    }
+  };
+
+  const scrollTreatments = (direction: 1 | -1) => {
+    pauseAutoScroll(2000);
+    treatmentScrollRef.current?.scrollBy({ left: direction * 340, behavior: 'smooth' });
+  };
+
+  const openTreatmentDetails = (name: string) => {
+    setActiveTreatmentIndex(treatments.findIndex((t) => t.name === name));
+    setDetailsOpen(true);
+  };
+
+  const renderTreatmentCard = (treatment: Treatment) => (
+    <Card className="group border border-border/60 shadow-soft bg-card card-lift overflow-hidden h-full flex flex-col rounded-3xl">
+      <button
+        type="button"
+        aria-label={`View ${treatment.name} details`}
+        onClick={() => openTreatmentDetails(treatment.name)}
+        className="relative h-44 sm:h-48 overflow-hidden block w-full text-left cursor-pointer"
+      >
+        <img
+          loading="lazy"
+          src={treatment.image}
+          alt={`${treatment.name} — Ayurvedic therapy at Sri Vinayaga Ayurvibe, Chennai`}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/5 transition-opacity duration-500" />
+        <div className="absolute top-3 left-3">
+          <Badge className="bg-gradient-gold text-earth border-none font-semibold shadow-sm text-xs">
+            {treatment.category}
+          </Badge>
+        </div>
+        <div className="absolute top-3 right-3">
+          <Badge variant="secondary" className="bg-black/35 text-white border-none backdrop-blur-sm text-xs">
+            <Clock className="h-3 w-3 mr-1" /> {treatment.duration}
+          </Badge>
+        </div>
+        <div className="absolute inset-x-4 bottom-3">
+          <h3 className="font-display text-lg font-bold text-white drop-shadow-md leading-tight">
+            {treatment.name}
+          </h3>
+        </div>
+      </button>
+
+      <CardContent className="p-5 space-y-3 flex flex-col flex-grow">
+        <CardDescription className="text-sm leading-relaxed line-clamp-3">
+          {treatment.description}
+        </CardDescription>
+
+        <div className="flex flex-wrap gap-1.5">
+          {treatment.benefits.slice(0, 2).map((benefit) => (
+            <span
+              key={benefit}
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-1"
+            >
+              <CheckCircle className="h-3 w-3" /> {benefit}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex gap-2 pt-1 mt-auto">
+          <Button asChild size="sm" className="flex-1 bg-primary hover:bg-primary/90">
+            <Link to="/booking">Book Now</Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            onClick={() => openTreatmentDetails(treatment.name)}
+          >
+            Details
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   // Booking form state (EmailJS schema)
   const [fullName, setFullName] = useState('');
@@ -225,113 +346,6 @@ const Index = () => {
     }
   };
 
-  const treatments = [
-    {
-      name: "Panchakarma",
-      description: "Complete detoxification and rejuvenation therapy using five traditional cleansing procedures to eliminate toxins and restore natural balance. This comprehensive treatment includes Vamana (therapeutic vomiting), Virechana (purgation), Basti (medicated enema), Nasya (nasal administration), and Raktamokshana (bloodletting) to cleanse the body at cellular level.",
-      duration: "7-21 days",
-      benefits: ["Complete detoxification", "Improved digestion", "Enhanced immunity", "Mental clarity", "Rejuvenated skin", "Balanced doshas", "Increased energy", "Better sleep quality", "Reduced inflammation", "Anti-aging effects"],
-      image: panchakarmaImg,
-      category: "Detox"
-    },
-    {
-      name: "Abhyanga", 
-      description: "Full-body synchronized massage with warm herbal oils to balance doshas, improve circulation, and deeply nourish tissues. This ancient therapy uses specific oil blends tailored to individual constitution, applied with rhythmic strokes to stimulate marma points and promote healing.",
-      duration: "60-90 mins",
-      benefits: ["Improved circulation", "Stress relief", "Better sleep", "Skin nourishment", "Joint flexibility", "Muscle relaxation", "Lymphatic drainage", "Hormonal balance", "Pain relief", "Enhanced immunity"],
-      image: abhyangaImg,
-      category: "Massage"
-    },
-    {
-      name: "Shirodhara",
-      description: "Continuous pouring of warm medicated oil on the forehead to calm the mind, relieve stress, and enhance mental clarity. This deeply relaxing therapy targets the third eye chakra and nervous system, promoting profound relaxation and mental rejuvenation.",
-      duration: "45-60 mins", 
-      benefits: ["Deep relaxation", "Anxiety relief", "Better sleep", "Mental clarity", "Nervous system balance", "Headache relief", "Improved concentration", "Emotional stability", "Reduced blood pressure", "Enhanced memory"],
-      image: shirodharaImg,
-      category: "Therapy"
-    },
-    {
-      name: "Detox Therapy",
-      description: "Personalized cleansing programs combining herbal medicines, dietary guidance, and therapeutic treatments. Our detox programs are customized based on individual constitution, lifestyle, and health goals to ensure safe and effective toxin elimination.",
-      duration: "3-14 days",
-      benefits: ["Toxin elimination", "Weight management", "Energy boost", "Digestive health", "Cellular renewal", "Improved metabolism", "Clearer skin", "Better mood", "Reduced cravings", "Enhanced vitality"],
-      image: herbsImg,
-      category: "Detox"
-    },
-    {
-      name: "Rejuvenation Programs",
-      description: "Comprehensive wellness packages combining multiple therapies for complete physical and mental renewal. These programs integrate Panchakarma, specialized massages, yoga, meditation, and dietary modifications for holistic transformation.",
-      duration: "5-30 days", 
-      benefits: ["Complete renewal", "Anti-aging effects", "Vitality boost", "Stress management", "Longevity enhancement", "Improved immunity", "Better sleep", "Enhanced mental clarity", "Balanced hormones", "Increased energy"],
-      image: panchakarmaImg,
-      category: "Wellness"
-    },
-    {
-      name: "Herbal Steam Therapy",
-      description: "Medicated steam therapy using carefully selected herbs to open pores, improve circulation and eliminate toxins. This therapy combines the healing properties of specific herbs with the therapeutic benefits of steam to promote deep cleansing and relaxation.",
-      duration: "20-30 mins",
-      benefits: ["Pore cleansing", "Improved circulation", "Respiratory health", "Skin detox", "Muscle relaxation", "Reduced inflammation", "Better breathing", "Enhanced skin texture", "Stress relief", "Improved immunity"],
-      image: herbsImg,
-      category: "Therapy"
-    },
-    {
-      name: "Pizhichil",
-      description: "Warm oil bath therapy where medicated oils are continuously poured over the body while receiving gentle massage. This luxurious treatment deeply nourishes tissues, improves circulation, and provides profound relaxation while balancing the nervous system.",
-      duration: "60-90 mins",
-      benefits: ["Deep tissue nourishment", "Improved circulation", "Muscle relaxation", "Joint mobility", "Skin rejuvenation", "Stress relief", "Better sleep", "Pain relief", "Enhanced flexibility", "Balanced doshas"],
-      image: abhyangaImg,
-      category: "Therapy"
-    },
-    {
-      name: "Udvartana",
-      description: "Herbal powder massage therapy that exfoliates the skin, improves circulation, and helps in weight management. This invigorating treatment uses specific herbal powders to stimulate the lymphatic system and promote healthy skin.",
-      duration: "45-60 mins",
-      benefits: ["Skin exfoliation", "Improved circulation", "Weight management", "Lymphatic drainage", "Cellulite reduction", "Better skin texture", "Increased metabolism", "Toxin elimination", "Enhanced energy", "Improved muscle tone"],
-      image: herbsImg,
-      category: "Therapy"
-    },
-    {
-      name: "Nasya",
-      description: "Nasal administration of medicated oils and herbal preparations to cleanse and nourish the head and neck region. This therapy is particularly beneficial for respiratory health, sinus issues, and mental clarity.",
-      duration: "15-30 mins",
-      benefits: ["Sinus relief", "Improved breathing", "Mental clarity", "Headache relief", "Better sleep", "Enhanced memory", "Reduced allergies", "Clearer vision", "Balanced hormones", "Improved concentration"],
-      image: herbsImg,
-      category: "Therapy"
-    },
-    {
-      name: "Kati Basti",
-      description: "Localized treatment for lower back pain where warm medicated oil is retained in a dough ring placed on the lower back. This targeted therapy provides deep relief for chronic back pain and spinal issues.",
-      duration: "30-45 mins",
-      benefits: ["Back pain relief", "Improved spinal health", "Muscle relaxation", "Reduced inflammation", "Better posture", "Enhanced flexibility", "Stress relief", "Improved circulation", "Nerve regeneration", "Better sleep"],
-      image: herbsImg,
-      category: "Therapy"
-    }
-  ];
-
-  const doctors = [
-    {
-      name: "Dr. Priya Sharma",
-      qualification: "BAMS, MD (Ayurveda)",
-      specialization: "Panchakarma & Women's Health",
-      experience: "15 years",
-      image: doctorImg
-    },
-    {  
-      name: "Dr. Rajesh Kumar",
-      qualification: "BAMS, PhD (Ayurvedic Medicine)",
-      specialization: "Chronic Disease Management",
-      experience: "20 years", 
-      image: doctorImg
-    },
-    {
-      name: "Dr. Anita Gupta", 
-      qualification: "BAMS, MD (Kayachikitsa)",
-      specialization: "Digestive Disorders & Detox",
-      experience: "12 years",
-      image: doctorImg
-    }
-  ];
-
   const testimonials = [
     {
       name: "Ananya Sharma",
@@ -405,14 +419,14 @@ const Index = () => {
   <div className="min-h-dvh bg-gradient-healing pb-10">
       <SEO 
         title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR"
-        description="Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr. V.Vaitheeshwari BAMS. Book now."
+        description="Government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai. Authentic Panchakarma, Abhyanga & Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S. Book a consultation."
         canonical="https://svayurvibe.com/"
-        locationKeywords={['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai', '20km radius', 'near Sholinganallur', 'Nookampalayam']}
+        locationKeywords={['Sholinganallur', 'Perumbakkam', 'OMR', 'Pallikaranai', 'Navalur', 'Kelambakkam', 'Tambaram', 'Medavakkam', 'Velachery', 'Thiruvanmiyur', 'Kovilambakkam', 'Thoraipakkam', 'Besant Nagar', 'Adyar', 'Mylapore', 'T. Nagar', 'Anna Nagar', 'Kodambakkam', 'Ashok Nagar', 'Porur', 'Mount Road', 'Egmore', 'Royapettah', 'Triplicane', 'George Town', 'Ambattur', 'Avadi', 'Pallavaram', 'Chromepet', 'St. Thomas Mount', 'Guindy', 'Saidapet', 'Nungambakkam', 'Kilpauk', 'Anna Salai', 'Cathedral Road', 'Rajiv Gandhi Salai', 'Old Mahabalipuram Road', 'ECR', 'East Coast Road', 'IT Corridor', 'Rajiv Gandhi IT Corridor', 'OMR IT Corridor', 'Chennai', 'near Sholinganallur', 'Nookampalayam']}
         jsonLd={[
           {
             "@type": "MedicalBusiness",
             "name": "Sri Vinayaga Ayurvibe",
-            "description": "Premier Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai offering Panchakarma, Abhyanga, Shirodhara treatments. Serving 20km radius – easily reachable from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery, Chromepet.",
+            "description": "Government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai offering Panchakarma, Abhyanga and Shirodhara treatments. Easily reachable from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam, Velachery and Chromepet.",
             "areaServed": [
               {"@type": "City", "name": "Sholinganallur"},
               {"@type": "City", "name": "Perumbakkam"},
@@ -500,7 +514,11 @@ const Index = () => {
       <SmoothScroll />
       <BackToTop />
       <ProgressiveWebApp />
-      
+
+      {/* Sticky site-wide navigation */}
+      <SiteHeader />
+
+      <main>
       {/* Hero Slider Section */}
       <HeroSlider />
 
@@ -510,12 +528,14 @@ const Index = () => {
           <StaggerGroup className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 bg-card rounded-3xl p-5 sm:p-8 shadow-glow border border-border/60 divide-y sm:divide-y-0 lg:divide-x divide-border/50">
             {[
               { value: '100+', label: 'Patients Healed' },
-              { value: '50+', label: 'Authentic Therapies' },
-              { value: '4.9★', label: '12 Verified Reviews' },
-              { value: 'Chennai', label: 'Service Radius' },
+              { value: '33+', label: 'Signature Therapies' },
+              { value: '4.9★', label: 'Google Rating' },
+              { value: '7 Days', label: 'Open Every Week' },
             ].map((s) => (
               <StaggerItem key={s.label} className="text-center pt-3 sm:pt-0">
-                <div className="font-display text-3xl sm:text-4xl font-bold text-gradient-gold">{s.value}</div>
+                <div className="font-display text-3xl sm:text-4xl font-bold text-gradient-gold">
+                  <AnimatedCounter value={s.value} />
+                </div>
                 <div className="text-xs sm:text-sm text-muted-foreground mt-1">{s.label}</div>
               </StaggerItem>
             ))}
@@ -535,11 +555,17 @@ const Index = () => {
             <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
               <Reveal direction="right" className="space-y-6 text-left">
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  <strong>Sri Vinayaga Ayurvibe</strong> is the best Ayurveda hospital near Sholinganallur, Chennai.
-                  Located at Nookampalayam, Perumbakkam (12/597, Main Road, Nethaji Nagar Main Rd), we serve patients within 20km – <Link to="/ayurveda-treatment-sholinganallur-chennai" className="text-primary font-medium hover:underline">Sholinganallur</Link>, <Link to="/ayurveda-clinic-omr-chennai" className="text-primary font-medium hover:underline">OMR</Link>, <Link to="/panchakarma-pallikaranai-chennai" className="text-primary font-medium hover:underline">Pallikaranai</Link>, <Link to="/ayurveda-hospital-perumbakkam-chennai" className="text-primary font-medium hover:underline">Perumbakkam</Link>, Navalur, Kelambakkam, Tambaram, <Link to="/ayurveda-hospital-medavakkam-chennai" className="text-primary font-medium hover:underline">Medavakkam</Link>, <Link to="/ayurveda-clinic-velachery-chennai" className="text-primary font-medium hover:underline">Velachery</Link>, Chromepet, and all nearby areas.
+                  <strong>Sri Vinayaga Ayurvibe</strong> is a government-certified Ayurveda hospital in
+                  Nookampalayam, Perumbakkam — a calm, welcoming space where traditional healing is
+                  practised the way it was meant to be. Patients visit us from across Chennai for
+                  personalised, authentic care.
                 </p>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                  Led by <strong>Dr. V.Vaitheeshwari BAMS</strong>, our government-certified Ayurveda hospital offers authentic <Link to="/treatments" className="text-primary font-medium hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> treatments. Explore our <Link to="/about" className="text-primary font-medium hover:underline">about</Link> page, <Link to="/doctors" className="text-primary font-medium hover:underline">doctor</Link>, and <Link to="/faq" className="text-primary font-medium hover:underline">FAQ</Link>.
+                  Led by <strong>Dr. V. Vaitheeshwari, B.A.M.S.</strong>, we offer classical therapies
+                  like <Link to="/treatments" className="text-primary font-medium hover:underline">Panchakarma, Abhyanga, and Shirodhara</Link> —
+                  each tailored to your constitution, health history, and goals. Have questions?
+                  Our <Link to="/faq" className="text-primary font-medium hover:underline">FAQ</Link> covers
+                  treatment durations, what to expect, and more.
                 </p>
                 <Button asChild className="bg-primary hover:bg-primary/90 group">
                   <Link to="/booking">Start your healing journey <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
@@ -589,84 +615,108 @@ const Index = () => {
   <div className="wide-wrapper">
           <Reveal className="text-center mb-14 flex flex-col items-center">
             <span className="eyebrow mb-4"><Sparkles className="h-3.5 w-3.5" /> Signature Therapies</span>
-            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Best Ayurvedic Treatments in Chennai</h2>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Our Signature Treatments</h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Chennai's most authentic Ayurvedic care near Sholinganallur.
-              Explore our <Link to="/authentic-panchakarma-treatment-chennai" className="text-primary font-medium hover:underline">Panchakarma</Link>, <Link to="/best-abhyanga-massage-chennai" className="text-primary font-medium hover:underline">Abhyanga</Link>, and <Link to="/shirodhara-therapy-chennai" className="text-primary font-medium hover:underline">Shirodhara</Link> programs — or read the <Link to="/blog" className="text-primary font-medium hover:underline">blog</Link> for wellness tips.
+              33 authentic Kerala-style therapies — from Shirodhara and Pizhichil to Kati Vasti
+              and Navara Kizhi — each personalised to your body type and health goals.
             </p>
           </Reveal>
 
-          <StaggerGroup amount={0.05} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 md:gap-8">
-            {treatments.map((treatment, index) => (
-              <StaggerItem key={index} className="h-full">
-              <Card className="group border border-border/60 shadow-soft bg-card card-lift overflow-hidden h-full flex flex-col">
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    loading="lazy"
-                    src={treatment.image}
-                    alt={treatment.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-gradient-gold text-earth border-none font-semibold shadow-sm">
-                      {treatment.category}
-                    </Badge>
-                  </div>
-                  <div className="absolute top-4 right-4">
-                    <Badge variant="secondary" className="bg-black/30 text-white border-none backdrop-blur-sm">
-                      {treatment.duration}
-                    </Badge>
-                  </div>
-                </div>
-
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <CardTitle className="text-xl text-foreground">{treatment.name}</CardTitle>
-                    <Badge className="bg-primary/10 text-primary border-none">
-                      {treatment.duration}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4 flex flex-col flex-grow">
-                  <CardDescription className="text-base leading-relaxed line-clamp-3">
-                    {treatment.description}
-                  </CardDescription>
-
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-2 text-sm">Key Benefits:</h4>
-                    <div className="grid grid-cols-1 gap-1">
-                      {treatment.benefits.slice(0, 3).map((benefit, idx) => (
-                        <div key={idx} className="flex items-center text-sm text-muted-foreground">
-                          <CheckCircle className="h-3 w-3 text-primary mr-2 flex-shrink-0" />
-                          {benefit}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-2 mt-auto">
-                    <Button asChild className="flex-1 bg-primary hover:bg-primary/90" size="sm">
-                      <Link to="/booking">Book Now</Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                      onClick={() => { setActiveTreatmentIndex(index); setDetailsOpen(true); }}
-                    >
-                      Details
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-              </StaggerItem>
+          {/* Category filter tabs */}
+          <Reveal className="flex flex-wrap justify-center gap-2 mb-10">
+            {treatmentCategories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setTreatmentFilter(c)}
+                aria-pressed={treatmentFilter === c}
+                className={cn(
+                  'px-5 py-2 rounded-full text-sm font-semibold border transition-all duration-300',
+                  treatmentFilter === c
+                    ? 'bg-primary text-primary-foreground border-primary shadow-glow scale-105'
+                    : 'bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-primary'
+                )}
+              >
+                {c}
+              </button>
             ))}
-          </StaggerGroup>
+          </Reveal>
+
+          {/* Treatments: auto-scrolling list, or full grid when "View All" is on */}
+          {!showAllTreatments ? (
+            <div className="relative">
+              {/* Manual scroll controls */}
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{filteredTreatments.length}</span> therapies
+                  <span className="hidden sm:inline"> — auto-scrolling, hover to pause</span>
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    aria-label="Scroll treatments left"
+                    onClick={() => scrollTreatments(-1)}
+                    className="w-10 h-10 rounded-full border border-border bg-card flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Scroll treatments right"
+                    onClick={() => scrollTreatments(1)}
+                    className="w-10 h-10 rounded-full border border-border bg-card flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                ref={treatmentScrollRef}
+                onMouseEnter={() => pauseAutoScroll()}
+                onMouseLeave={() => { autoScrollPausedRef.current = false; }}
+                onTouchStart={() => pauseAutoScroll(2500)}
+                onPointerDown={() => pauseAutoScroll(2500)}
+                onWheel={() => pauseAutoScroll(2000)}
+                onFocus={() => pauseAutoScroll()}
+                onBlur={() => { autoScrollPausedRef.current = false; }}
+                className="flex gap-5 md:gap-6 overflow-x-auto pb-4 no-scrollbar [mask-image:linear-gradient(to_right,transparent,black_3%,black_97%,transparent)]"
+              >
+                {filteredTreatments.map((treatment) => (
+                  <div key={treatment.slug} className="flex-shrink-0 w-[270px] sm:w-[300px]">
+                    {renderTreatmentCard(treatment)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <StaggerGroup key={treatmentFilter} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+              {filteredTreatments.map((treatment) => (
+                <StaggerItem key={treatment.slug} className="h-full">
+                  {renderTreatmentCard(treatment)}
+                </StaggerItem>
+              ))}
+            </StaggerGroup>
+          )}
+
+          {/* View All / Show Less toggle */}
+          <div className="text-center mt-10">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setShowAllTreatments((v) => !v)}
+              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground px-8 group"
+            >
+              {showAllTreatments ? (
+                <>Show Less <ChevronUp className="ml-2 h-4 w-4 transition-transform group-hover:-translate-y-0.5" /></>
+              ) : (
+                <>View All {filteredTreatments.length} Treatments <ChevronDown className="ml-2 h-4 w-4 transition-transform group-hover:translate-y-0.5" /></>
+              )}
+            </Button>
+          </div>
           {/* Treatment Details Modal */}
           <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
               {activeTreatmentIndex !== null && (
                 <>
                   <DialogHeader>
@@ -679,11 +729,11 @@ const Index = () => {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    <div className="rounded-lg overflow-hidden">
-                      <img 
-                        src={treatments[activeTreatmentIndex].image} 
-                        alt={treatments[activeTreatmentIndex].name}
-                        className="w-full h-48 object-cover"
+                    <div className="rounded-2xl overflow-hidden">
+                      <img
+                        src={treatments[activeTreatmentIndex].image}
+                        alt={`${treatments[activeTreatmentIndex].name} — Ayurvedic therapy at Sri Vinayaga Ayurvibe, Chennai`}
+                        className="w-full h-56 md:h-64 object-cover"
                       />
                     </div>
                     <p className="text-muted-foreground">
@@ -735,30 +785,15 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Treatment Comparison Section */}
-  <section id="comparison" className="bg-background section-spacing">
-  <div className="wide-wrapper">
-          <Reveal className="text-center mb-14 flex flex-col items-center">
-            <span className="eyebrow mb-4"><CheckCircle className="h-3.5 w-3.5" /> Find Your Fit</span>
-            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2">Compare Our Treatments</h2>
-            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Not sure where to begin? Compare therapies side by side and find the perfect
-              match for your wellness goals.
-            </p>
-          </Reveal>
-          <Reveal><TreatmentComparison /></Reveal>
-        </div>
-      </section>
-
       {/* Our Expert Practitioner Section */}
   <section id="doctors" className="bg-cream bg-mesh section-spacing">
   <div className="wide-wrapper">
           <Reveal className="text-center mb-12 flex flex-col items-center">
             <span className="eyebrow mb-4"><Stethoscope className="h-3.5 w-3.5" /> Meet Your Doctor</span>
-            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Dr. V.Vaitheeshwari, B.A.M.S. — Chennai's trusted Ayurveda doctor</h2>
+            <h2 className="font-display font-bold text-foreground mb-5 fluid-h2 max-w-3xl">Dr. V. Vaitheeshwari, B.A.M.S.</h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              A Panchakarma and women's-health specialist serving Perumbakkam, Nookampalayam, OMR, Sholinganallur,
-              Pallikaranai, Navalur, Kelambakkam, and Tambaram with authentic, personalised care.
+              A Panchakarma and women's-health specialist who takes the time to understand your
+              constitution and history before crafting a personalised treatment plan.
             </p>
           </Reveal>
 
@@ -768,7 +803,7 @@ const Index = () => {
                 <div className="relative bg-gradient-earth animate-gradient p-8 flex items-center justify-center">
                   <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-gold/25 blur-2xl float-slow" />
                   <div className="w-44 h-44 rounded-full overflow-hidden ring-4 ring-gold/50 shadow-warm transition-transform duration-500 hover:scale-105">
-                    <img loading="lazy" src={drVaitheeshwari} alt="Dr. V.Vaitheeshwari" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={drVaitheeshwari} alt="Dr. V. Vaitheeshwari, B.A.M.S. — Ayurvedic doctor at Sri Vinayaga Ayurvibe, Chennai" className="w-full h-full object-cover" />
                   </div>
                 </div>
                 <CardContent className="p-8 flex flex-col justify-center text-left">
@@ -872,8 +907,9 @@ const Index = () => {
           <div className="grid md:grid-cols-2 gap-12 lg:gap-16 items-center">
             <Reveal direction="right" className="relative">
               <img
+                loading="lazy"
                 src={hospitalImg}
-                alt="Ayurveda Hospital"
+                alt="Sri Vinayaga Ayurvibe hospital building at Nookampalayam, Perumbakkam, Chennai"
                 className="w-full h-64 md:h-80 lg:h-[26rem] object-cover rounded-3xl shadow-glow"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-3xl"></div>
@@ -969,14 +1005,6 @@ const Index = () => {
             isOpen={showDoshaQuiz} 
             onClose={() => setShowDoshaQuiz(false)} 
           />
-        </div>
-      </section>
-
-      {/* Wellness Blog Section */}
-  <section id="blog" className="bg-background section-spacing" aria-labelledby="blog-heading">
-  <div className="wide-wrapper">
-          <h2 id="blog-heading" className="sr-only">Wellness Blog</h2>
-          <WellnessBlog />
         </div>
       </section>
 
@@ -1142,6 +1170,7 @@ const Index = () => {
           </div>
         </div>
       </section>
+      </main>
 
       {/* Thank You Dialog */}
       <Dialog open={showThankYou} onOpenChange={setShowThankYou}>
@@ -1173,8 +1202,8 @@ const Index = () => {
       {/* Footer */}
   <footer id="contact" className="bg-earth text-primary-foreground section-spacing">
   <div className="wide-wrapper">
-          <div className="grid md:grid-cols-3 gap-12 mb-12">
-            <div>
+          <StaggerGroup className="grid md:grid-cols-3 gap-12 mb-12">
+            <StaggerItem>
         <div className="flex items-center space-x-3 mb-6">
           <Logo className="h-10 w-auto object-contain" withText textClassName="" subtitleText="Ayurveda Wellness" />
         </div>
@@ -1185,14 +1214,14 @@ const Index = () => {
                 Reg No: 2095
               </p>
               <p className="text-primary-foreground/80 leading-relaxed mb-6">
-                Sri Vinayaga Ayurvibe is your destination for authentic Ayurvedic treatments. 
-                Located at Nookampalayam, Perumbakkam, we serve patients across Chennai and nearby areas within 20km. 
-                Experience Panchakarma, Abhyanga massage, and Shirodhara therapy with Dr. V.Vaitheeshwari BAMS.
+                Your destination for authentic Ayurvedic healing in Chennai. Experience
+                Panchakarma, Abhyanga, and Shirodhara in a calm, government-certified
+                facility at Nookampalayam, Perumbakkam.
               </p>
-              
-            </div>
 
-            <div>
+            </StaggerItem>
+
+            <StaggerItem>
               <h3 className="text-xl font-bold mb-6 text-gold">Contact Information</h3>
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
@@ -1212,9 +1241,9 @@ const Index = () => {
                   <p className="text-primary-foreground/90">sv.ayurvibe@gmail.com</p>
                 </div>
               </div>
-            </div>
+            </StaggerItem>
 
-            <div>
+            <StaggerItem>
               <h3 className="text-xl font-bold mb-6 text-gold">Hours of Operation</h3>
               <div className="space-y-2 text-primary-foreground/90">
                 <div className="flex justify-between">
@@ -1226,9 +1255,9 @@ const Index = () => {
               {/* <p className="text-sm text-primary-foreground/70">
                 Government Certified Ayurveda Hospital
               </p> */}
-            </div>
+            </StaggerItem>
 
-          </div>
+          </StaggerGroup>
 
           <Separator className="bg-primary-foreground/20 mb-8" />
           

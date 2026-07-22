@@ -44,12 +44,29 @@ const PharmacyPrintPage = () => {
     }
     try {
       let raw = localStorage.getItem(PRINT_STORAGE_KEY + id);
-      if (!raw) raw = localStorage.getItem('print_consult_' + id);
+      if (!raw) {
+        // Consultation payload fallback only helps when it actually carries billing lines —
+        // otherwise it would render a misleading ₹0 invoice.
+        const consultRaw = localStorage.getItem('print_consult_' + id);
+        if (consultRaw) {
+          try {
+            const parsed = JSON.parse(consultRaw) as Record<string, unknown>;
+            const hasBillingData =
+              (Array.isArray(parsed.medicines) && parsed.medicines.length > 0) ||
+              (Array.isArray(parsed.treatments) && parsed.treatments.length > 0);
+            if (hasBillingData) raw = consultRaw;
+          } catch {
+            /* ignore malformed fallback payload */
+          }
+        }
+      }
       if (raw) {
         const data = JSON.parse(raw) as Record<string, unknown>;
         setCons(data);
       }
-    } catch {}
+    } catch {
+      /* ignore storage errors; empty state renders below */
+    }
     setLoaded(true);
   }, [id]);
 

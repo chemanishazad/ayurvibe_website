@@ -6,19 +6,18 @@ import { Calendar, ChevronLeft, ChevronRight, Phone, ShieldCheck, Star, Leaf } f
 import { cn } from '@/lib/utils';
 
 // Import background images
-import panchakarmaImg from '@/assets/panchakarma-treatment.jpg';
-import abhyangaImg from '@/assets/abhyanga-massage.jpg';
-import shirodharaImg from '@/assets/shirodhara-therapy.jpg';
+import panchakarmaImg from '@/assets/panchakarma-treatment.png';
+import abhyangaImg from '@/assets/abhyanga-massage.png';
+import shirodharaImg from '@/assets/shirodhara-therapy.png';
 import herbsImg from '@/assets/ayurvedic-herbs.jpg';
 import hospitalImg from '@/assets/hospital-exterior.jpg';
-import { Logo } from '@/components/Logo';
 
 const slides = [
   {
     id: 1,
     image: hospitalImg,
     eyebrow: 'Government-Certified · Reg No. 2095',
-    title: 'Best Ayurveda Clinic in Chennai',
+    title: 'Heal Naturally with Authentic Ayurveda',
     subtitle: 'Where Ancient Wisdom Meets Modern Healing',
     description:
       'Authentic Ayurvedic care at Nookampalayam, Perumbakkam — led by Dr. V.Vaitheeshwari, B.A.M.S. Personalised treatment for your unique constitution.',
@@ -67,14 +66,6 @@ const trustBadges = [
   { icon: Leaf, label: '100% Authentic' },
 ];
 
-const navLinks = [
-  { to: '/about', label: 'About' },
-  { to: '/treatments', label: 'Treatments' },
-  { to: '/dosha', label: 'Find Your Dosha' },
-  { to: '/blog', label: 'Blog' },
-  { to: '/booking', label: 'Book' },
-];
-
 const HeroSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -92,7 +83,7 @@ const HeroSlider = () => {
   const slide = slides[currentSlide];
 
   return (
-    <div className="relative h-[92vh] min-h-[640px] sm:h-screen overflow-hidden">
+    <div className="relative min-h-[760px] h-[92vh] sm:h-screen overflow-hidden flex flex-col">
       {/* Background Images with cross-fade + Ken Burns */}
       {slides.map((s, index) => (
         <div
@@ -121,38 +112,8 @@ const HeroSlider = () => {
       <div className="absolute -top-16 -left-10 w-72 h-72 rounded-full bg-gold/20 blur-3xl float-slow pointer-events-none" aria-hidden />
       <div className="absolute bottom-10 right-0 w-80 h-80 rounded-full bg-sage/25 blur-3xl float-x pointer-events-none" aria-hidden />
 
-      {/* Navigation */}
-      <nav className="relative z-20 container mx-auto px-4 py-4 md:py-6">
-        <div className="flex items-center justify-between">
-          <Logo
-            className="h-14 md:h-20 w-auto drop-shadow-lg"
-            withText
-            textClassName="hidden sm:block text-white"
-            subtitleText="Holistic Ayurveda"
-          />
-          <div className="hidden md:flex items-center gap-1 glass rounded-full px-2 py-1.5">
-            {navLinks.map((l) => (
-              <Link
-                key={l.to}
-                to={l.to}
-                className="text-white/90 hover:text-white text-sm font-medium px-4 py-2 rounded-full hover:bg-white/15 transition-colors"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-          <a
-            href="tel:+918122939197"
-            className="md:hidden glass rounded-full p-2.5 text-white"
-            aria-label="Call us"
-          >
-            <Phone className="h-5 w-5" />
-          </a>
-        </div>
-      </nav>
-
       {/* Content */}
-      <div className="relative z-20 container mx-auto px-4 pt-10 md:pt-16 text-center text-white">
+      <div className="relative z-20 flex-1 flex flex-col justify-center container mx-auto px-4 pt-24 md:pt-28 pb-28 sm:pb-32 text-center text-white">
         <AnimatePresence mode="wait">
           <motion.div
             key={slide.id}
@@ -206,7 +167,7 @@ const HeroSlider = () => {
 
         {/* Trust badges */}
         <motion.div
-          className="mt-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-3"
+          className="mt-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-3"
           initial="hidden"
           animate="show"
           variants={{ show: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } } }}
@@ -235,14 +196,14 @@ const HeroSlider = () => {
       {/* Arrow Navigation */}
       <button
         onClick={prevSlide}
-        className="absolute left-3 md:left-5 top-1/2 -translate-y-1/2 z-20 glass rounded-full p-3 transition-all duration-300 group hover:scale-110"
+        className="hidden sm:block absolute left-3 md:left-5 top-1/2 -translate-y-1/2 z-20 glass rounded-full p-3 transition-all duration-300 group hover:scale-110"
         aria-label="Previous slide"
       >
         <ChevronLeft className="h-6 w-6 text-white group-hover:text-gold" />
       </button>
       <button
         onClick={nextSlide}
-        className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 z-20 glass rounded-full p-3 transition-all duration-300 group hover:scale-110"
+        className="hidden sm:block absolute right-3 md:right-5 top-1/2 -translate-y-1/2 z-20 glass rounded-full p-3 transition-all duration-300 group hover:scale-110"
         aria-label="Next slide"
       >
         <ChevronRight className="h-6 w-6 text-white group-hover:text-gold" />

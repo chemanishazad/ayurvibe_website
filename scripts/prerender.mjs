@@ -84,7 +84,6 @@ const renderBody = (route) => {
     ['/treatments', 'Treatments'],
     ['/doctors', 'Doctor'],
     ['/dosha', 'Dosha Quiz'],
-    ['/blog', 'Blog'],
     ['/faq', 'FAQ'],
     ['/booking', 'Book Appointment'],
   ]
@@ -155,6 +154,10 @@ const buildPage = (route) => {
   html = html.replace('</head>', `  ${renderJsonLd(route, url)}\n</head>`);
 
   // Seed #root with crawler-visible content. React replaces it on mount.
+  // The #app-loader overlay (position:fixed, full-screen) stays in the snapshot
+  // and visually covers this content for real users until React mounts and
+  // removes it — so humans see a branded loader, while crawlers (which ignore
+  // the fixed overlay / don't run the removal JS) still read the content below.
   html = html.replace(
     /<div id="root">\s*<\/div>/,
     `<div id="root">${renderBody(route)}</div>`
