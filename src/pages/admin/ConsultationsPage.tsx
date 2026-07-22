@@ -67,6 +67,7 @@ import {
   UtensilsCrossed,
   Heart,
   MessageSquare,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatAppDate, formatHhmmToAmPm } from '@/lib/datetime';
@@ -77,6 +78,7 @@ import { useConsultationPatientSearch } from '@/pages/admin/hooks/useConsultatio
 import { openConsultationPrint, saveConsultationPrintPayload } from '@/lib/print-handoff';
 import ConsultationsTopBar from '@/pages/admin/consultations/ConsultationsTopBar';
 import ClinicSelectionNotice from '@/pages/admin/consultations/ClinicSelectionNotice';
+import EditPrescriptionDialog from '@/pages/admin/consultations/EditPrescriptionDialog';
 import {
   Table,
   TableBody,
@@ -264,6 +266,9 @@ const ConsultationsPage = () => {
   const [viewLoading, setViewLoading] = useState(false);
   const [opFormLoading, setOpFormLoading] = useState(false);
   const [viewConsultation, setViewConsultation] = useState<Record<string, unknown> | null>(null);
+  const [editPrescriptionOpen, setEditPrescriptionOpen] = useState(false);
+  /** Prescription edits are admin/doctor only (backend enforces the same). */
+  const canEditPrescription = user?.role === 'admin' || user?.role === 'doctor';
   const defaultPersonalHistory = () => ({
     diet: [] as string[],
     exercise: [] as string[],
@@ -473,6 +478,7 @@ const ConsultationsPage = () => {
   useEffect(() => {
     if (!isConsultationViewRoute || !consultationIdFromRoute) {
       setViewConsultation(null);
+      setEditPrescriptionOpen(false);
       return;
     }
     setViewLoading(true);
@@ -994,13 +1000,9 @@ const ConsultationsPage = () => {
         });
         loadConsultations();
         const cid = updated?.id || consultationIdFromRoute;
-        // Important: open the print tab directly (avoid popup blockers).
+        // Save the payload BEFORE opening — the print tab reads localStorage on mount.
+        saveConsultationPrintPayload(cid, updated);
         openConsultationPrint(cid);
-        // Best-effort payload handoff (print page can live-fetch if storage fails).
-        api.consultations
-          .get(cid)
-          .then((data) => saveConsultationPrintPayload(cid, data))
-          .catch(() => {});
         // After saving OP completion, return to Consultations list.
         navigate('/admin/consultations', { replace: true });
         setLoading(false);
@@ -1105,13 +1107,9 @@ const ConsultationsPage = () => {
       });
       loadConsultations();
       if (created?.id) {
-        // Important: open the print tab directly (avoid popup blockers).
+        // Save the payload BEFORE opening — the print tab reads localStorage on mount.
+        saveConsultationPrintPayload(created.id, created);
         openConsultationPrint(created.id);
-        // Best-effort payload handoff (print page can live-fetch if storage fails).
-        api.consultations
-          .get(created.id)
-          .then((data) => saveConsultationPrintPayload(created.id, data))
-          .catch(() => {});
         // After saving, return to the main Consultations list.
         navigate('/admin/consultations', { replace: true });
       }
@@ -2458,7 +2456,17 @@ const ConsultationsPage = () => {
                     : 'View details. You can print or start a follow-up.'}
                 </CardDescription>
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2 shrink-0">
+                {canEditPrescription && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditPrescriptionOpen(true)}
+                    disabled={!consultationIdFromRoute || !viewConsultation}
+                  >
+                    <Pencil className="h-4 w-4 mr-1.5" /> Edit prescription
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -2886,6 +2894,13 @@ const ConsultationsPage = () => {
                         {!isNurseStaff && (
                         <TabsContent value="prescription" className="mt-4 space-y-3">
                           <Section title="Prescription" description="Medicines and instructions." icon={<Pill className="h-4 w-4" />}>
+                            {canEditPrescription && (
+                              <div className="mb-3 flex justify-end">
+                                <Button size="sm" variant="outline" onClick={() => setEditPrescriptionOpen(true)}>
+                                  <Pencil className="h-4 w-4 mr-1.5" /> Edit prescription
+                                </Button>
+                              </div>
+                            )}
                             {Array.isArray(viewConsultation.prescription) && viewConsultation.prescription.length > 0 ? (
                               <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
                                 <div className="overflow-x-auto">
@@ -2983,6 +2998,15 @@ const ConsultationsPage = () => {
             )}
           </CardContent>
         </Card>
+      )}
+      {isViewRoute && consultationIdFromRoute && (
+        <EditPrescriptionDialog
+          consultationId={consultationIdFromRoute}
+          prescription={viewConsultation?.prescription}
+          open={editPrescriptionOpen}
+          onOpenChange={setEditPrescriptionOpen}
+          onSaved={(updated) => setViewConsultation(updated)}
+        />
       )}
     </div>
   );

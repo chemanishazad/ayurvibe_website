@@ -9,20 +9,9 @@
  * configs in src/components/SEORedirect.tsx. This file is the canonical copy —
  * prefer editing here over duplicating strings across the app.
  */
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const blogPosts = require('../src/content/blogPosts.json');
-
 export const BASE_URL = process.env.SITE_URL || 'https://svayurvibe.com';
 export const SITE_NAME = 'Sri Vinayaga Ayurvibe';
 export const DEFAULT_IMAGE = `${BASE_URL}/logo.png`;
-
-export const slugify = (title) =>
-  title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
 
 /**
  * Each route: { path, title, description, priority, changefreq,
@@ -36,13 +25,13 @@ const sectionRoutes = [
     path: '/',
     title: 'Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR',
     description:
-      'Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr.V.Vaitheeshwari B.A.M.S., Book now.',
+      'Government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai. Authentic Panchakarma, Abhyanga & Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S. Book a consultation.',
     priority: '1.0',
     changefreq: 'daily',
     heading: 'Best Ayurveda Hospital in Chennai — Sri Vinayaga Ayurvibe',
     body: [
       'Sri Vinayaga Ayurvibe is a government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai 600131, led by Dr. V. Vaitheeshwari, B.A.M.S.',
-      'We offer authentic Panchakarma, Abhyanga massage, Shirodhara therapy, detox and rejuvenation programs, serving a 20km radius including Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam and Velachery.',
+      'We offer authentic Panchakarma, Abhyanga massage, Shirodhara therapy, detox and rejuvenation programs — easily reachable from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam and Velachery.',
     ],
   },
   {
@@ -107,17 +96,6 @@ const sectionRoutes = [
     ],
   },
   {
-    path: '/blog',
-    title: 'Blog | Sri Vinayaga Ayurvibe',
-    description:
-      'Ayurveda blog: detox tips, nutrition, herbal therapies & natural healing guidance Chennai.',
-    heading: 'Ayurveda Wellness Blog',
-    body: [
-      'Articles on Ayurvedic detox, nutrition, daily rituals, stress management and natural healing.',
-    ],
-    // links populated below from blogPosts
-  },
-  {
     path: '/faq',
     title: 'FAQ | Sri Vinayaga Ayurvibe',
     description:
@@ -169,9 +147,9 @@ const seoRoutes = [
   { path: '/abhyanga-massage-navalur-chennai', title: 'Abhyanga Massage in Navalur, Chennai | Sri Vinayaga Ayurvibe | Therapeutic Massage', description: 'Abhyanga massage in Navalur, Chennai. Therapeutic massage for relaxation, healing, and wellness. Expert therapists and authentic techniques.' },
   { path: '/shirodhara-therapy-kelambakkam-chennai', title: 'Shirodhara Therapy in Kelambakkam, Chennai | Sri Vinayaga Ayurvibe | Stress Relief', description: 'Shirodhara therapy in Kelambakkam, Chennai. Stress relief treatment with warm oil therapy, expert care, and personalized wellness programs.' },
   { path: '/ayurveda-doctor-tambaram-chennai', title: 'Ayurveda Doctor in Tambaram, Chennai | Sri Vinayaga Ayurvibe | Local Physician', description: 'Ayurveda doctor in Tambaram, Chennai. Local physician with expertise in traditional medicine, modern diagnostics, and holistic patient care.' },
-  { path: '/ayurveda-hospital-medavakkam-chennai', title: 'Ayurveda Hospital in Medavakkam, Chennai | Sri Vinayaga Ayurvibe | 20km Reachable', description: 'Ayurveda hospital near Medavakkam, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.' },
-  { path: '/ayurveda-clinic-velachery-chennai', title: 'Ayurveda Clinic in Velachery, Chennai | Sri Vinayaga Ayurvibe | 20km Reachable', description: 'Ayurveda clinic near Velachery, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.' },
-  { path: '/ayurveda-treatment-chromepet-chennai', title: 'Ayurveda Treatment in Chromepet, Chennai | Sri Vinayaga Ayurvibe | 20km Reachable', description: 'Ayurveda treatment near Chromepet, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr.V.Vaitheeshwari B.A.M.S.,.' },
+  { path: '/ayurveda-hospital-medavakkam-chennai', title: 'Ayurveda Hospital near Medavakkam, Chennai | Sri Vinayaga Ayurvibe', description: 'Ayurveda hospital near Medavakkam, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.' },
+  { path: '/ayurveda-clinic-velachery-chennai', title: 'Ayurveda Clinic near Velachery, Chennai | Sri Vinayaga Ayurvibe', description: 'Ayurveda clinic near Velachery, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.' },
+  { path: '/ayurveda-treatment-chromepet-chennai', title: 'Ayurveda Treatment near Chromepet, Chennai | Sri Vinayaga Ayurvibe', description: 'Ayurveda treatment near Chromepet, Chennai. Located at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S.' },
 ].map((r) => ({
   priority: r.priority || '0.9',
   changefreq: r.changefreq || 'weekly',
@@ -180,29 +158,4 @@ const seoRoutes = [
   ...r,
 }));
 
-// --- Blog post detail routes (canonical slug paths) ---
-const blogRoutes = blogPosts.map((p) => {
-  const slug = slugify(p.title);
-  return {
-    path: `/blog/${p.id}/${slug}`,
-    title: `${p.title} | Sri Vinayaga Ayurvibe Blog`,
-    description: p.excerpt,
-    priority: '0.7',
-    changefreq: 'monthly',
-    type: 'article',
-    publishedTime: new Date(p.date).toISOString(),
-    image: p.image ? `${BASE_URL}${p.image.startsWith('/') ? p.image : '/' + p.image}` : undefined,
-    heading: p.title,
-    body: [p.excerpt],
-    lastmod: new Date(p.date).toISOString(),
-  };
-});
-
-// Fill the /blog index links from blog posts
-const blogIndex = sectionRoutes.find((r) => r.path === '/blog');
-if (blogIndex) {
-  blogIndex.links = blogRoutes.map((b) => ({ href: b.path, text: b.title }));
-}
-
-export const allRoutes = [...sectionRoutes, ...seoRoutes, ...blogRoutes];
-export const blogRouteList = blogRoutes;
+export const allRoutes = [...sectionRoutes, ...seoRoutes];

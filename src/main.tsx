@@ -24,4 +24,18 @@ const ensureFavicon = () => {
 
 ensureFavicon();
 
+// Remove the initial HTML loader once React has mounted, so users never see the
+// raw prerendered/unstyled content flash before the app paints.
+const removeInitialLoader = () => {
+	const loader = document.getElementById('app-loader');
+	if (!loader) return;
+	loader.style.opacity = '0';
+	loader.style.transition = 'opacity 0.3s ease';
+	window.setTimeout(() => loader.remove(), 300);
+};
+
 createRoot(document.getElementById("root")!).render(<App />);
+
+// requestAnimationFrame fires after the first paint, ensuring the app is visible
+// underneath before we fade the loader out.
+requestAnimationFrame(() => requestAnimationFrame(removeInitialLoader));

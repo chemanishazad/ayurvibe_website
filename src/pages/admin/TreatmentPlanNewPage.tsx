@@ -88,7 +88,8 @@ const TreatmentPlanNewPage = () => {
 
   useEffect(() => {
     if (form.startDate && form.durationDays) {
-      const start = new Date(form.startDate);
+      // Noon anchor avoids the UTC-midnight/local-mutation off-by-one on negative offsets.
+      const start = new Date(form.startDate + 'T12:00:00');
       start.setDate(start.getDate() + form.durationDays);
       setForm((f) => ({ ...f, endDate: format(start, 'yyyy-MM-dd') }));
     }

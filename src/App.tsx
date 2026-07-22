@@ -13,7 +13,6 @@ import SEO from "@/components/SEO";
 
 const queryClient = new QueryClient();
 const NotFound = React.lazy(() => import("./pages/NotFound"));
-const BlogPost = React.lazy(() => import("./pages/BlogPost"));
 const SectionPage = React.lazy(() => import("./pages/SectionPage"));
 const AdminShell = React.lazy(() => import("./pages/admin/AdminShell"));
 const DashboardPage = React.lazy(() => import("./pages/admin/DashboardPage"));
@@ -83,7 +82,7 @@ const App = () => (
               <>
                 <SEO 
                   title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR" 
-                  description="Ayurveda hospital at Nookampalayam, Perumbakkam. Panchakarma, Abhyanga, Shirodhara. Serving 20km radius. Dr.V.Vaitheeshwari B.A.M.S., Book now." 
+                  description="Government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai. Authentic Panchakarma, Abhyanga & Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S. Book a consultation."
                   canonical="https://svayurvibe.com/"
                 />
                 <Index />
@@ -98,7 +97,6 @@ const App = () => (
           <Route path="/testimonials" element={<SectionPage sectionId="testimonials" title="Healing Stories | Sri Vinayaga Ayurvibe" description="Patient success stories & reviews of our Ayurvedic treatments in Chennai." canonical="https://svayurvibe.com/testimonials" />} />
           <Route path="/why-ayurveda-hospital" element={<SectionPage sectionId="why" title="Why Choose Us | Sri Vinayaga Ayurvibe" description="Why choose our Ayurveda hospital in Chennai – safe authentic care, hygiene & personalized treatment." canonical="https://svayurvibe.com/why-ayurveda-hospital" />} />
           <Route path="/dosha" element={<SectionPage sectionId="dosha" title="Dosha Quiz | Sri Vinayaga Ayurvibe" description="Find your Ayurvedic body type (Vata Pitta Kapha) – free dosha quiz & lifestyle tips Chennai." canonical="https://svayurvibe.com/dosha" />} />
-          <Route path="/blog" element={<SectionPage sectionId="blog" title="Blog | Sri Vinayaga Ayurvibe" description="Ayurveda blog: detox tips, nutrition, herbal therapies & natural healing guidance Chennai." canonical="https://svayurvibe.com/blog" />} />
           <Route path="/faq" element={<SectionPage sectionId="faq" title="FAQ | Sri Vinayaga Ayurvibe" description="FAQ: Ayurvedic treatment duration, Panchakarma process, pricing & consultation details Chennai." canonical="https://svayurvibe.com/faq" />} />
           <Route path="/booking" element={<SectionPage sectionId="booking" title="Book Appointment | Sri Vinayaga Ayurvibe" description="Book Ayurveda consultation or Panchakarma therapy in Perumbakkam, Chennai – call or schedule online." canonical="https://svayurvibe.com/booking" />} />
 
@@ -141,10 +139,6 @@ const App = () => (
               <Route path="uom" element={<UomAdminPage />} />
             </Route>
           </Route>
-
-          {/* Blog by numeric ID; optional slug for cleaner URLs */}
-          <Route path="/blog/:id" element={<BlogPost />} />
-          <Route path="/blog/:id/:slug" element={<BlogPost />} />
 
           {/* All SEO routes redirect to main page with specific SEO */}
           <Route path="/best-ayurveda-hospital-chennai" element={<SEORedirect />} />

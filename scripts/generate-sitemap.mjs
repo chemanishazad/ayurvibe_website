@@ -11,7 +11,7 @@ import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { gzipSync } from 'zlib';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { allRoutes, blogRouteList, BASE_URL } from './seo-routes.mjs';
+import { allRoutes, BASE_URL } from './seo-routes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(__dirname);
@@ -28,24 +28,11 @@ const writeXmlFile = (dir, name, xml) => {
   }
 };
 
-const blogPaths = new Set(blogRouteList.map((b) => b.path));
-
-const staticRouteEntries = allRoutes
-  .filter((r) => !blogPaths.has(r.path))
-  .map((r) => ({
-    loc: r.path,
-    lastmod: buildRunTimeISO,
-    priority: r.priority || '0.7',
-    changefreq: r.changefreq || 'weekly',
-  }));
-
-const blogRouteEntries = blogRouteList.map((b) => ({
-  loc: b.path,
-  lastmod: b.lastmod || buildRunTimeISO,
-  priority: b.priority || '0.7',
-  changefreq: b.changefreq || 'monthly',
-  image: b.image,
-  title: b.heading || b.title,
+const staticRouteEntries = allRoutes.map((r) => ({
+  loc: r.path,
+  lastmod: buildRunTimeISO,
+  priority: r.priority || '0.7',
+  changefreq: r.changefreq || 'weekly',
 }));
 
 const urlTag = (u) => {
@@ -62,15 +49,13 @@ const buildUrlset = (entries) =>
   '\n</urlset>\n';
 
 const staticXml = buildUrlset(staticRouteEntries);
-const blogXml = buildUrlset(blogRouteEntries);
-const combinedXml = buildUrlset([...staticRouteEntries, ...blogRouteEntries]);
+const combinedXml = buildUrlset(staticRouteEntries);
 
 const sitemapIndexXml =
   `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
   [
     { loc: `${BASE_URL}/sitemap.xml`, lastmod: buildRunTimeISO },
     { loc: `${BASE_URL}/sitemap-static.xml`, lastmod: buildRunTimeISO },
-    { loc: `${BASE_URL}/sitemap-blog.xml`, lastmod: buildRunTimeISO },
   ]
     .map((s) => `  <sitemap><loc>${s.loc}</loc><lastmod>${s.lastmod}</lastmod></sitemap>`)
     .join('\n') +
@@ -79,7 +64,6 @@ const sitemapIndexXml =
 const writeAll = (dir) => {
   writeXmlFile(dir, 'sitemap.xml', combinedXml);
   writeXmlFile(dir, 'sitemap-static.xml', staticXml);
-  writeXmlFile(dir, 'sitemap-blog.xml', blogXml);
   writeXmlFile(dir, 'sitemap_index.xml', sitemapIndexXml);
 };
 
@@ -92,6 +76,4 @@ if (existsSync(distDir)) writeAll(distDir);
 
 console.log('Sitemaps generated:', {
   static: staticRouteEntries.length,
-  blog: blogRouteEntries.length,
-  combined: staticRouteEntries.length + blogRouteEntries.length,
 });

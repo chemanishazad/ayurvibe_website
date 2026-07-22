@@ -129,6 +129,11 @@ All colors MUST be HSL.
     scroll-behavior: smooth;
   }
 
+  /* Keep section headings clear of the fixed site header on anchor scroll */
+  section[id], footer[id] {
+    scroll-margin-top: 84px;
+  }
+
   body {
     @apply bg-background text-foreground overflow-x-hidden;
   }
@@ -374,6 +379,15 @@ All colors MUST be HSL.
 
 .marquee-container:hover .marquee-track {
   animation-play-state: paused;
+}
+
+/* Hide scrollbar for the auto-scrolling treatments list */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Print: A5 paper - full usable area, auto-fit */
