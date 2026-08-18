@@ -116,7 +116,12 @@ export default {
         "fade-in-up": "fade-in-up 0.7s cubic-bezier(0.22,1,0.36,1) both",
       },
       fontFamily: {
-        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        // `sans` is deliberately left at Tailwind's default so the admin panel is
+        // unaffected; the public site sets Inter via html.site in site-theme.css.
+        display: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },

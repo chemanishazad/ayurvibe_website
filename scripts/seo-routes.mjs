@@ -23,12 +23,12 @@ export const DEFAULT_IMAGE = `${BASE_URL}/logo.png`;
 const sectionRoutes = [
   {
     path: '/',
-    title: 'Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR',
+    title: 'Ayurveda Hospital in Chennai | Sri Vinayaga Ayurvibe',
     description:
-      'Government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai. Authentic Panchakarma, Abhyanga & Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S. Book a consultation.',
+      'Government-certified Ayurveda hospital in Perumbakkam, Chennai. Panchakarma, Abhyanga and Shirodhara, prescribed by Dr. V. Vaitheeshwari, B.A.M.S.',
     priority: '1.0',
     changefreq: 'daily',
-    heading: 'Best Ayurveda Hospital in Chennai — Sri Vinayaga Ayurvibe',
+    heading: 'Authentic Ayurveda hospital in Chennai',
     body: [
       'Sri Vinayaga Ayurvibe is a government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai 600131, led by Dr. V. Vaitheeshwari, B.A.M.S.',
       'We offer authentic Panchakarma, Abhyanga massage, Shirodhara therapy, detox and rejuvenation programs — easily reachable from Sholinganallur, OMR, Pallikaranai, Navalur, Kelambakkam, Tambaram, Medavakkam and Velachery.',
@@ -39,7 +39,7 @@ const sectionRoutes = [
     title: 'About | Sri Vinayaga Ayurvibe Chennai',
     description:
       'About our Ayurveda hospital in Perumbakkam, Chennai – mission, values & qualified Ayurvedic doctors.',
-    heading: 'About Sri Vinayaga Ayurvibe',
+    heading: 'A certified Ayurveda hospital in Perumbakkam, Chennai',
     body: [
       'Our Ayurveda hospital in Perumbakkam, Chennai is built on authentic, government-certified care led by qualified Ayurvedic doctors.',
       'We combine traditional Ayurvedic wisdom with modern facilities to deliver personalised, holistic wellness for every patient.',
@@ -50,10 +50,47 @@ const sectionRoutes = [
     title: 'Treatments | Sri Vinayaga Ayurvibe',
     description:
       'Ayurvedic treatments in Chennai: Panchakarma, Abhyanga, Shirodhara, detox & rejuvenation therapies.',
-    heading: 'Ayurvedic Treatments in Chennai',
+    heading: '33 classical Ayurvedic treatments in Chennai',
     body: [
       'We provide authentic Panchakarma detox programs, Abhyanga full-body herbal oil massage, Shirodhara therapy, and rejuvenation programs.',
       'Each treatment plan is personalised to your dosha and health goals by Dr. V. Vaitheeshwari, B.A.M.S.',
+    ],
+  },
+  {
+    path: '/panchakarma',
+    title: 'Panchakarma Treatment in Chennai | Sri Vinayaga Ayurvibe',
+    description:
+      'Authentic Panchakarma at a government-certified Ayurveda hospital in Perumbakkam, Chennai — Vamana, Virechana, Vasti, Nasya and Raktamokshana, prescribed and supervised by Dr. V. Vaitheeshwari, B.A.M.S.',
+    heading: 'Supervised Panchakarma treatment in Chennai',
+    body: [
+      'Panchakarma means five actions — Vamana (therapeutic emesis), Virechana (purgation), Vasti (medicated enema), Nasya (nasal instillation) and Raktamokshana (blood-letting). Each is a specific classical procedure with its own indications and contraindications, not an item on a spa menu.',
+      'At Sri Vinayaga Ayurvibe, Nookampalayam, Perumbakkam, Chennai 600131, Panchakarma is preceded by oleation (snehana) and sudation (swedana), supervised throughout by Dr. V. Vaitheeshwari, B.A.M.S., and followed by a graded return to normal diet and a Rasayana course. Programmes typically run 7 to 21 days.',
+    ],
+    links: [
+      { href: '/treatments#therapy-nasyam', text: 'Nasya — nasal instillation' },
+      { href: '/treatments#therapy-kashaya-vasti', text: 'Kashaya Vasti — decoction enema' },
+      { href: '/treatments#therapy-matra-vasti', text: 'Matra Vasti — oil enema' },
+      { href: '/treatments#therapy-pizhichil', text: 'Pizhichil — oleation before purification' },
+      { href: '/medicines', text: 'The medicines used during Panchakarma' },
+    ],
+  },
+  {
+    path: '/medicines',
+    title: 'Ayurvedic Medicines & Ingredients | Sri Vinayaga Ayurvibe Chennai',
+    description:
+      'What is inside the Ayurvedic medicines we use: Dhanwantharam Thailam, Triphala Churna, Podikizhi, Brahmi dhara oil, Yogaraja Guggulu and Chyawanprash — every herb named.',
+    heading: 'The Ayurvedic medicines we use, and what is in them',
+    body: [
+      'Our pharmacy compounds classical preparations described in the Ashtanga Hridayam, Charaka Samhita and Sharangadhara Samhita — Dhanwantharam Thailam, Triphala Churna, Podikizhi poultices, Brahmi dhara oil, Yogaraja Guggulu and Chyawanprash.',
+      'Every formulation is dispensed only after consultation with Dr. V. Vaitheeshwari, B.A.M.S., at our Ayurveda hospital in Nookampalayam, Perumbakkam, Chennai. Each ingredient — Bala, sesame oil, Dashamoola, Haritaki, Bibhitaki, Amalaki, Nirgundi, turmeric, Brahmi, Jatamansi, sandalwood, Guggulu, Pippali and more — is named in full.',
+    ],
+    links: [
+      { href: '/treatments#therapy-shareera-abhyangam', text: 'Dhanwantharam Thailam — used in Shareera Abhyangam and Pizhichil' },
+      { href: '/treatments#therapy-netra-tarpanam', text: 'Triphala Churna — used in Netra Tarpanam and Udwarthanam' },
+      { href: '/treatments#therapy-podi-kizhi', text: 'Podikizhi bolus — used in Podi Kizhi, Elakizhi and Navara Kizhi' },
+      { href: '/treatments#therapy-shirodhara', text: 'Brahmi Dhara Taila — used in Shirodhara and Takra Dhara' },
+      { href: '/treatments#therapy-kati-vasti', text: 'Yogaraja Guggulu — used in Kati Vasti and Greeva Vasti' },
+      { href: '/treatments#therapy-kashaya-vasti', text: 'Chyawanprash — given after Panchakarma as a Rasayana' },
     ],
   },
   {
@@ -61,7 +98,7 @@ const sectionRoutes = [
     title: 'Doctor | Sri Vinayaga Ayurvibe',
     description:
       'Consult qualified Ayurvedic doctor in Perumbakkam, Chennai for personalized wellness plans.',
-    heading: 'Our Ayurvedic Doctor',
+    heading: 'Dr. V. Vaitheeshwari, B.A.M.S.',
     body: [
       'Dr. V. Vaitheeshwari, B.A.M.S., is a Panchakarma and women’s health specialist offering personalised consultations in Perumbakkam, Chennai.',
     ],
@@ -70,7 +107,7 @@ const sectionRoutes = [
     path: '/testimonials',
     title: 'Healing Stories | Sri Vinayaga Ayurvibe',
     description: 'Patient success stories & reviews of our Ayurvedic treatments in Chennai.',
-    heading: 'Patient Healing Stories',
+    heading: 'What patients say after finishing treatment',
     body: [
       'Read real success stories from patients who have completed Panchakarma, Abhyanga and Shirodhara treatments at Sri Vinayaga Ayurvibe.',
     ],
@@ -80,7 +117,7 @@ const sectionRoutes = [
     title: 'Why Choose Us | Sri Vinayaga Ayurvibe',
     description:
       'Why choose our Ayurveda hospital in Chennai – safe authentic care, hygiene & personalized treatment.',
-    heading: 'Why Choose Sri Vinayaga Ayurvibe',
+    heading: 'The difference between a spa and a certified hospital',
     body: [
       'Government-certified, hygienic facilities, authentic therapies, and personalised treatment plans make us a trusted Ayurveda hospital in Chennai.',
     ],
@@ -90,7 +127,7 @@ const sectionRoutes = [
     title: 'Dosha Quiz | Sri Vinayaga Ayurvibe',
     description:
       'Find your Ayurvedic body type (Vata Pitta Kapha) – free dosha quiz & lifestyle tips Chennai.',
-    heading: 'Find Your Dosha',
+    heading: 'Vata, Pitta and Kapha — find your dosha',
     body: [
       'Take our free Ayurvedic dosha quiz to discover whether your constitution is predominantly Vata, Pitta or Kapha, and get lifestyle guidance tailored to your body type.',
     ],
@@ -100,7 +137,7 @@ const sectionRoutes = [
     title: 'FAQ | Sri Vinayaga Ayurvibe',
     description:
       'FAQ: Ayurvedic treatment duration, Panchakarma process, pricing & consultation details Chennai.',
-    heading: 'Frequently Asked Questions',
+    heading: 'Everything patients ask before booking',
     body: [
       'Answers to common questions about Ayurvedic treatment duration, the Panchakarma process, pricing and consultations at our Chennai hospital.',
     ],
@@ -110,7 +147,7 @@ const sectionRoutes = [
     title: 'Book Appointment | Sri Vinayaga Ayurvibe',
     description:
       'Book Ayurveda consultation or Panchakarma therapy in Perumbakkam, Chennai – call or schedule online.',
-    heading: 'Book Your Appointment',
+    heading: 'Book an Ayurveda consultation in Perumbakkam, Chennai',
     body: [
       'Book an Ayurveda consultation or Panchakarma therapy at our Perumbakkam, Chennai hospital. Call +91 81229 39197 or schedule online.',
     ],
