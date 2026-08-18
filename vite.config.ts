@@ -34,6 +34,8 @@ export default defineConfig({
           router: ["react-router-dom"],
           icons: ["lucide-react"],
           motion: ["framer-motion"],
+          // three.js is only ever pulled in by the lazily-imported WebGL scenes.
+          three: ["three", "@react-three/fiber"],
         },
       },
     },

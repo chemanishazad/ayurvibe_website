@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import SEO from './SEO';
 import Index from '../pages/Index';
 
 // SEO configurations for different routes
@@ -172,16 +171,15 @@ const SEORedirect: React.FC = () => {
     keywords: ['Ayurveda Hospital Chennai', 'Best Ayurveda Clinic', 'Panchakarma Treatment', 'Holistic Wellness']
   };
 
+  // The landing page owns the single <SEO> instance for the route; passing the
+  // config down prevents two components racing over <title> and the canonical.
   return (
-    <>
-      <SEO
-        title={seoConfig.title}
-        description={seoConfig.description}
-        canonical={`https://svayurvibe.com${currentPath}`}
-        locationKeywords={seoConfig.keywords}
-      />
-      <Index />
-    </>
+    <Index
+      title={seoConfig.title}
+      description={seoConfig.description}
+      canonical={`https://svayurvibe.com${currentPath}`}
+      locationKeywords={seoConfig.keywords}
+    />
   );
 };
 

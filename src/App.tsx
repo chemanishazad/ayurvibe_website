@@ -9,7 +9,6 @@ import Login from "./pages/Login";
 import AdminRoute, { AdminOnlyRoute } from "./components/AdminRoute";
 import { AdminErrorBoundary } from "./components/AdminErrorBoundary";
 import SEORedirect from "./components/SEORedirect";
-import SEO from "@/components/SEO";
 
 const queryClient = new QueryClient();
 const NotFound = React.lazy(() => import("./pages/NotFound"));
@@ -50,7 +49,7 @@ const AnalyticsListener = () => {
     // Respect availability & user consent (Cookiebot defines window.Cookiebot when loaded)
     const sendPageView = () => {
       // @ts-expect-error gtag is injected by analytics script at runtime
-      if (window.gtag && (!window.Cookiebot || window.Cookiebot.consent.statistics)) {
+      if (window.gtag && (!window.Cookiebot || window.Cookiebot?.consent?.statistics)) {
         // @ts-expect-error gtag is injected by analytics script at runtime
         window.gtag('event', 'page_view', {
           page_path: location.pathname + location.search,
@@ -76,29 +75,19 @@ const App = () => (
         <React.Suspense fallback={null}>
           <Routes>
           {/* Root */}
-          <Route 
-            path="/" 
-            element={
-              <>
-                <SEO 
-                  title="Sri Vinayaga Ayurvibe — Best Ayurveda Hospital Chennai | Perumbakkam, OMR" 
-                  description="Government-certified Ayurveda hospital at Nookampalayam, Perumbakkam, Chennai. Authentic Panchakarma, Abhyanga & Shirodhara by Dr. V. Vaitheeshwari, B.A.M.S. Book a consultation."
-                  canonical="https://svayurvibe.com/"
-                />
-                <Index />
-              </>
-            } 
-          />
+          <Route path="/" element={<Index />} />
 
           {/* Section deep links (SEO friendly readable paths) */}
-          <Route path="/about" element={<SectionPage sectionId="about" title="About | Sri Vinayaga Ayurvibe Chennai" description="About our Ayurveda hospital in Perumbakkam, Chennai – mission, values & qualified Ayurvedic doctors." canonical="https://svayurvibe.com/about" />} />
-          <Route path="/treatments" element={<SectionPage sectionId="treatments" title="Treatments | Sri Vinayaga Ayurvibe" description="Ayurvedic treatments in Chennai: Panchakarma, Abhyanga, Shirodhara, detox & rejuvenation therapies." canonical="https://svayurvibe.com/treatments" />} />
-          <Route path="/doctors" element={<SectionPage sectionId="doctors" title="Doctor | Sri Vinayaga Ayurvibe" description="Consult qualified Ayurvedic doctor in Perumbakkam, Chennai for personalized wellness plans." canonical="https://svayurvibe.com/doctors" />} />
-          <Route path="/testimonials" element={<SectionPage sectionId="testimonials" title="Healing Stories | Sri Vinayaga Ayurvibe" description="Patient success stories & reviews of our Ayurvedic treatments in Chennai." canonical="https://svayurvibe.com/testimonials" />} />
-          <Route path="/why-ayurveda-hospital" element={<SectionPage sectionId="why" title="Why Choose Us | Sri Vinayaga Ayurvibe" description="Why choose our Ayurveda hospital in Chennai – safe authentic care, hygiene & personalized treatment." canonical="https://svayurvibe.com/why-ayurveda-hospital" />} />
-          <Route path="/dosha" element={<SectionPage sectionId="dosha" title="Dosha Quiz | Sri Vinayaga Ayurvibe" description="Find your Ayurvedic body type (Vata Pitta Kapha) – free dosha quiz & lifestyle tips Chennai." canonical="https://svayurvibe.com/dosha" />} />
-          <Route path="/faq" element={<SectionPage sectionId="faq" title="FAQ | Sri Vinayaga Ayurvibe" description="FAQ: Ayurvedic treatment duration, Panchakarma process, pricing & consultation details Chennai." canonical="https://svayurvibe.com/faq" />} />
-          <Route path="/booking" element={<SectionPage sectionId="booking" title="Book Appointment | Sri Vinayaga Ayurvibe" description="Book Ayurveda consultation or Panchakarma therapy in Perumbakkam, Chennai – call or schedule online." canonical="https://svayurvibe.com/booking" />} />
+          <Route path="/about" element={<SectionPage sectionId="about" title="About | Sri Vinayaga Ayurvibe Chennai" description="About our Ayurveda hospital in Perumbakkam, Chennai – mission, values & qualified Ayurvedic doctors." canonical="https://svayurvibe.com/about" breadcrumbName="About" path="/about" />} />
+          <Route path="/treatments" element={<SectionPage sectionId="treatments" title="Treatments | Sri Vinayaga Ayurvibe" description="Ayurvedic treatments in Chennai: Panchakarma, Abhyanga, Shirodhara, detox & rejuvenation therapies." canonical="https://svayurvibe.com/treatments" breadcrumbName="Treatments" path="/treatments" />} />
+          <Route path="/panchakarma" element={<SectionPage sectionId="panchakarma" title="Panchakarma Treatment in Chennai | Sri Vinayaga Ayurvibe" description="Authentic Panchakarma at a government-certified Ayurveda hospital in Perumbakkam, Chennai — Vamana, Virechana, Vasti, Nasya and Raktamokshana, prescribed and supervised by Dr. V. Vaitheeshwari, B.A.M.S." canonical="https://svayurvibe.com/panchakarma" breadcrumbName="Panchakarma" path="/panchakarma" />} />
+          <Route path="/medicines" element={<SectionPage sectionId="medicines" title="Ayurvedic Medicines & Ingredients | Sri Vinayaga Ayurvibe Chennai" description="What is inside the Ayurvedic medicines we use: Dhanwantharam Thailam, Triphala, Podikizhi, Brahmi dhara oil, Yogaraja Guggulu and Chyawanprash — every herb named." canonical="https://svayurvibe.com/medicines" breadcrumbName="Medicines" path="/medicines" />} />
+          <Route path="/doctors" element={<SectionPage sectionId="doctors" title="Doctor | Sri Vinayaga Ayurvibe" description="Consult qualified Ayurvedic doctor in Perumbakkam, Chennai for personalized wellness plans." canonical="https://svayurvibe.com/doctors" breadcrumbName="Doctor" path="/doctors" />} />
+          <Route path="/testimonials" element={<SectionPage sectionId="testimonials" title="Healing Stories | Sri Vinayaga Ayurvibe" description="Patient success stories & reviews of our Ayurvedic treatments in Chennai." canonical="https://svayurvibe.com/testimonials" breadcrumbName="Patient Stories" path="/testimonials" />} />
+          <Route path="/why-ayurveda-hospital" element={<SectionPage sectionId="why" title="Why Choose Us | Sri Vinayaga Ayurvibe" description="Why choose our Ayurveda hospital in Chennai – safe authentic care, hygiene & personalized treatment." canonical="https://svayurvibe.com/why-ayurveda-hospital" breadcrumbName="Why Choose Us" path="/why-ayurveda-hospital" />} />
+          <Route path="/dosha" element={<SectionPage sectionId="dosha" title="Dosha Quiz | Sri Vinayaga Ayurvibe" description="Find your Ayurvedic body type (Vata Pitta Kapha) – free dosha quiz & lifestyle tips Chennai." canonical="https://svayurvibe.com/dosha" breadcrumbName="Dosha Quiz" path="/dosha" />} />
+          <Route path="/faq" element={<SectionPage sectionId="faq" title="FAQ | Sri Vinayaga Ayurvibe" description="FAQ: Ayurvedic treatment duration, Panchakarma process, pricing & consultation details Chennai." canonical="https://svayurvibe.com/faq" breadcrumbName="FAQ" path="/faq" />} />
+          <Route path="/booking" element={<SectionPage sectionId="booking" title="Book Appointment | Sri Vinayaga Ayurvibe" description="Book Ayurveda consultation or Panchakarma therapy in Perumbakkam, Chennai – call or schedule online." canonical="https://svayurvibe.com/booking" breadcrumbName="Book Appointment" path="/booking" />} />
 
           {/* Print: no login required, uses localStorage for data */}
           <Route path="/print/consultation/:id" element={<ConsultationPrintPage />} />

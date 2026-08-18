@@ -82,6 +82,7 @@ const renderBody = (route) => {
     ['/', 'Home'],
     ['/about', 'About'],
     ['/treatments', 'Treatments'],
+    ['/medicines', 'Medicines'],
     ['/doctors', 'Doctor'],
     ['/dosha', 'Dosha Quiz'],
     ['/faq', 'FAQ'],

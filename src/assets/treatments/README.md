@@ -1,43 +1,45 @@
 # Treatment images
 
-Drop one PNG per treatment in this folder. The site picks them up automatically
-(`src/data/treatments.ts` globs `*.png` here); any missing image falls back to
-`/placeholder.svg`.
+Drop one PNG (or WebP) per treatment in this folder, then run `npm run images`
+to generate the `<slug>.webp` renditions the site actually ships. The site globs
+`*.webp` here (`src/data/treatments.ts`); any missing image falls back to
+`/placeholder.svg`. The PNG masters are kept for re-encoding but are never
+bundled, so their size does not affect page weight.
 
 Required filenames (33):
 
-1. shiro-abhyangam.png
-2. shirodhara.png
-3. shiro-pichu.png
-4. thalapothichil.png
-5. netra-tarpanam.png
-6. nasyam.png
-7. takra-dhara.png
-8. mukha-abhyangam.png
-9. navara-mukha-lepam.png
-10. ksheera-dhoomam.png
-11. paada-abhyangam.png
-12. shareera-abhyangam.png
-13. udwarthanam.png
-14. podi-kizhi.png
-15. elakizhi.png
-16. navara-kizhi.png
-17. pizhichil.png
-18. kashaya-dhara.png
-19. ksheera-dhara.png
-20. dhanyamla-dhara.png
-21. jambira-pinda-swedanam.png
-22. valuka-swedanam.png
-23. naadi-swedanam.png
-24. baspa-sweda.png
-25. greeva-vasti.png
-26. prishta-vasti.png
-27. kati-vasti.png
-28. jaanu-vasti.png
-29. kashaya-vasti.png
-30. matra-vasti.png
-31. yoni-prakshalanam.png
-32. pichu.png
-33. upanaha-lepam.png
+1. shiro-abhyangam.webp
+2. shirodhara.webp
+3. shiro-pichu.webp
+4. thalapothichil.webp
+5. netra-tarpanam.webp
+6. nasyam.webp
+7. takra-dhara.webp
+8. mukha-abhyangam.webp
+9. navara-mukha-lepam.webp
+10. ksheera-dhoomam.webp
+11. paada-abhyangam.webp
+12. shareera-abhyangam.webp
+13. udwarthanam.webp
+14. podi-kizhi.webp
+15. elakizhi.webp
+16. navara-kizhi.webp
+17. pizhichil.webp
+18. kashaya-dhara.webp
+19. ksheera-dhara.webp
+20. dhanyamla-dhara.webp
+21. jambira-pinda-swedanam.webp
+22. valuka-swedanam.webp
+23. naadi-swedanam.webp
+24. baspa-sweda.webp
+25. greeva-vasti.webp
+26. prishta-vasti.webp
+27. kati-vasti.webp
+28. jaanu-vasti.webp
+29. kashaya-vasti.webp
+30. matra-vasti.webp
+31. yoni-prakshalanam.webp
+32. pichu.webp
+33. upanaha-lepam.webp
 
 Recommended size: landscape, ~1200x800 (cards crop with `object-cover`).

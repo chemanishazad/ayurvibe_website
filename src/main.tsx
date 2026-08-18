@@ -1,5 +1,9 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+// Public marketing theme. Scoped to `html.site`, so the admin panel and login
+// screen keep the tokens declared in index.css. Imported first so Tailwind
+// utility classes always win over the site component classes below.
+import "./styles/site-theme.css";
 import "./index.css";
 import { logoPath as appLogo } from '@/components/Logo';
 

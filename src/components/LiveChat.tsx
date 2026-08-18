@@ -507,7 +507,7 @@ Thank you for choosing Sri Vinayaga Ayurvibe! 🙏`,
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-4 right-4 xs:bottom-5 xs:right-5 sm:bottom-6 sm:right-6 z-50 max-w-[calc(100vw-2rem)]">
+      <div className="fixed bottom-24 right-4 z-50 max-w-[calc(100vw-2rem)] sm:bottom-6 sm:right-16">
         <Button
           onClick={() => setIsOpen(true)}
           className="rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-all duration-300 bg-primary hover:bg-primary/90"
@@ -522,7 +522,7 @@ Thank you for choosing Sri Vinayaga Ayurvibe! 🙏`,
   }
 
   return (
-    <div className="fixed bottom-2 right-2 xs:bottom-3 xs:right-3 sm:bottom-4 sm:right-4 z-50 w-full pointer-events-none flex justify-end pr-2">
+    <div className="pointer-events-none fixed bottom-24 right-2 z-50 flex w-full justify-end pr-2 sm:bottom-5 sm:right-12">
       <Card className="pointer-events-auto w-[90vw] max-w-[20rem] sm:max-w-[22rem] h-[26rem] sm:h-96 shadow-2xl border-none bg-card flex flex-col">
         <CardHeader className="bg-primary text-primary-foreground p-4 rounded-t-lg">
           <div className="flex items-center justify-between">

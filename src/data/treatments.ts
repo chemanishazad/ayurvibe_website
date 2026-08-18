@@ -1,7 +1,8 @@
 // Signature treatments of Sri Vinayaga Ayurvibe.
-// Each treatment expects an image at src/assets/treatments/<slug>.png —
-// drop a PNG with the matching slug name and it is picked up automatically;
-// until then the card falls back to /placeholder.svg.
+// Each treatment expects an image at src/assets/treatments/<slug>.webp —
+// drop a WebP with the matching slug name and it is picked up automatically;
+// until then the card falls back to /placeholder.svg. PNG masters live in the
+// same folder and are converted with `npm run images` (scripts/optimize-images.mjs).
 
 export interface Treatment {
   name: string;
@@ -10,7 +11,10 @@ export interface Treatment {
   duration: string;
   benefits: string[];
   category: TreatmentCategory;
+  /** ~900px wide — used in the details dialog. */
   image: string;
+  /** ~480px wide — what the grid cards actually need. */
+  thumb: string;
 }
 
 export type TreatmentCategory =
@@ -31,15 +35,21 @@ export const treatmentCategories = [
   'Specialised',
 ] as const;
 
-const treatmentImages = import.meta.glob('../assets/treatments/*.png', {
+// WebP renditions replace the multi-megabyte PNGs: ~900px for the dialog and
+// ~480px for the grid cards, which are never wider than ~330 CSS px. The PNG
+// masters stay on disk for re-encoding but are no longer bundled.
+const treatmentImages = import.meta.glob('../assets/treatments/*.webp', {
   eager: true,
   import: 'default',
 }) as Record<string, string>;
 
 const imageFor = (slug: string) =>
-  treatmentImages[`../assets/treatments/${slug}.png`] ?? '/placeholder.svg';
+  treatmentImages[`../assets/treatments/${slug}.webp`] ?? '/placeholder.svg';
 
-interface TreatmentInput extends Omit<Treatment, 'image'> {}
+const thumbFor = (slug: string) =>
+  treatmentImages[`../assets/treatments/${slug}-480.webp`] ?? imageFor(slug);
+
+type TreatmentInput = Omit<Treatment, 'image' | 'thumb'>;
 
 const data: TreatmentInput[] = [
   {
@@ -344,4 +354,5 @@ const data: TreatmentInput[] = [
 export const treatments: Treatment[] = data.map((t) => ({
   ...t,
   image: imageFor(t.slug),
+  thumb: thumbFor(t.slug),
 }));
