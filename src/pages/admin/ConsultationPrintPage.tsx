@@ -166,6 +166,7 @@ const ConsultationPrintPage = () => {
   const timePart = consultationTime ? formatHhmmToAmPm(consultationTime) : '';
   const dateTimeStr = timePart ? `${datePart} ${timePart}` : datePart;
   const DEFAULT_ORG = 'Sri Vinayaga Ayurvibe';
+  
   const rawClinicName = String(cons.clinicName as string || '').trim();
   const dashParts = rawClinicName.split(/\s*[—–]\s*/);
   const mainClinicHeading = dashParts[0]?.trim() || rawClinicName || DEFAULT_ORG;
